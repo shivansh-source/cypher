@@ -1,0 +1,33 @@
+# RBI entity-specific Directions, 2026 — skeleton, not real data.
+#
+# IMPORTANT: RBI's 2016 Cyber Security Framework was repealed 31 July 2026
+# and replaced by entity-specific Directions, 2026. This file must represent
+# the CURRENT Directions only — never hardcode or fall back to 2016-framework
+# control text. See repo-root CLAUDE.md principle 8.
+#
+# TODO: RBI issues *entity-specific* Directions (e.g. distinct requirements
+# for banks vs. NBFCs vs. payment system operators) rather than one uniform
+# document. This skeleton assumes a single control list; revisit whether
+# this file should instead be split per entity type, or gain an
+# `applies_to_entity_types` field per control, once the real Directions text
+# is reviewed.
+#
+# See governance/control_library/README.md for the shape every file here follows.
+
+framework: rbi_2026_directions
+# TODO: set to the actual Directions, 2026 version/notification identifier.
+version: null
+# TODO: set to 2026-07-31 or the actual notified effective date, whichever is correct.
+effective_from: null
+effective_to: null
+# This framework supersedes the repealed 2016 Cyber Security Framework.
+supersedes: "rbi_cyber_security_framework_2016"
+
+controls: []
+  # TODO: populate from the actual Directions, 2026 text. One example entry,
+  # for shape reference only:
+  # - control_id: "RBI-2026-INCIDENT-REPORTING"
+  #   title: "Cyber incident reporting timeline"
+  #   description: "TODO: full control text from the current Directions, 2026."
+  #   maps_to_finding_types: ["cve", "misconfiguration"]
+  #   applies_to_entity_types: []  # TODO: e.g. ["bank", "nbfc", "payment_system_operator"]

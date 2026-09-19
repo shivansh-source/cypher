@@ -1,0 +1,32 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.env
+.env.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Local data / snapshots — never commit real telemetry or real rupee figures
+data/
+snapshots/
+*.snapshot.json
+!schema/sample_aggregated.json
+
+.DS_Store
+.idea/
+.vscode/
+
+# interfaces/dashboard/ (Next.js frontend)
+interfaces/dashboard/node_modules/
+interfaces/dashboard/.next/
+interfaces/dashboard/out/
+interfaces/dashboard/.env*.local

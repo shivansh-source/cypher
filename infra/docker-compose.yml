@@ -1,0 +1,60 @@
+# Skeleton only — no services are wired up yet. Fill in as connectors and
+# interfaces are implemented. Values below are placeholders, not defaults
+# safe for any real environment.
+
+version: "3.9"
+
+services:
+  # TODO: the API surface (interfaces/api/app.py), once implemented.
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api  # TODO: does not exist yet
+    ports:
+      - "8000:8000"
+    environment:
+      - SURAKSHA_ENV=local
+      # TODO: LLM provider credentials belong in a secret store, never
+      # committed here or in a real .env checked into the repo.
+    depends_on:
+      - db
+
+  # The Next.js frontend (interfaces/dashboard/) — scaffolded, still the
+  # default create-next-app starter page. Talks to `api` over HTTP only —
+  # never given filesystem/import access to the Python backend.
+  dashboard:
+    build:
+      context: ../interfaces/dashboard
+      dockerfile: Dockerfile  # TODO: does not exist yet
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000  # TODO: confirm the real env var name once the app exists
+    depends_on:
+      - api
+
+  # TODO: snapshot/assumption persistence. Confirm whether this is Postgres
+  # or something else once core/snapshot.py's storage needs are designed.
+  db:
+    image: postgres:16
+    environment:
+      - POSTGRES_DB=suraksha
+      - POSTGRES_USER=suraksha
+      - POSTGRES_PASSWORD=changeme  # TODO: never use a literal password; wire to a secret.
+    ports:
+      - "5432:5432"
+    volumes:
+      - suraksha-db-data:/var/lib/postgresql/data
+
+  # TODO: scheduled connector runs (infra/connectors/). Confirm cadence per
+  # connector — some tools (EPSS/KEV) refresh far more often than a full
+  # Nessus scan.
+  connector-scheduler:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.connectors  # TODO: does not exist yet
+    depends_on:
+      - db
+
+volumes:
+  suraksha-db-data:

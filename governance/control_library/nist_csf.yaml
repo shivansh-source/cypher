@@ -1,0 +1,16 @@
+# NIST Cybersecurity Framework — skeleton, not real data.
+# See governance/control_library/README.md for the shape every file here follows.
+
+framework: nist_csf
+# TODO: set to the actual NIST CSF version in use (e.g. "2.0") once decided.
+version: null
+effective_from: null
+effective_to: null
+supersedes: null
+
+controls: []
+  # TODO: populate. One example entry, for shape reference only:
+  # - control_id: "ID.AM-01"
+  #   title: "Inventories of hardware managed by the organization are maintained"
+  #   description: "TODO: full control text from the current NIST CSF document."
+  #   maps_to_finding_types: ["cve", "misconfiguration"]

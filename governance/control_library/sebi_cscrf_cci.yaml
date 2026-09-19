@@ -1,0 +1,18 @@
+# SEBI Cybersecurity and Cyber Resilience Framework (CSCRF) / Cyber
+# Capability Index (CCI) — skeleton, not real data.
+# See governance/control_library/README.md for the shape every file here follows.
+
+framework: sebi_cscrf_cci
+# TODO: set to the actual CSCRF circular version/date in use.
+version: null
+effective_from: null
+effective_to: null
+supersedes: null
+
+controls: []
+  # TODO: populate. One example entry, for shape reference only:
+  # - control_id: "SEBI-CSCRF-GOVERNANCE-01"
+  #   title: "Board-approved cybersecurity policy"
+  #   description: "TODO: full control text from the current CSCRF circular."
+  #   maps_to_finding_types: []
+  #   cci_weight: null  # TODO: if this control contributes to the Cyber Capability Index score, record its weight here.

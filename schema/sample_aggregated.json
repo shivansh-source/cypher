@@ -1,0 +1,121 @@
+{
+  "snapshot_id": "sha256:PLACEHOLDER0000000000000000000000000000000000000000000000000",
+  "observed_at": "2026-09-20T00:00:00Z",
+  "valid_from": "2026-09-20T00:00:00Z",
+  "valid_to": null,
+
+  "scan_scope": {
+    "reachable_scanners": ["nessus_connector", "prowler_connector", "wazuh_connector", "iam_connector"],
+    "unreachable_scanners": ["nmap_connector"],
+    "coverage": []
+  },
+
+  "services": [
+    {
+      "service_id": "svc-core-banking",
+      "name": "Core Banking Platform",
+      "criticality": "critical",
+      "backup": {
+        "exists": true,
+        "last_tested_at": "2026-08-01T00:00:00Z",
+        "rpo_hours": 1,
+        "rto_hours": 4,
+        "immutable_copy": true
+      }
+    },
+    {
+      "service_id": "svc-internal-hr",
+      "name": "Internal HR Portal",
+      "criticality": "low",
+      "backup": {
+        "exists": false,
+        "last_tested_at": null,
+        "rpo_hours": null,
+        "rto_hours": null,
+        "immutable_copy": null
+      }
+    }
+  ],
+
+  "assets": [
+    {
+      "asset_id": "asset-web-01",
+      "service_ids": ["svc-core-banking"],
+      "findings": [
+        {
+          "finding_id": "finding-0001",
+          "type": "cve",
+          "cve_id": "CVE-2026-00001",
+          "epss_score": 0.87,
+          "kev_listed": true,
+          "criticality": "critical",
+          "provenance": { "connector": "nessus_connector", "raw_source_id": "nessus-plugin-999999" },
+          "first_seen_at": "2026-09-01T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": ["rule-web-exploit-generic"],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 2,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": true,
+        "open_ports": [443]
+      }
+    },
+    {
+      "asset_id": "asset-hr-db-01",
+      "service_ids": ["svc-internal-hr"],
+      "findings": [
+        {
+          "finding_id": "finding-0002",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "unknown",
+          "provenance": { "connector": "prowler_connector", "raw_source_id": "prowler-check-s3-public" },
+          "first_seen_at": "2026-09-10T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": false,
+        "agent_healthy": null,
+        "detection_rules_active": null,
+        "recent_alerts": null
+      },
+      "identity_access": {
+        "privileged_accounts_count": 1,
+        "mfa_enforced": false
+      },
+      "network": {
+        "internet_facing": false,
+        "open_ports": null
+      }
+    }
+  ],
+
+  "endpoints": [
+    {
+      "endpoint_id": "endpoint-0001",
+      "address_type": "ipv4",
+      "address": "203.0.113.10",
+      "resolved_asset_id": "asset-web-01"
+    },
+    {
+      "endpoint_id": "endpoint-0002",
+      "address_type": "hostname",
+      "address": "hr-db-01.internal",
+      "resolved_asset_id": "asset-hr-db-01"
+    }
+  ]
+}

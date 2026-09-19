@@ -1,0 +1,58 @@
+[project]
+name = "suraksha"
+version = "0.1.0"
+description = "Su₹aksha — cyber risk quantification platform (SIH 2026, PS 26105). Converts security telemetry into rupee-denominated risk (EAL, VaR) via Open FAIR + Monte Carlo, recommends budget allocation, and maps findings to Indian regulatory frameworks."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+
+dependencies = [
+    # TODO: pin real versions once implementation begins.
+    "pydantic>=2",
+    "numpy",
+    "jsonschema",
+    "pyyaml",
+    "fastapi",
+    "uvicorn",
+    "typer",
+    "httpx",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "mypy",
+    "ruff",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["core/tests", "governance/tests", "ai/tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+disallow_untyped_defs = true
+# `pip install -e .` leaves a build/ scratch directory in the project root
+# (a normal side effect of the setuptools backend, not a repo artifact —
+# it's gitignored). Without this, mypy treats build/lib/<pkg>/__init__.py
+# as a second copy of every top-level package and refuses to run at all.
+exclude = ["^build/"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# See the mypy `exclude` comment above — same reason.
+extend-exclude = ["build"]
+
+[tool.setuptools.packages.find]
+# Explicit include list: this is a flat layout with several top-level
+# packages (ai/, core/, governance/, infra/, interfaces/), which setuptools'
+# automatic discovery refuses to guess between on its own. schema/ and docs/
+# are intentionally excluded — they hold data/config and prose, not importable
+# Python.
+include = ["ai*", "core*", "governance*", "infra*", "interfaces*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

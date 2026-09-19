@@ -1,0 +1,43 @@
+name: CI / Build
+
+# Scoped from DroneAcharaya's ci-build.yml. Su₹aksha's Python side has no
+# analogous "build" step (nothing is compiled/bundled) — this workflow
+# exists only to prove the Next.js dashboard actually builds.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dashboard:
+    name: next build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: interfaces/dashboard
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: interfaces/dashboard/package-lock.json
+
+      - run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+        # TODO: once interfaces/dashboard/ has an API client, set
+        # NEXT_PUBLIC_API_BASE_URL (or whatever env var it reads) here
+        # explicitly, so a CI build never silently bakes in a default that
+        # differs from what a developer sees locally.

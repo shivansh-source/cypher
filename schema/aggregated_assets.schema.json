@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://suraksha.internal/schema/aggregated_assets.schema.json",
+  "title": "AggregatedAssetsSnapshot",
+  "description": "The one shared contract every connector emits into and the only shape core/ ever reads. See schema/README.md for narrative documentation of each field. This schema is bitemporal and content-addressed: every snapshot is immutable once written.",
+  "type": "object",
+  "required": [
+    "snapshot_id",
+    "observed_at",
+    "valid_from",
+    "valid_to",
+    "scan_scope",
+    "services",
+    "assets",
+    "endpoints"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "snapshot_id": {
+      "type": "string",
+      "description": "Content hash of this snapshot's normalized payload (e.g. sha256 hex digest). Computed after normalization, before commit. Two snapshots with identical content must have identical snapshot_id — this is what makes 'no material change' detectable without comparing every field by hand."
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Wall-clock time this snapshot was assembled by the aggregation pipeline. Distinct from valid_from/valid_to, which describe the period the snapshot's data is asserted to represent."
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Start of the bitemporal validity window: the point from which this snapshot's facts are asserted true. TODO: define whether this can ever be backdated for a late-arriving connector run, and if so how commit_snapshot should treat ordering against an already-current snapshot with a later valid_from."
+    },
+    "valid_to": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "End of the bitemporal validity window, or null while this snapshot is still current. Set only when a later snapshot supersedes this one — never mutated for any other reason, since snapshots are immutable."
+    },
+    "scan_scope": {
+      "type": "object",
+      "description": "Which scanners/tools actually ran and covered which assets in this snapshot. This is the mechanism that distinguishes 'this scanner didn't run against this asset' from 'this scanner ran and found nothing' — the latter is a real absence-of-finding, the former must never be read as one. TODO: finalize whether scope is expressed per-connector, per-asset, or as a cross product of the two; per-asset granularity is likely required once asset ownership is split across business units.",
+      "required": ["reachable_scanners", "unreachable_scanners"],
+      "additionalProperties": false,
+      "properties": {
+        "reachable_scanners": {
+          "type": "array",
+          "description": "Scanner/connector identifiers that successfully ran and reported for (some or all of) this snapshot's asset population.",
+          "items": { "type": "string" }
+        },
+        "unreachable_scanners": {
+          "type": "array",
+          "description": "Scanner/connector identifiers that were expected but did not run or could not be reached this cycle. A quality gate must reject any finding attributed to a scanner listed here.",
+          "items": { "type": "string" }
+        },
+        "coverage": {
+          "type": "array",
+          "description": "Optional finer-grained record of which asset_ids each scanner actually covered, for organizations where scan scope varies per-asset rather than being all-or-nothing. TODO: decide if this is required once real deployments show scope is rarely uniform across the estate.",
+          "items": {
+            "type": "object",
+            "required": ["scanner", "asset_ids"],
+            "additionalProperties": false,
+            "properties": {
+              "scanner": { "type": "string" },
+              "asset_ids": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "services": {
+      "type": "array",
+      "description": "Business/technical services in scope, each carrying its own backup/DR posture. Services are the unit the FAIR engine attaches financial impact to (a service has a revenue-per-hour, a set of dependent assets, etc.) — TODO: confirm whether financial attributes belong here or purely in core/assumptions.py mapped by service criticality tier.",
+      "items": {
+        "type": "object",
+        "required": ["service_id", "name", "criticality", "backup"],
+        "additionalProperties": false,
+        "properties": {
+          "service_id": { "type": "string", "description": "Stable identifier for this service, referenced by assets/endpoints that support it." },
+          "name": { "type": "string" },
+          "criticality": {
+            "type": "string",
+            "description": "Business criticality tier. TODO: enumerate the fixed set of allowed values once the org's criticality taxonomy is settled — must never be an ordinal stuffed into a numeric field (see quality gate 5)."
+          },
+          "backup": {
+            "type": "object",
+            "description": "Backup/DR posture for this service, used to derive RTO multipliers in core/assumptions.py.",
+            "required": ["exists", "last_tested_at", "rpo_hours", "rto_hours"],
+            "additionalProperties": false,
+            "properties": {
+              "exists": { "type": "boolean" },
+              "last_tested_at": { "type": ["string", "null"], "format": "date-time", "description": "Null if never tested — must not be conflated with 'recently tested and fine'." },
+              "rpo_hours": { "type": ["number", "null"] },
+              "rto_hours": { "type": ["number", "null"] },
+              "immutable_copy": { "type": ["boolean", "null"], "description": "Whether an offline/immutable backup copy exists (relevant to ransomware loss scenarios). TODO: confirm this is knowable from any connector or requires manual_attestation." }
+            }
+          }
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "description": "Technical assets (hosts, workloads, identities-bearing systems, network devices) with their normalized findings and posture data from every connector that covers them.",
+      "items": {
+        "type": "object",
+        "required": ["asset_id", "findings", "threat_intel", "edr", "identity_access", "network"],
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "description": "Resolved, stable identity for this asset across all connectors. Identity resolution (matching a Nessus host to a Prowler resource to a CMDB entry) happens in infra/connectors/ before this document is assembled — this field must never be a raw per-tool identifier."
+          },
+          "service_ids": {
+            "type": "array",
+            "description": "Which services (by service_id) this asset supports. An asset may support zero or more services.",
+            "items": { "type": "string" }
+          },
+          "findings": {
+            "type": "array",
+            "description": "Normalized vulnerability/misconfiguration findings from any scanner (Nessus, Prowler, nmap, etc). Every finding must carry provenance (quality gate 4) and a criticality that is present or explicitly 'unknown' (quality gate 3) — never silently defaulted.",
+            "items": {
+              "type": "object",
+              "required": ["finding_id", "type", "criticality", "provenance", "first_seen_at"],
+              "additionalProperties": false,
+              "properties": {
+                "finding_id": { "type": "string" },
+                "type": { "type": "string", "description": "e.g. 'cve', 'misconfiguration', 'open_port'. TODO: enumerate once connector coverage is finalized." },
+                "cve_id": { "type": ["string", "null"] },
+                "epss_score": { "type": ["number", "null"], "description": "EPSS probability, [0,1], if this finding is CVE-backed. Populated by threat_intel_connector, not by the scanner connector itself." },
+                "kev_listed": { "type": ["boolean", "null"], "description": "Whether this CVE appears in CISA's Known Exploited Vulnerabilities catalog." },
+                "criticality": { "type": ["string", "null"], "description": "Null is not the same as 'unknown' — use the literal string 'unknown' when a scanner reports a finding without a severity. Null means the field was never evaluated at all, which a quality gate should treat as a defect, not an absence." },
+                "provenance": {
+                  "type": "object",
+                  "description": "Which connector and raw source produced this finding — mandatory, never null (quality gate 4).",
+                  "required": ["connector", "raw_source_id"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "connector": { "type": "string" },
+                    "raw_source_id": { "type": "string", "description": "The tool-native identifier this was normalized from, kept for auditability/debugging only — must never be read by core/ or governance/." }
+                  }
+                },
+                "first_seen_at": { "type": "string", "format": "date-time" },
+                "remediated_at": { "type": ["string", "null"], "format": "date-time", "description": "Null while open. Distinguishing 'remediated' from 'scanner stopped reporting it because the scanner went dark' is exactly what scan_scope is for — this field alone is not sufficient evidence of remediation if the relevant scanner is in unreachable_scanners." }
+              }
+            }
+          },
+          "threat_intel": {
+            "type": "object",
+            "description": "Threat-intelligence context attached to this asset (beyond per-finding EPSS/KEV), e.g. active campaigns targeting this asset's exposed services. TODO: define shape once threat_intel_connector's real data sources are chosen.",
+            "additionalProperties": true,
+            "properties": {}
+          },
+          "edr": {
+            "type": "object",
+            "description": "EDR/endpoint posture and alert summary for this asset from wazuh_connector or equivalent.",
+            "required": ["agent_installed", "agent_healthy"],
+            "additionalProperties": false,
+            "properties": {
+              "agent_installed": { "type": "boolean" },
+              "agent_healthy": { "type": ["boolean", "null"] },
+              "detection_rules_active": { "type": ["array", "null"], "items": { "type": "string" }, "description": "TODO: confirm whether the engine needs rule-level granularity to model control overlap (principle 7) or a coarser coverage summary suffices." },
+              "recent_alerts": { "type": ["array", "null"], "items": { "type": "object" }, "description": "TODO: define alert shape once wazuh_connector's normalization is designed." }
+            }
+          },
+          "identity_access": {
+            "type": "object",
+            "description": "IAM posture relevant to this asset from iam_connector, e.g. privileged accounts with access, MFA coverage.",
+            "additionalProperties": true,
+            "properties": {
+              "privileged_accounts_count": { "type": ["integer", "null"] },
+              "mfa_enforced": { "type": ["boolean", "null"] }
+            }
+          },
+          "network": {
+            "type": "object",
+            "description": "Network exposure posture for this asset from nmap_connector, e.g. internet-facing status and open ports.",
+            "additionalProperties": true,
+            "properties": {
+              "internet_facing": { "type": ["boolean", "null"] },
+              "open_ports": { "type": ["array", "null"], "items": { "type": "integer" } }
+            }
+          }
+        }
+      }
+    },
+    "endpoints": {
+      "type": "array",
+      "description": "Network-addressable endpoints (IPs/hostnames/URLs) discovered by cmdb_connector/nmap_connector, prior to or independent of asset_id resolution. TODO: clarify the exact relationship between an 'endpoint' and an 'asset' — whether every endpoint must eventually resolve to exactly one asset_id, or whether unresolved endpoints are a valid (flagged) terminal state.",
+      "items": {
+        "type": "object",
+        "required": ["endpoint_id", "address_type", "address"],
+        "additionalProperties": false,
+        "properties": {
+          "endpoint_id": { "type": "string" },
+          "address_type": { "type": "string", "description": "e.g. 'ipv4', 'ipv6', 'hostname', 'url'." },
+          "address": { "type": "string" },
+          "resolved_asset_id": { "type": ["string", "null"], "description": "Null if this endpoint has not yet been resolved to a known asset_id." }
+        }
+      }
+    }
+  }
+}

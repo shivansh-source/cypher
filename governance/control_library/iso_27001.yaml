@@ -1,0 +1,16 @@
+# ISO/IEC 27001 Annex A controls — skeleton, not real data.
+# See governance/control_library/README.md for the shape every file here follows.
+
+framework: iso_27001
+# TODO: set to the actual ISO/IEC 27001 edition in use (e.g. "2022") once decided.
+version: null
+effective_from: null
+effective_to: null
+supersedes: null
+
+controls: []
+  # TODO: populate. One example entry, for shape reference only:
+  # - control_id: "A.8.8"
+  #   title: "Management of technical vulnerabilities"
+  #   description: "TODO: full control text from the current ISO/IEC 27001 Annex A."
+  #   maps_to_finding_types: ["cve"]

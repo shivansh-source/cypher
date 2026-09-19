@@ -1,0 +1,50 @@
+name: CI / Semgrep SAST
+
+# Scoped from DroneAcharaya's ci-semgrep.yml: this repo is also polyglot
+# (Python backend + TypeScript frontend in interfaces/dashboard/), so it
+# needs the same Python and JS/TS rulesets.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - run: pip install semgrep
+
+      # p/owasp-top-ten includes github-actions-mutable-action-tag, which
+      # treats an unpinned `uses: actions/checkout@v7` as a Blocking finding.
+      # Every action in .github/workflows/ is therefore pinned to a full commit
+      # SHA with the version in a trailing comment — keep it that way when
+      # adding steps, or this job fails on its own workflow files.
+      - name: Run Semgrep
+        run: |
+          semgrep scan \
+            --config p/python \
+            --config p/javascript \
+            --config p/typescript \
+            --config p/owasp-top-ten \
+            --error \
+            --exclude=node_modules \
+            --exclude=.next \
+            --exclude=venv \
+            --exclude=.venv \
+            --exclude=build

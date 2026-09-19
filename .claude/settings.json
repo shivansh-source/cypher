@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Grep(**)",
+      "Glob(**)",
+      "Bash(pytest*)",
+      "Bash(mypy*)",
+      "Bash(ruff*)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)"
+    ],
+    "ask": [
+      "Bash(git push*)",
+      "Bash(rm*)",
+      "Bash(git reset*)",
+      "Bash(git checkout*)",
+      "Bash(git clean*)",
+      "Edit(schema/aggregated_assets.schema.json)"
+    ],
+    "deny": [
+      "Bash(git push --force*)"
+    ]
+  }
+}

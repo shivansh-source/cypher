@@ -1,0 +1,71 @@
+name: CI / Lint
+
+# Scoped from DroneAcharaya's ci-lint.yml. Su₹aksha's Python side is one
+# package rooted at the repo root (no backend/ subdirectory), configured
+# entirely in pyproject.toml — no separate ruff.toml/mypy.ini.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  python:
+    name: Ruff + mypy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # Editable install (not just `pip install ruff mypy`): mypy runs in
+      # strict mode against real dependencies (pydantic, fastapi, ...), so
+      # it needs them importable to type-check call sites accurately.
+      - name: Install project + dev tools
+        run: pip install -e ".[dev]"
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: mypy type-check
+        run: mypy .
+
+  dashboard:
+    name: ESLint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: interfaces/dashboard
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: interfaces/dashboard/package-lock.json
+
+      - run: npm ci --ignore-scripts
+
+      - name: ESLint
+        run: npm run lint
+
+      # No separate `tsc --noEmit` step, and no such script in package.json:
+      # ci-build.yml's `next build` already fails on the same TypeScript
+      # errors (typescript.ignoreBuildErrors is false by default and unset
+      # in next.config.ts), and that workflow runs on the same
+      # push/pull_request triggers as this one.

@@ -1,0 +1,19 @@
+{
+  "_comment": "Skeleton only — no real attestations. Manual attestations cover controls that cannot be evidenced by automated findings alone (e.g. physical security, board-level policy sign-off, third-party audit results). Each entry must be traceable to who attested and when, and must expire — an attestation with no expiry is a liability, not evidence.",
+
+  "attestations": [
+    {
+      "_comment": "One example entry showing the intended shape — delete before real use.",
+      "control_id": "PLACEHOLDER-control-id",
+      "framework": "PLACEHOLDER-framework-key",
+      "attested_by": "PLACEHOLDER-name-or-role",
+      "attested_at": "PLACEHOLDER-ISO-8601-timestamp",
+      "expires_at": "PLACEHOLDER-ISO-8601-timestamp",
+      "evidence_description": "PLACEHOLDER-free-text-description-of-what-was-reviewed",
+      "evidence_document_refs": [
+        "PLACEHOLDER-path-or-id-of-supporting-document"
+      ],
+      "status": "PLACEHOLDER-one-of-met-not_met-insufficient_evidence"
+    }
+  ]
+}
