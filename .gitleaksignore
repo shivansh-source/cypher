@@ -1,0 +1,10 @@
+# Fingerprints of confirmed false positives from `gitleaks detect`, each with
+# why it isn't a secret. Do not add an entry here without checking the actual
+# line — this file silences the scanner, so every entry must be justified.
+
+# interfaces/dashboard/src/app/compliance/page.tsx:15 — a static routing key
+# in a config object literal (`{ key: "rbi_2026_directions", label: ... }`),
+# matching a YAML filename under governance/control_library/. Not a secret;
+# gitleaks' generic-api-key rule pattern-matches on `key:` + a quoted string
+# regardless of context.
+4307e6d9300b97fa2437be685d02eefd35ee5811:interfaces/dashboard/src/app/compliance/page.tsx:generic-api-key:15
