@@ -16,6 +16,9 @@ dependencies = [
     "uvicorn",
     "typer",
     "httpx",
+    "requests",
+    "boto3",
+    "python-gvm",
 ]
 
 [project.optional-dependencies]
@@ -25,10 +28,12 @@ dev = [
     "mypy",
     "ruff",
     "types-PyYAML",
+    "types-jsonschema",
+    "lxml-stubs",
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["core/tests", "governance/tests", "ai/tests"]
+testpaths = ["core/tests", "governance/tests", "ai/tests", "infra/tests"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -55,6 +60,18 @@ exclude = ["^build/"]
 # imports numpy for real and needs its types checked directly.
 module = "_pytest.python_api"
 follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+# boto3 (and botocore beneath it) ships no py.typed marker and no bundled
+# stubs, and `types-boto3`/`boto3-stubs` are deliberately not added as a
+# dependency here (they pin to specific service-client type surfaces that
+# would need constant upkeep for a single S3 client). infra/connectors/
+# only ever calls boto3.client("s3", ...) through
+# infra/connectors/_object_store.py, so the resulting `Any` types stay
+# contained to that one module rather than leaking into typed connector
+# code. Revisit if boto3 ships py.typed upstream.
+module = ["boto3", "boto3.*", "botocore", "botocore.*"]
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100

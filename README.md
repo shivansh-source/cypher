@@ -11,9 +11,14 @@ recommends where to spend a finite security budget for maximum risk
 reduction, and maps the underlying findings to Indian regulatory frameworks
 (RBI Directions 2026, SEBI CSCRF/CCI, CIS Controls, NIST CSF, ISO 27001).
 
-**This repository is currently a scaffold.** Every module contains
-signatures and docstrings only — see `CLAUDE.md` for the design principles
-that govern how the bodies must be implemented.
+**This repository is partially implemented.** `governance/` and four of
+`infra/connectors/` (`wazuh_connector.py`, `greenbone_connector.py`,
+`prowler_connector.py`, `scoutsuite_connector.py`) plus the `ingest`
+command in `interfaces/cli/riskctl.py` are real; everything else
+(`core/`, `ai/`, `interfaces/api/`, the remaining connectors and CLI
+commands) still contains signatures and docstrings only — see `CLAUDE.md`
+for the design principles that govern how the remaining bodies must be
+implemented.
 
 ## Why rupees, and why not ML
 
@@ -92,6 +97,8 @@ is a different language runtime entirely (Node.js) and is never part of
 that venv; it manages its own dependencies via `package.json`/`node_modules`
 and is isolated by that mechanism instead.
 
-There is nothing to run yet on the backend — connectors, the engine, and
-the optimizer are unimplemented. See `.claude/commands/` for the workflows
-a contributor will repeat once implementation begins.
+`riskctl ingest` (see `infra/README.md`) is runnable today against real
+Wazuh/Greenbone/Prowler/ScoutSuite output. The FAIR + Monte Carlo engine,
+the quality gates, and the optimizer are still unimplemented, so a
+committed snapshot has nowhere to go yet — see `.claude/commands/` for the
+workflows a contributor will repeat as that lands.

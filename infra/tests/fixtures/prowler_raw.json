@@ -1,0 +1,29 @@
+[
+  {
+    "CheckID": "s3_bucket_public_access",
+    "Status": "FAIL",
+    "Severity": "critical",
+    "Resources": [
+      { "uid": "arn:aws:s3:::example-public-bucket" }
+    ],
+    "Timestamp": "2026-09-10T00:00:00Z"
+  },
+  {
+    "CheckID": "iam_root_mfa_enabled",
+    "Status": "PASS",
+    "Severity": "high",
+    "Resources": [
+      { "uid": "arn:aws:iam::123456789012:root" }
+    ],
+    "Timestamp": "2026-09-10T00:00:00Z"
+  },
+  {
+    "CheckID": "ec2_security_group_open_ssh",
+    "Status": "FAIL",
+    "Severity": "medium",
+    "Resources": [
+      { "uid": "arn:aws:ec2:us-east-1:123456789012:security-group/sg-0123456789abcdef0" }
+    ],
+    "Timestamp": "2026-09-11T00:00:00Z"
+  }
+]
