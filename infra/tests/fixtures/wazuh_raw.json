@@ -1,0 +1,32 @@
+{
+  "auth_response": {
+    "data": { "token": "test-jwt-token" },
+    "error": 0
+  },
+  "agents_response": {
+    "data": {
+      "affected_items": [
+        { "id": "001", "name": "web-01", "ip": "10.0.0.5", "status": "active" },
+        { "id": "002", "name": "db-01", "ip": "10.0.0.6", "status": "disconnected" }
+      ]
+    }
+  },
+  "packages_response": { "data": { "affected_items": [] } },
+  "ports_response": { "data": { "affected_items": [] } },
+  "alerts_response": {
+    "hits": {
+      "hits": [
+        {
+          "_source": {
+            "agent": { "id": "001" },
+            "rule": {
+              "id": "5710",
+              "description": "sshd: Attempt to login using a non-existent user"
+            },
+            "timestamp": "2026-09-19T10:00:00.000Z"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -114,10 +114,24 @@ class Connector(abc.ABC):
     def run(self) -> list[dict[str, Any]]:
         """Execute fetch -> normalize -> attach asset_id, in order.
 
+        After :meth:`resolve_asset_id` is called on a normalized fragment,
+        any key in that fragment starting with ``_`` is stripped before it
+        is returned. Such keys (e.g. ``_identity_hint``) are a private,
+        non-schema bridging convention some connectors use internally to
+        carry whatever raw identity information they have (a hostname, an
+        agent IP, a cloud resource ARN) from :meth:`normalize` into
+        :meth:`resolve_asset_id`, pending a real CMDB-based identity
+        resolution (``cmdb_connector.py`` is itself still a stub with an
+        unresolved TODO on identity keys). They must never survive into the
+        aggregated snapshot, since nothing in ``schema/aggregated_assets.schema.json``
+        defines them and ``additionalProperties: false`` would reject them.
+
         Returns:
             A list of normalized, asset_id-attached fragments ready to be
             merged into an aggregated snapshot by the aggregation pipeline
-            that calls this connector.
+            that calls this connector — each a dict of
+            ``{"asset_id": <resolved>, **fragment}`` with all ``_``-prefixed
+            keys removed from ``fragment``.
 
         Must never:
             Catch a fetch failure and return an empty list silently — a
@@ -125,4 +139,11 @@ class Connector(abc.ABC):
             connector under ``scan_scope.unreachable_scanners`` instead of
             an absence of findings being misread as a clean scan.
         """
-        raise NotImplementedError
+        raw = self.fetch()
+        fragments = self.normalize(raw)
+        attached: list[dict[str, Any]] = []
+        for fragment in fragments:
+            asset_id = self.resolve_asset_id(fragment)
+            cleaned = {key: value for key, value in fragment.items() if not key.startswith("_")}
+            attached.append({"asset_id": asset_id, **cleaned})
+        return attached
