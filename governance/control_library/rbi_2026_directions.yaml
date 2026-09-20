@@ -1,33 +1,221 @@
-# RBI entity-specific Directions, 2026 — skeleton, not real data.
+# RBI entity-specific Directions, 2026 — NBFC Middle Layer.
 #
-# IMPORTANT: RBI's 2016 Cyber Security Framework was repealed 31 July 2026
-# and replaced by entity-specific Directions, 2026. This file must represent
-# the CURRENT Directions only — never hardcode or fall back to 2016-framework
-# control text. See repo-root CLAUDE.md principle 8.
+# ============================================================================
+# CRITICAL SOURCING WARNING — READ BEFORE USING ANY VALUE IN THIS FILE
+# ============================================================================
+# This session could NOT verify this regulation against any RBI primary
+# source. Direct fetches of RBI's own NBFC Master Directions listing page
+# (rbi.org.in, current as of 2026-09-19) and RBI's homepage "What's New"
+# section (current through 2026-09-18) show NO trace of a 2026 NBFC
+# cybersecurity Direction. A site:rbi.org.in search returned zero results.
 #
-# TODO: RBI issues *entity-specific* Directions (e.g. distinct requirements
-# for banks vs. NBFCs vs. payment system operators) rather than one uniform
-# document. This skeleton assumes a single control list; revisit whether
-# this file should instead be split per entity type, or gain an
-# `applies_to_entity_types` field per control, once the real Directions text
-# is reviewed.
+# ~9 independent-looking compliance-vendor/SEO blogs consistently cite a
+# specific notification number ("RBI/DoS/2026-27/461, dated 2026-07-31"), a
+# "six-hour DAKSH reporting window," and a "628 circulars repealed into 64
+# Directions" structure — but this consistency is NOT independent
+# verification; it may reflect shared/copied source material rather than
+# confirmed fact. Zero primary document, legal-database entry, or PDF was
+# found for this specific notification.
 #
-# See governance/control_library/README.md for the shape every file here follows.
+# What IS confirmed: (1) RBI's 2017 "Information Technology Framework for
+# the NBFC Sector" circular exists and is a plausible repeal target: this is
+# the actual predecessor document for the NBFC sector specifically (distinct
+# from the 2016 Cyber Security Framework circular for banks, which is what
+# repo-root CLAUDE.md principle 8 refers to). (2) RBI's DAKSH supervisory
+# platform is real (confirmed via an actual rbidocs.rbi.org.in press release
+# and Business Standard coverage).
+#
+# EVERY entry below is confidence: low for this reason, regardless of how
+# specific or consistent the underlying secondary sources sound. Treat this
+# entire file as needing a human primary-source check — via RBI's own
+# notification search or a subscription legal database — before it is cited
+# to anyone outside this project. See governance/library_loader.py's loud
+# low-confidence warning at load time.
+# ============================================================================
 
 framework: rbi_2026_directions
-# TODO: set to the actual Directions, 2026 version/notification identifier.
-version: null
-# TODO: set to 2026-07-31 or the actual notified effective date, whichever is correct.
-effective_from: null
+version: "Reserve Bank of India (Non-Banking Financial Companies — Cybersecurity, Technology: Risk, Resilience and Assurance Framework) Directions, 2026 [UNVERIFIED TITLE]"
+effective_from: "2026-07-31"
 effective_to: null
-# This framework supersedes the repealed 2016 Cyber Security Framework.
-supersedes: "rbi_cyber_security_framework_2016"
+supersedes: "rbi_nbfc_it_framework_2017"
 
-controls: []
-  # TODO: populate from the actual Directions, 2026 text. One example entry,
-  # for shape reference only:
-  # - control_id: "RBI-2026-INCIDENT-REPORTING"
-  #   title: "Cyber incident reporting timeline"
-  #   description: "TODO: full control text from the current Directions, 2026."
-  #   maps_to_finding_types: ["cve", "misconfiguration"]
-  #   applies_to_entity_types: []  # TODO: e.g. ["bank", "nbfc", "payment_system_operator"]
+sources:
+  - url_or_citation: "https://rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=10999 (RBI's own NBFC Master Directions listing — confirms the 2017 IT Framework circular exists; shows NO 2026 successor as of retrieval)"
+    retrieved: "2026-09-20"
+    covers: "Confirms predecessor document only; does NOT confirm the 2026 Directions this file describes"
+  - url_or_citation: "https://taxguru.in/rbi/rbi-issues-nbfc-cybersecurity-technology-risk-directions-2026-governance-framework.html (secondary, unverified against any primary source)"
+    retrieved: "2026-09-20"
+    covers: "Claimed notification number, date, and most control content below"
+  - url_or_citation: "rbidocs.rbi.org.in DAKSH press release; Business Standard coverage of DAKSH (both confirm DAKSH platform itself is real)"
+    retrieved: "2026-09-20"
+    covers: "DAKSH platform existence only — NOT the specific 6-hour reporting SLA claimed by secondary sources"
+
+controls:
+  # --- Telemetry-derivable (all confidence: low — see warning above) -----
+  - id: rbi_2026_mfa_privileged_access
+    framework_ref: "unnumbered — secondary sources describe an 'access controls' chapter, no clause number found"
+    parameter_name: "Multi-factor authentication for privileged/administrative access"
+    weight: null
+    description: "NBFCs are expected to enforce strong authentication (MFA) for privileged and administrative access to critical systems."
+    maturity_bands: null
+    source: "https://taxguru.in/rbi/rbi-issues-nbfc-cybersecurity-technology-risk-directions-2026-governance-framework.html (secondary, generic; regulation itself unverified)"
+    confidence: low
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].identity_access.mfa_enforced, .privileged_accounts_count"
+      logic: "For every asset with privileged_accounts_count > 0, mfa_enforced must be true."
+      check_type: "all_assets_field_true"
+      check_params:
+        field_path: "identity_access.mfa_enforced"
+        only_where: { field_path: "identity_access.privileged_accounts_count", op: "gt", value: 0 }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: rbi_2026_endpoint_protection
+    framework_ref: "unnumbered — described generically as 'application and network security'"
+    parameter_name: "Endpoint detection and response coverage"
+    weight: null
+    description: "Critical systems are expected to run active endpoint protection/detection tooling."
+    maturity_bands: null
+    source: "https://taxguru.in/rbi/rbi-issues-nbfc-cybersecurity-technology-risk-directions-2026-governance-framework.html (secondary, generic; regulation itself unverified)"
+    confidence: low
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].edr.agent_installed, .agent_healthy"
+      logic: "Every in-scope asset must have an EDR agent installed and healthy."
+      check_type: "all_edr_agents_healthy"
+      check_params: {}
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: rbi_2026_vulnerability_management
+    framework_ref: "unnumbered — 'vulnerability assessment, penetration testing' cited generically"
+    parameter_name: "Timely remediation of known-exploited vulnerabilities"
+    weight: null
+    description: "NBFCs are expected to run regular vulnerability assessments and remediate high-risk findings, with particular urgency for actively-exploited CVEs."
+    maturity_bands: null
+    source: "https://taxguru.in/rbi/rbi-issues-nbfc-cybersecurity-technology-risk-directions-2026-governance-framework.html (secondary, generic — no specific remediation SLA found in any source)"
+    confidence: low
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].findings[] where type==\"cve\" and kev_listed==true, .remediated_at"
+      logic: "No unremediated finding may be both type=cve and kev_listed=true."
+      check_type: "no_unremediated_findings"
+      check_params: { match: { type: "cve", kev_listed: true } }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: rbi_2026_cloud_config_posture
+    framework_ref: "unnumbered — no source explicitly names cloud configuration; this mapping is this project's own inference from generic 'IT risk management' language"
+    parameter_name: "Cloud/infrastructure misconfiguration exposure"
+    weight: null
+    description: "Conceptually mapped from generic 'IT risk management' language in secondary reporting — no source explicitly discusses cloud configuration scanning for this framework."
+    maturity_bands: null
+    source: "No source found specifically for cloud config under this framework — both the regulation and this specific control mapping are unverified/inferred, not sourced."
+    confidence: low
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].findings[] where type==\"misconfiguration\" and provenance.connector==\"prowler_connector\""
+      logic: "No unremediated, critical/high-criticality misconfiguration finding from the CSPM connector may remain open."
+      check_type: "no_unremediated_findings"
+      check_params: { match: { type: "misconfiguration", provenance_connector: "prowler_connector", criticality_in: ["critical", "high"] } }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: rbi_2026_backup_recovery
+    framework_ref: "unnumbered — 'business continuity planning, disaster recovery' cited generically"
+    parameter_name: "Tested, resilient backup posture for critical services"
+    weight: null
+    description: "NBFCs are expected to maintain and periodically test backup/DR capability for critical services."
+    maturity_bands: null
+    source: "https://taxguru.in/rbi/rbi-issues-nbfc-cybersecurity-technology-risk-directions-2026-governance-framework.html (secondary, generic; regulation itself unverified)"
+    confidence: low
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "services[].backup.exists, .last_tested_at"
+      logic: "Every in-scope service must have a backup that exists and was tested within core.assumptions.BACKUP_TEST_RECENCY_DAYS."
+      check_type: "backup_tested_within_days"
+      check_params: { days: null }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  # --- Attestation-only (all confidence: low) --------------------------
+  - id: rbi_2026_incident_reporting_timeline
+    framework_ref: "unnumbered"
+    parameter_name: "Cyber incident reporting to RBI via DAKSH"
+    weight: null
+    description: "NBFCs are claimed to be required to report qualifying cyber incidents via RBI's DAKSH platform within a mandated window (secondary sources claim 6 hours — unverified against any primary source)."
+    maturity_bands: null
+    source: "DAKSH platform existence confirmed via rbidocs.rbi.org.in press release / Business Standard; the 6-hour SLA specifically is from taxguru.in and similar blogs only, unverified."
+    confidence: low
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Confirm a documented process exists to report qualifying cyber incidents via RBI's DAKSH platform within the applicable window (verify the actual SLA against the primary Direction before relying on the commonly-cited 6-hour figure), and provide evidence of the last incident reporting drill or filed report."
+    attestation_validity_months: null
+
+  - id: rbi_2026_board_governance
+    framework_ref: "unnumbered"
+    parameter_name: "Board-approved IT/cybersecurity policy and governance structure"
+    weight: null
+    description: "NBFCs are claimed to be required to maintain board-approved IT/cybersecurity policy and a governance structure (IT Strategy Committee, Information Security Committee, designated CISO)."
+    maturity_bands: null
+    source: "taxguru.in, ogma.in (secondary, generic; consistent across sources but unverified against primary text)"
+    confidence: low
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Confirm the Board has approved an IT and cybersecurity policy within the last attestation cycle, and that a governance structure (IT Strategy Committee, Information Security Committee, designated CISO) is in place, with meeting minutes or policy sign-off as evidence."
+    attestation_validity_months: null
+
+  - id: rbi_2026_security_awareness_training
+    framework_ref: "unnumbered"
+    parameter_name: "Security awareness training program"
+    weight: null
+    description: "General staff security awareness training is this project's reasonable inference from typical framework structure; only board-level training is directly mentioned in the one source found."
+    maturity_bands: null
+    source: "rmaindia.org ('Board Level Cyber Risk Governance Training') — mentions board-level training specifically; general staff training is inferred, not directly sourced."
+    confidence: low
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Confirm a security awareness training program exists for staff with access to critical systems, and provide completion records for the most recent training cycle."
+    attestation_validity_months: null
+
+  - id: rbi_2026_vendor_risk_assessment
+    framework_ref: "unnumbered — 'outsourcing of IT services' cited generically"
+    parameter_name: "Third-party/vendor cybersecurity risk assessment"
+    weight: null
+    description: "NBFCs are claimed to be required to assess cybersecurity risk of IT service providers/vendors."
+    maturity_bands: null
+    source: "matrixgard.com (vendor-risk-focused blog with no visible citation to primary text)"
+    confidence: low
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Confirm a risk assessment process exists for IT service providers/vendors with access to critical systems or data, including evidence of the most recent vendor risk review."
+    attestation_validity_months: null
+
+  - id: rbi_2026_bcp_dr_testing
+    framework_ref: "unnumbered"
+    parameter_name: "BCP/DR testing cadence"
+    weight: null
+    description: "NBFCs are claimed to be required to test business continuity and disaster recovery plans for critical services on a defined cadence."
+    maturity_bands: null
+    source: "taxguru.in (generic 'business continuity planning, disaster recovery' mention)"
+    confidence: low
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Confirm business continuity and disaster recovery plans for critical services have been tested within the attestation validity window, with test reports as evidence."
+    attestation_validity_months: null

@@ -1,17 +1,369 @@
-# CIS Critical Security Controls — skeleton, not real data.
-# See governance/control_library/README.md for the shape every file here follows.
+# CIS Critical Security Controls, Version 8.1.
+#
+# CIS's own page (cisecurity.org/controls/v8-1, primary) confirms v8.1 is an
+# iterative, non-disruptive update to v8 (same safeguard numbering, no
+# renumbering) — but the exact v8.1 safeguard text could not be
+# independently verified this session (PDF fetch attempts failed; safeguard
+# numbers/titles below come from a secondary listing cross-checked only for
+# structural consistency against a second secondary source). Confidence is
+# capped at medium throughout for that reason — see
+# governance/control_library/README.md and the sourcing-difficulty note
+# this file's authoring research produced.
+#
+# See governance/library_loader.py for how `telemetry_check` is actually
+# evaluated (check_type/check_params, not the `logic` prose).
 
 framework: cis_controls
-# TODO: set to the actual CIS Controls version in use (e.g. "v8.1") once decided.
-version: null
-# TODO: set effective_from to when this version was adopted for mapping purposes.
+version: "8.1"
 effective_from: null
 effective_to: null
 supersedes: null
 
-controls: []
-  # TODO: populate. One example entry, for shape reference only:
-  # - control_id: "CIS-01"
-  #   title: "Inventory and Control of Enterprise Assets"
-  #   description: "TODO: full control text from the current CIS Controls document."
-  #   maps_to_finding_types: ["cve", "misconfiguration"]
+sources:
+  - url_or_citation: "https://www.cisecurity.org/controls/v8-1 (CIS's own page confirming v8.1 exists and its relationship to v8)"
+    retrieved: "2026-09-20"
+    covers: "Framework existence, 18-control/IG1-3 structure, v8->v8.1 change scope"
+  - url_or_citation: "bastion.tech CIS Controls v8 safeguard listing (secondary — v8.1-specific PDF was not extractable this session)"
+    retrieved: "2026-09-20"
+    covers: "Individual safeguard IDs, titles, and Implementation Group tiering used below"
+  - url_or_citation: "Wikipedia: CIS Critical Security Controls (secondary, cross-check only)"
+    retrieved: "2026-09-20"
+    covers: "Cross-check of 18-control structure"
+
+controls:
+  # --- Telemetry-derivable -------------------------------------------------
+  - id: cis_mfa_admin_access
+    framework_ref: "6.5"
+    parameter_name: "Require MFA for Administrative Access"
+    weight: null
+    description: "Require multi-factor authentication for all administrative access accounts, where supported, on all enterprise assets."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].identity_access.mfa_enforced, .privileged_accounts_count"
+      logic: "For every asset with privileged_accounts_count > 0, mfa_enforced must be true."
+      check_type: "all_assets_field_true"
+      check_params:
+        field_path: "identity_access.mfa_enforced"
+        only_where: { field_path: "identity_access.privileged_accounts_count", op: "gt", value: 0 }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: cis_mfa_external_apps
+    framework_ref: "6.3"
+    parameter_name: "Require MFA for Externally-Exposed Applications"
+    weight: null
+    description: "Require multi-factor authentication for externally-exposed applications."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].identity_access.mfa_enforced, assets[].network.internet_facing"
+      logic: "For every asset with internet_facing == true, mfa_enforced must be true."
+      check_type: "all_assets_field_true"
+      check_params:
+        field_path: "identity_access.mfa_enforced"
+        only_where: { field_path: "network.internet_facing", op: "eq", value: true }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: cis_malware_defenses_deployed
+    framework_ref: "10.1"
+    parameter_name: "Deploy and Maintain Anti-Malware Software"
+    weight: null
+    description: "Deploy and maintain anti-malware/EDR software on all enterprise assets."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].edr.agent_installed"
+      logic: "Every in-scope asset must have an EDR agent installed."
+      check_type: "all_assets_field_true"
+      check_params: { field_path: "edr.agent_installed" }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: cis_malware_defenses_centralized
+    framework_ref: "10.6"
+    parameter_name: "Centrally Manage Anti-Malware Software"
+    weight: null
+    description: "Centrally manage anti-malware/EDR software."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: low
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: "assets[].edr.agent_healthy"
+      logic: "agent_healthy is, at best, a proxy for an agent that is reporting to central management — it does not itself confirm centralized management/policy control, which is what this safeguard requires."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Confirm EDR/anti-malware tooling is centrally managed and provide the management console/policy configuration as evidence."
+    attestation_validity_months: null
+
+  - id: cis_vuln_mgmt_process
+    framework_ref: "7.1"
+    parameter_name: "Establish and Maintain a Vulnerability Management Process"
+    weight: null
+    description: "Establish and maintain a documented vulnerability management process."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: "assets[].findings[].type==\"cve\""
+      logic: "The presence of tracked CVE findings is supporting evidence a process exists, but a snapshot with zero findings is indistinguishable from 'no process' vs 'no current vulnerabilities' — this safeguard is about whether a documented process exists, which telemetry alone cannot confirm."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Provide the documented vulnerability management process and its review date."
+    attestation_validity_months: null
+
+  - id: cis_patch_mgmt_os
+    framework_ref: "7.3"
+    parameter_name: "Perform Automated OS Patch Management"
+    weight: null
+    description: "Perform operating system patch management via automated patch management tooling on a monthly or more frequent basis."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: "assets[].findings[].remediated_at (where type==\"cve\")"
+      logic: "Time-to-remediate on CVE findings only approximates patch cadence. Schema gap: no direct patch_level/patch-compliance field exists on assets or endpoints, and no field confirms patching is automated vs. manual."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Confirm automated OS patch management tooling is in place and provide its configured cadence."
+    attestation_validity_months: null
+
+  - id: cis_vuln_remediation
+    framework_ref: "7.7"
+    parameter_name: "Remediate Detected Vulnerabilities"
+    weight: null
+    description: "Remediate detected vulnerabilities in software through processes and tooling on a monthly or more frequent basis, based on the remediation process."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].findings[] where type==\"cve\" and kev_listed==true, .remediated_at"
+      logic: "No unremediated finding may be both type=cve and kev_listed=true."
+      check_type: "no_unremediated_findings"
+      check_params: { match: { type: "cve", kev_listed: true } }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: cis_secure_config_process
+    framework_ref: "4.1"
+    parameter_name: "Establish and Maintain a Secure Configuration Process"
+    weight: null
+    description: "Establish and maintain a secure configuration process for enterprise assets and software."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].findings[] where type==\"misconfiguration\" and provenance.connector==\"prowler_connector\""
+      logic: "No unremediated cloud/config misconfiguration finding from the CSPM connector may remain open."
+      check_type: "no_unremediated_findings"
+      check_params: { match: { type: "misconfiguration", provenance_connector: "prowler_connector" } }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: cis_data_recovery_process
+    framework_ref: "11.1"
+    parameter_name: "Establish and Maintain a Data Recovery Process"
+    weight: null
+    description: "Establish and maintain a documented data recovery process sufficient to restore in-scope enterprise assets."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "services[].backup.exists"
+      logic: "Every in-scope service must have backup.exists == true."
+      check_type: "all_services_field_true"
+      check_params: { field_path: "backup.exists" }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: cis_automated_backups
+    framework_ref: "11.2"
+    parameter_name: "Perform Automated Backups"
+    weight: null
+    description: "Perform automated backups, with a defined recovery point objective, for in-scope enterprise assets."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "services[].backup.rpo_hours"
+      logic: "Every in-scope service must have a non-null rpo_hours (a defined recovery point objective)."
+      check_type: "all_services_field_present"
+      check_params: { field_path: "backup.rpo_hours" }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: cis_isolated_recovery_data
+    framework_ref: "11.4"
+    parameter_name: "Establish and Maintain an Isolated Instance of Recovery Data"
+    weight: null
+    description: "Establish and maintain an isolated instance of recovery data (e.g. offline, air-gapped, or otherwise not accessible via a network connection)."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: low
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "services[].backup.immutable_copy"
+      logic: "immutable_copy == true for every in-scope service. Imperfect proxy: this safeguard asks for network/access isolation, and our schema only captures immutability — a real gap, not a full equivalence."
+      check_type: "all_services_field_true"
+      check_params: { field_path: "backup.immutable_copy" }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: cis_test_data_recovery
+    framework_ref: "11.5"
+    parameter_name: "Test Data Recovery"
+    weight: null
+    description: "Test backup recovery quarterly, or more frequently, for a sampling of in-scope enterprise assets."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "services[].backup.last_tested_at"
+      logic: "Every in-scope service's backup must have been tested within core.assumptions.BACKUP_TEST_RECENCY_DAYS (90 days, approximating this safeguard's own quarterly cadence)."
+      check_type: "backup_tested_within_days"
+      check_params: { days: null }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: cis_network_segmentation
+    framework_ref: "12.2 / 13.4"
+    parameter_name: "Establish/Maintain a Secure Network Architecture; Perform Traffic Filtering Between Network Segments"
+    weight: null
+    description: "Design and maintain a secure network architecture, including segmentation between network segments with appropriate access controls."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: null
+      logic: "No network-segmentation/architecture field exists anywhere in schema/aggregated_assets.schema.json."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Provide network architecture/segmentation diagrams and evidence of inter-segment traffic filtering rules."
+    attestation_validity_months: null
+
+  # --- Attestation-only ------------------------------------------------
+  - id: cis_ir_designated_personnel
+    framework_ref: "17.1"
+    parameter_name: "Designate Personnel to Manage Incident Handling"
+    weight: null
+    description: "Designate one key person, and at least one backup, to manage the incident handling process."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Confirm named personnel/role are designated to lead incident handling, with documented contact information."
+    attestation_validity_months: null
+
+  - id: cis_ir_process
+    framework_ref: "17.4"
+    parameter_name: "Establish and Maintain an Incident Response Process"
+    weight: null
+    description: "Establish and maintain an incident response process that addresses roles and responsibilities, compliance requirements, and a communication plan."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide the current documented incident response process, including roles and communication mechanisms."
+    attestation_validity_months: null
+
+  - id: cis_ir_exercises
+    framework_ref: "17.7"
+    parameter_name: "Conduct Routine Incident Response Exercises"
+    weight: null
+    description: "Plan and conduct routine incident response exercises and scenarios for personnel involved in incident response."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide the date and scope of the most recent IR tabletop/exercise, and its post-incident review."
+    attestation_validity_months: null
+
+  - id: cis_awareness_program
+    framework_ref: "14.1"
+    parameter_name: "Establish and Maintain a Security Awareness Program"
+    weight: null
+    description: "Establish and maintain a security awareness program to influence behavior among the workforce to be security conscious."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Confirm an active, documented security awareness program exists and provide the most recent completion rate."
+    attestation_validity_months: null
+
+  - id: cis_vendor_inventory
+    framework_ref: "15.1"
+    parameter_name: "Establish and Maintain an Inventory of Service Providers"
+    weight: null
+    description: "Establish and maintain an inventory of service providers, including those holding sensitive data or responsible for critical IT platforms."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide the current inventory of service providers holding sensitive data or responsible for critical IT platforms."
+    attestation_validity_months: null
+
+  - id: cis_vendor_assessment
+    framework_ref: "15.5"
+    parameter_name: "Assess Service Providers"
+    weight: null
+    description: "Assess service providers consistent with the enterprise's third-party risk management policy."
+    maturity_bands: null
+    source: "bastion.tech CIS Controls v8 safeguard listing"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide the most recent security assessment date/result for classified service providers under contract."
+    attestation_validity_months: null

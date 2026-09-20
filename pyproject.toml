@@ -24,6 +24,7 @@ dev = [
     "pytest-cov",
     "mypy",
     "ruff",
+    "types-PyYAML",
 ]
 
 [tool.pytest.ini_options]
@@ -38,6 +39,22 @@ disallow_untyped_defs = true
 # it's gitignored). Without this, mypy treats build/lib/<pkg>/__init__.py
 # as a second copy of every top-level package and refuses to run at all.
 exclude = ["^build/"]
+
+[[tool.mypy.overrides]]
+# numpy's own bundled .pyi stubs use `type X = ...` (PEP 695), which is
+# Python 3.12+ only syntax — mypy fails to even parse them under this
+# project's python_version = "3.11" target. This surfaces even though no
+# project code imports numpy yet: pytest's own optional numpy integration
+# (_pytest/python_api.py) pulls numpy in while mypy checks any test file
+# that imports pytest, and neither ignore_errors nor follow_imports=skip on
+# numpy itself prevents that parse (the failure happens while mypy resolves
+# _pytest's own type info, before a numpy-targeted override applies).
+# Skipping just this one pytest submodule (not all of _pytest, which would
+# lose fixture-decorator typing everywhere) stops the chain at its source.
+# Revisit if a newer mypy/numpy pairing fixes this, or once core/engine.py
+# imports numpy for real and needs its types checked directly.
+module = "_pytest.python_api"
+follow_imports = "skip"
 
 [tool.ruff]
 line-length = 100

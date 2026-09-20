@@ -10,15 +10,15 @@
       "Bash(git status)",
       "Bash(git diff*)",
       "Bash(git log*)",
-      "Bash(git add*)",
-      "Bash(git commit*)"
+      "Bash(git checkout*)",
+      "Bash(git add*)"
     ],
     "ask": [
       "Bash(git push*)",
       "Bash(rm*)",
       "Bash(git reset*)",
-      "Bash(git checkout*)",
       "Bash(git clean*)",
+      "Bash(git commit*)",
       "Edit(schema/aggregated_assets.schema.json)"
     ],
     "deny": [

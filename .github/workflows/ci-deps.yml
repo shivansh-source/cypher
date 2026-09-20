@@ -29,6 +29,12 @@ jobs:
         with:
           python-version: "3.11"
 
+      # actions/setup-python's bundled setuptools (via ensurepip) can be
+      # stale enough to carry its own disclosed CVEs independent of
+      # anything this project declares — upgrade it explicitly rather than
+      # let a runner-image artifact fail this audit.
+      - run: pip install --upgrade pip setuptools
+
       # Install only production dependencies (no [dev] extra) so the audit
       # reflects what actually ships, not pytest/mypy/ruff's own deps too.
       - run: pip install . pip-audit

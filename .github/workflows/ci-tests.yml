@@ -30,6 +30,11 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+      # See ci-deps.yml: actions/setup-python's bundled setuptools can carry
+      # its own disclosed CVEs independent of anything this project
+      # declares.
+      - run: pip install --upgrade pip setuptools
+
       - name: Install project + dev tools
         run: pip install -e ".[dev]"
 

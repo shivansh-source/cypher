@@ -1,16 +1,403 @@
-# ISO/IEC 27001 Annex A controls — skeleton, not real data.
-# See governance/control_library/README.md for the shape every file here follows.
+# ISO/IEC 27001:2022 Annex A — control identifiers and titles only.
+#
+# The standard's full normative text is paywalled/copyrighted. Every
+# `description` below is a one-line paraphrase in our own words, not
+# standard text, and every entry is capped at confidence: medium (never
+# high) because none of it came from the licensed primary document — see
+# governance/control_library/README.md and the project's sourcing rules.
+#
+# See governance/control_library/README.md for the shape every file here
+# follows, and governance/library_loader.py for how `telemetry_check` is
+# actually evaluated (check_type/check_params dispatch to named functions
+# in governance/mapper.py — `logic` is the human-readable description of
+# the same rule, not executable itself).
 
 framework: iso_27001
-# TODO: set to the actual ISO/IEC 27001 edition in use (e.g. "2022") once decided.
-version: null
-effective_from: null
+version: "ISO/IEC 27001:2022"
+effective_from: "2022-10-25"
 effective_to: null
 supersedes: null
 
-controls: []
-  # TODO: populate. One example entry, for shape reference only:
-  # - control_id: "A.8.8"
-  #   title: "Management of technical vulnerabilities"
-  #   description: "TODO: full control text from the current ISO/IEC 27001 Annex A."
-  #   maps_to_finding_types: ["cve"]
+sources:
+  - url_or_citation: "https://www.iso.org/standard/27001"
+    retrieved: "2026-09-20"
+    covers: "Publication date and existence of the 2022 revision"
+  - url_or_citation: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    retrieved: "2026-09-20"
+    covers: "Annex A control IDs and titles (cross-checked against dataguard.com)"
+  - url_or_citation: "https://www.dataguard.com/iso-27001/2022/"
+    retrieved: "2026-09-20"
+    covers: "Annex A control IDs and titles (cross-checked against hightable.io)"
+  - url_or_citation: "https://scrut.io"
+    retrieved: "2026-09-20"
+    covers: "Cross-check for organizational/governance control IDs (A.5.x)"
+
+controls:
+  # --- Telemetry-derivable -------------------------------------------------
+  - id: secure_authentication
+    framework_ref: "A.8.5"
+    parameter_name: "Secure authentication"
+    weight: null
+    description: "Secure authentication procedures and technologies should be used for user and system access, in line with access control requirements."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/ ; https://www.dataguard.com/iso-27001/2022/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].identity_access.mfa_enforced"
+      logic: "MFA must be enforced on every in-scope asset; a null value means the fact was never evaluated, not that it failed."
+      check_type: "all_assets_field_true"
+      check_params: { field_path: "identity_access.mfa_enforced" }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: access_control_policy
+    framework_ref: "A.5.15"
+    parameter_name: "Access control"
+    weight: null
+    description: "Rules to control physical and logical access to information and other associated assets should be established and implemented based on business requirements."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/ ; https://www.dataguard.com/iso-27001/2022/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: "assets[].identity_access.mfa_enforced, .privileged_accounts_count"
+      logic: "mfa_enforced and privileged_accounts_count are supporting signals only (e.g. many privileged accounts without MFA is a red flag) — they cannot confirm a documented access-control policy exists or is followed, which is what this control actually requires."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Provide the current access control policy and evidence it governs how physical/logical access is granted, reviewed, and revoked."
+    attestation_validity_months: null
+
+  - id: access_rights_provisioning
+    framework_ref: "A.5.18"
+    parameter_name: "Access rights"
+    weight: null
+    description: "Access rights should be provisioned, reviewed, modified, and removed in accordance with the organization's access control policy and topic-specific policies."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/ ; https://www.dataguard.com/iso-27001/2022/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: null
+      logic: "No field in our schema captures access-rights review/revocation cadence."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Provide evidence of the most recent access rights review (joiners/movers/leavers) and its date."
+    attestation_validity_months: null
+
+  - id: protection_against_malware
+    framework_ref: "A.8.7"
+    parameter_name: "Protection against malware"
+    weight: null
+    description: "Protection against malware should be implemented and supported by appropriate user awareness."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/ ; https://www.dataguard.com/iso-27001/2022/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].edr.agent_installed, .agent_healthy"
+      logic: "Every in-scope asset must have an EDR agent installed and healthy; a null health value means never evaluated, not passing."
+      check_type: "all_edr_agents_healthy"
+      check_params: {}
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: management_of_technical_vulnerabilities
+    framework_ref: "A.8.8"
+    parameter_name: "Management of technical vulnerabilities"
+    weight: null
+    description: "Information about technical vulnerabilities of information systems in use should be obtained, the organization's exposure evaluated, and appropriate measures taken."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/ ; https://www.dataguard.com/iso-27001/2022/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].findings[] where type==\"cve\", .kev_listed, .remediated_at"
+      logic: "No unremediated finding may be both type=cve and kev_listed=true (an actively exploited vulnerability left open)."
+      check_type: "no_unremediated_findings"
+      check_params: { match: { type: "cve", kev_listed: true } }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: configuration_management
+    framework_ref: "A.8.9"
+    parameter_name: "Configuration management"
+    weight: null
+    description: "Configurations, including security configurations, of hardware, software, services, and networks should be established, documented, implemented, monitored, and reviewed."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/ ; https://www.dataguard.com/iso-27001/2022/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].findings[] where type==\"misconfiguration\" and provenance.connector==\"prowler_connector\""
+      logic: "No unremediated cloud/config misconfiguration finding from the CSPM connector may remain open."
+      check_type: "no_unremediated_findings"
+      check_params: { match: { type: "misconfiguration", provenance_connector: "prowler_connector" } }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: information_backup
+    framework_ref: "A.8.13"
+    parameter_name: "Information backup"
+    weight: null
+    description: "Backup copies of information, software, and systems should be maintained and regularly tested in accordance with an agreed backup policy."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/ ; https://www.dataguard.com/iso-27001/2022/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "services[].backup.exists, .last_tested_at"
+      logic: "Every in-scope service must have a backup that exists and was tested within core.assumptions.BACKUP_TEST_RECENCY_DAYS."
+      check_type: "backup_tested_within_days"
+      check_params: { days: null }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: networks_security
+    framework_ref: "A.8.20"
+    parameter_name: "Networks security"
+    weight: null
+    description: "Networks and network devices should be secured, managed, and controlled to protect information in systems and applications."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/ ; https://www.dataguard.com/iso-27001/2022/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].network.internet_facing, .open_ports"
+      logic: "No internet-facing asset may expose a port on core.assumptions.DANGEROUS_INTERNET_FACING_PORTS (a heuristic list, not a substitute for an asset-specific expected-ports policy)."
+      check_type: "no_dangerous_ports_on_internet_facing_assets"
+      check_params: {}
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: segregation_of_networks
+    framework_ref: "A.8.22"
+    parameter_name: "Segregation of networks"
+    weight: null
+    description: "Groups of information services, users, and information systems should be segregated on the organization's networks."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/ ; https://www.dataguard.com/iso-27001/2022/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: null
+      logic: "No network-segmentation field exists anywhere in schema/aggregated_assets.schema.json — this control cannot be telemetry-derived at all with the current schema. See docs/ASSUMPTIONS.md / schema-gap notes."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Provide network architecture/segmentation diagrams and evidence that critical systems are isolated from general-purpose networks."
+    attestation_validity_months: null
+
+  # --- Attestation-only ------------------------------------------------
+  - id: policies_for_information_security
+    framework_ref: "A.5.1"
+    parameter_name: "Policies for information security"
+    weight: null
+    description: "Information security policy and topic-specific policies should be defined, approved by management, published, and reviewed at planned intervals."
+    maturity_bands: null
+    source: "https://scrut.io (cross-checked against hightable.io)"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide the current board/management-approved information security policy document and its last review date."
+    attestation_validity_months: null
+
+  - id: infosec_roles_and_responsibilities
+    framework_ref: "A.5.2"
+    parameter_name: "Information security roles and responsibilities"
+    weight: null
+    description: "Information security roles and responsibilities should be defined and allocated according to organizational need."
+    maturity_bands: null
+    source: "https://scrut.io (cross-checked against hightable.io)"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide evidence that information security roles and responsibilities are defined and assigned (e.g. org chart, RACI)."
+    attestation_validity_months: null
+
+  - id: supplier_relationships_security
+    framework_ref: "A.5.19"
+    parameter_name: "Information security in supplier relationships"
+    weight: null
+    description: "Processes and procedures should be defined and implemented to manage the information security risks associated with the use of supplier's products or services."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide the supplier information-security risk assessment process and evidence it was applied to current critical suppliers."
+    attestation_validity_months: null
+
+  - id: supplier_agreements_security
+    framework_ref: "A.5.20"
+    parameter_name: "Addressing information security within supplier agreements"
+    weight: null
+    description: "Relevant information security requirements should be established and agreed with each supplier based on the type of supplier relationship."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide evidence that current supplier contracts include information security clauses."
+    attestation_validity_months: null
+
+  - id: ict_supply_chain_security
+    framework_ref: "A.5.21"
+    parameter_name: "Managing information security in the ICT supply chain"
+    weight: null
+    description: "Processes and procedures should be defined and implemented to manage the information security risks associated with the ICT products and services supply chain."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Describe how ICT supply chain risk (e.g. software/hardware provenance) is assessed and managed."
+    attestation_validity_months: null
+
+  - id: supplier_service_monitoring
+    framework_ref: "A.5.22"
+    parameter_name: "Monitoring, review and change management of supplier services"
+    weight: null
+    description: "The organization should regularly monitor, review, evaluate, and manage change in supplier information security practices and service delivery."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide evidence of periodic review of supplier service delivery against agreed security requirements."
+    attestation_validity_months: null
+
+  - id: incident_mgmt_planning
+    framework_ref: "A.5.24"
+    parameter_name: "Information security incident management planning and preparation"
+    weight: null
+    description: "The organization should plan and prepare for managing information security incidents by defining, establishing, and communicating processes, roles, and responsibilities."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide the incident response plan and evidence of its last review/test date."
+    attestation_validity_months: null
+
+  - id: incident_event_assessment
+    framework_ref: "A.5.25"
+    parameter_name: "Assessment and decision on information security events"
+    weight: null
+    description: "The organization should assess information security events and decide if they are to be categorized as information security incidents."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Describe the process and criteria used to classify security events as incidents."
+    attestation_validity_months: null
+
+  - id: incident_response
+    framework_ref: "A.5.26"
+    parameter_name: "Response to information security incidents"
+    weight: null
+    description: "Information security incidents should be responded to in accordance with the documented procedures."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide evidence of the most recent incident response execution or tabletop exercise."
+    attestation_validity_months: null
+
+  - id: incident_lessons_learned
+    framework_ref: "A.5.27"
+    parameter_name: "Learning from information security incidents"
+    weight: null
+    description: "Knowledge gained from information security incidents should be used to strengthen and improve controls."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide evidence that post-incident reviews produce documented improvement actions."
+    attestation_validity_months: null
+
+  - id: incident_evidence_collection
+    framework_ref: "A.5.28"
+    parameter_name: "Collection of evidence"
+    weight: null
+    description: "The organization should establish and implement procedures for the identification, collection, acquisition, and preservation of evidence related to information security events."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Describe the procedure for identifying, collecting, and preserving evidence during incidents."
+    attestation_validity_months: null
+
+  - id: infosec_during_disruption
+    framework_ref: "A.5.29"
+    parameter_name: "Information security during disruption"
+    weight: null
+    description: "The organization should plan how to maintain information security at an appropriate level during disruption."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Describe how information security is maintained during a business disruption event."
+    attestation_validity_months: null
+
+  - id: ict_readiness_bcp
+    framework_ref: "A.5.30"
+    parameter_name: "ICT readiness for business continuity"
+    weight: null
+    description: "ICT readiness should be planned, implemented, maintained, and tested based on business continuity objectives and ICT continuity requirements."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide the most recent BCP/DR test date, scope, and results for ICT systems."
+    attestation_validity_months: null
+
+  - id: security_awareness_training
+    framework_ref: "A.6.3"
+    parameter_name: "Information security awareness, education and training"
+    weight: null
+    description: "Personnel should receive appropriate information security awareness, education, and training, and regular updates on organizational policies and procedures."
+    maturity_bands: null
+    source: "https://hightable.io/iso-27001-2022-everything-you-need-to-know/"
+    confidence: medium
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide evidence of security awareness training completion rates for the current cycle."
+    attestation_validity_months: null
