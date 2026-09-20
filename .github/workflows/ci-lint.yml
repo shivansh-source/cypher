@@ -29,6 +29,11 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+      # See ci-deps.yml: actions/setup-python's bundled setuptools can carry
+      # its own disclosed CVEs independent of anything this project
+      # declares.
+      - run: pip install --upgrade pip setuptools
+
       # Editable install (not just `pip install ruff mypy`): mypy runs in
       # strict mode against real dependencies (pydantic, fastapi, ...), so
       # it needs them importable to type-check call sites accurately.
