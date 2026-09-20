@@ -1,26 +1,41 @@
 @import "tailwindcss";
 
+/*
+ * Su₹aksha console theme.
+ *
+ * Dark by default and not theme-switchable: this is an operations console read
+ * in the same room as SOC tooling, and a single fixed palette means two people
+ * looking at the same screenshot of a risk figure see identical colour coding.
+ * Semantic colours are reserved for status — never decoration — so that red on
+ * this screen always means "worse".
+ */
+@theme {
+  --color-canvas: #0a0d14;
+  --color-surface: #11151e;
+  --color-surface-2: #161b27;
+  --color-line: #232a38;
+  --color-ink: #e7ebf3;
+  --color-muted: #8a94a7;
+  --color-faint: #5d6678;
+
+  --color-accent: #58a6ff;
+  --color-danger: #f87171;
+  --color-warn: #f0b429;
+  --color-ok: #34d399;
+  --color-sample: #c084fc;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* Tabular figures everywhere a rupee amount or count is displayed, so columns
+   of numbers align and digit changes don't shift layout. */
+.tnum {
+  font-variant-numeric: tabular-nums;
 }

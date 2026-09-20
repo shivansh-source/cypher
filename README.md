@@ -11,10 +11,11 @@ recommends where to spend a finite security budget for maximum risk
 reduction, and maps the underlying findings to Indian regulatory frameworks
 (RBI Directions 2026, SEBI CSCRF/CCI, CIS Controls, NIST CSF, ISO 27001).
 
-**This repository is partially implemented.** `governance/` and four of
+**This repository is partially implemented.** `governance/`, four of
 `infra/connectors/` (`wazuh_connector.py`, `greenbone_connector.py`,
-`prowler_connector.py`, `scoutsuite_connector.py`) plus the `ingest`
-command in `interfaces/cli/riskctl.py` are real; everything else
+`prowler_connector.py`, `scoutsuite_connector.py`), the `ingest`
+command in `interfaces/cli/riskctl.py`, and `interfaces/dashboard/` are
+real; everything else
 (`core/`, `ai/`, `interfaces/api/`, the remaining connectors and CLI
 commands) still contains signatures and docstrings only — see `CLAUDE.md`
 for the design principles that govern how the remaining bodies must be
@@ -72,9 +73,14 @@ pytest
 
 ### Frontend (`interfaces/dashboard/`)
 
-A standalone Next.js app (TypeScript, App Router, Tailwind), scaffolded but
-still just the default `create-next-app` starter page — no Su₹aksha-specific
-UI yet.
+A standalone Next.js app (TypeScript, App Router, Tailwind) with four routes:
+exposure (EAL/VaR and what drives them), investment (budget-constrained
+portfolio), compliance (control-by-control framework status), and data quality
+(snapshot provenance, quality gates, scanner coverage). Because `core/` and
+`interfaces/api/` are still unimplemented, it renders explicit "no figure
+computed yet" states rather than placeholder numbers; see
+`interfaces/dashboard/README.md` for the backend endpoint contract it expects
+and for the opt-in sample-data mode.
 
 ```
 cd interfaces/dashboard
