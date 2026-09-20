@@ -128,3 +128,56 @@ MONTE_CARLO_ITERATIONS: int = 0  # TODO: set and justify via convergence study
 # CALIBRATION: a business/reporting decision, not a statistical one —
 # confirm with stakeholders which percentile they expect to see.
 VALUE_AT_RISK_PERCENTILE: float = 0.0  # TODO: set (e.g. 0.95) and keep in sync with reporting
+
+# ---------------------------------------------------------------------------
+# Governance / attestation constants
+# ---------------------------------------------------------------------------
+# ASSUMPTION: how long a manual attestation stays current before it must be
+# re-attested, in months, keyed by control_id for controls whose regulatory
+# source specifies (or implies) a different cadence than the default.
+# JUSTIFICATION: PLACEHOLDER — populate from a control's own framework text
+# where it specifies a review/audit/testing cadence (e.g. "VAPT every six
+# months", "BCP-DR test annually") as that research is done; entries left
+# out use DEFAULT_ATTESTATION_VALIDITY_MONTHS below.
+# CALIBRATION: read the specific clause of each regulatory source (see
+# governance/control_library/*.yaml `source` fields) that governs review
+# frequency for that control, rather than assuming a uniform cadence.
+ATTESTATION_VALIDITY_MONTHS: dict[str, int] = {
+    # "control_id": 6,  # e.g. VAPT/pentest-cadence controls
+}
+
+# ASSUMPTION: default attestation validity window (months) for any control
+# not listed in ATTESTATION_VALIDITY_MONTHS above.
+# JUSTIFICATION: 12 months matches the common annual audit/surveillance
+# cadence shared by ISO 27001 surveillance audits, RBI/SEBI annual
+# compliance certifications, and CIS/NIST self-assessment cycles — a
+# reasonable default, not a researched value for any single framework.
+# CALIBRATION: revisit once each framework's actual review cadence has been
+# researched and recorded per-control above; this default should shrink in
+# importance over time, not grow.
+DEFAULT_ATTESTATION_VALIDITY_MONTHS: int = 12
+
+# ASSUMPTION: how recent a backup test must be (days) for
+# governance.mapper's `backup_tested_within_days` telemetry check to count
+# it as "tested", independent of `core.engine`'s own RTO/RPO modelling.
+# JUSTIFICATION: 90 days approximates a quarterly test cadence, a common
+# baseline recommendation (e.g. in CIS Control 11) where the specific
+# control's own source doesn't specify an exact figure.
+# CALIBRATION: replace with the specific cadence named in each control's
+# `source` document where one exists; this is a fallback, not a citation.
+BACKUP_TEST_RECENCY_DAYS: int = 90
+
+# ASSUMPTION: ports that, if open on an internet-facing asset, indicate weak
+# network exposure control — used by governance.mapper's
+# `no_dangerous_ports_on_internet_facing_assets` telemetry check (e.g. for
+# ISO 27001's A.8.20 "Networks security").
+# JUSTIFICATION: these are commonly targeted for direct exploitation or
+# credential brute-forcing when reachable from the internet (SSH, Telnet,
+# RDP, SMB, FTP, and common database ports that should never be
+# internet-facing). This is a generic heuristic, not a substitute for an
+# asset-specific expected-ports policy, and no control library entry treats
+# it as authoritative regulatory text.
+# CALIBRATION: replace with (or supplement via) an organization-specific
+# expected-ports allowlist per asset once that data is available from a
+# connector, rather than a single global blocklist.
+DANGEROUS_INTERNET_FACING_PORTS: list[int] = [21, 22, 23, 445, 3306, 3389, 5432, 6379, 27017]

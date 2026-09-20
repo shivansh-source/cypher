@@ -1,16 +1,348 @@
-# NIST Cybersecurity Framework — skeleton, not real data.
-# See governance/control_library/README.md for the shape every file here follows.
+# NIST Cybersecurity Framework (CSF) 2.0.
+#
+# Primary source read directly this session (NIST.CSWP.29, the CSF 2.0
+# reference document itself — a free US government publication, no
+# paywall). Confidence is high throughout for subcategory codes/text; where
+# a real schema field only partially evidences a subcategory's actual
+# outcome, that subcategory is marked NOT telemetry-derivable rather than
+# forcing an unreliable pass/fail out of a weak signal — see the `logic`
+# field on each such entry for why.
+#
+# See governance/control_library/README.md for the shape every file here
+# follows, and governance/library_loader.py for how `telemetry_check` is
+# actually evaluated (check_type/check_params, not the `logic` prose).
 
 framework: nist_csf
-# TODO: set to the actual NIST CSF version in use (e.g. "2.0") once decided.
-version: null
-effective_from: null
+version: "2.0"
+effective_from: "2024-02-26"
 effective_to: null
 supersedes: null
 
-controls: []
-  # TODO: populate. One example entry, for shape reference only:
-  # - control_id: "ID.AM-01"
-  #   title: "Inventories of hardware managed by the organization are maintained"
-  #   description: "TODO: full control text from the current NIST CSF document."
-  #   maps_to_finding_types: ["cve", "misconfiguration"]
+sources:
+  - url_or_citation: "NIST Cybersecurity White Paper NIST.CSWP.29 — The NIST Cybersecurity Framework (CSF) 2.0, https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf, DOI 10.6028/NIST.CSWP.29"
+    retrieved: "2026-09-20"
+    covers: "All subcategory codes, titles, and outcome text below — read directly from Appendix A of the primary document."
+
+controls:
+  # --- Telemetry-derivable -------------------------------------------------
+  - id: mfa_authentication
+    framework_ref: "PR.AA-03"
+    parameter_name: "Authentication of users, services, hardware"
+    weight: null
+    description: "Users, services, and hardware are authenticated."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].identity_access.mfa_enforced"
+      logic: "MFA must be enforced on every in-scope asset; null means never evaluated, not failing."
+      check_type: "all_assets_field_true"
+      check_params: { field_path: "identity_access.mfa_enforced" }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: privileged_access_hygiene
+    framework_ref: "PR.AA-05"
+    parameter_name: "Least-privilege access permissions"
+    weight: null
+    description: "Access permissions, entitlements, and authorizations are defined in a policy, managed, enforced, and reviewed, and incorporate the principles of least privilege and separation of duties."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: "assets[].identity_access.privileged_accounts_count"
+      logic: "privileged_accounts_count is a weak supporting signal only (a nonzero count means privileged access exists) — it cannot confirm a least-privilege policy is actually enforced or reviewed, which is what this subcategory requires."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Provide the access entitlement review process and evidence of the most recent least-privilege/separation-of-duties review."
+    attestation_validity_months: null
+
+  - id: endpoint_detection_monitoring
+    framework_ref: "DE.CM-09"
+    parameter_name: "Endpoint/runtime monitoring"
+    weight: null
+    description: "Computing hardware and software, runtime environments, and their data are monitored to find potentially adverse events."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].edr.agent_installed, .agent_healthy, .detection_rules_active"
+      logic: "Every in-scope asset must have an EDR agent installed and healthy."
+      check_type: "all_edr_agents_healthy"
+      check_params: {}
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: internet_exposure_risk_input
+    framework_ref: "ID.RA-04"
+    parameter_name: "Impact/likelihood from exposed assets"
+    weight: null
+    description: "Potential impacts and likelihoods of threats exploiting vulnerabilities are identified and recorded."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: "assets[].network.internet_facing, .open_ports"
+      logic: "internet_facing and open_ports are contributing telemetry inputs to an impact/likelihood assessment, not proof that the assessment itself is recorded and maintained — that is a risk-register/process fact our schema doesn't capture."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Provide the risk register entry (or equivalent) showing impact/likelihood assessment for internet-facing assets, and its last update date."
+    attestation_validity_months: null
+
+  - id: vulnerability_identification
+    framework_ref: "ID.RA-01"
+    parameter_name: "Vulnerability identification"
+    weight: null
+    description: "Vulnerabilities in assets are identified, validated, and recorded."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: "assets[].findings[].type==\"cve\", .cve_id"
+      logic: "Well-formed CVE findings in a single snapshot are supporting evidence that identification happens, but a snapshot with zero current CVE findings would be indistinguishable from 'no vulnerabilities exist' vs 'no process identifies them' — this subcategory is about whether the process exists, which a single point-in-time snapshot cannot itself confirm."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Confirm the vulnerability identification process/tooling in place and its scan cadence."
+    attestation_validity_months: null
+
+  - id: threat_informed_prioritization
+    framework_ref: "ID.RA-05"
+    parameter_name: "Threat/vuln/impact-informed prioritization"
+    weight: null
+    description: "Threats, vulnerabilities, likelihoods, and impacts are used to understand inherent risk and inform risk response prioritization."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].findings[] where type==\"cve\" and kev_listed==true, .remediated_at"
+      logic: "No unremediated finding may be both type=cve and kev_listed=true — this is the clearest telemetry-observable evidence that KEV status is actually being used to prioritize response."
+      check_type: "no_unremediated_findings"
+      check_params: { match: { type: "cve", kev_listed: true } }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: cloud_configuration_management
+    framework_ref: "PR.PS-01"
+    parameter_name: "Configuration management"
+    weight: null
+    description: "Configuration management practices are established and applied."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].findings[] where type==\"misconfiguration\" and provenance.connector==\"prowler_connector\""
+      logic: "No unremediated cloud/config misconfiguration finding from the CSPM connector may remain open."
+      check_type: "no_unremediated_findings"
+      check_params: { match: { type: "misconfiguration", provenance_connector: "prowler_connector" } }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: patch_currency_approximate
+    framework_ref: "PR.PS-02"
+    parameter_name: "Software maintained/patched per risk"
+    weight: null
+    description: "Software is maintained, replaced, and removed commensurate with risk."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: "assets[].findings[].remediated_at (where type==\"cve\")"
+      logic: "Time-to-remediate on known CVE findings is only an approximation of patch cadence. Schema gap: there is no direct patch_level/patch-compliance field on assets or endpoints, so this subcategory cannot be directly evidenced."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Provide the current patch management SLA and evidence of adherence for the most recent cycle."
+    attestation_validity_months: null
+
+  - id: backup_integrity_for_recovery
+    framework_ref: "RC.RP-03"
+    parameter_name: "Backup integrity before restoration"
+    weight: null
+    description: "The integrity of backups and other restoration assets is verified before using them for restoration."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: "services[].backup.immutable_copy"
+      logic: "immutable_copy tells us tamper-resistant storage exists, not that an integrity check is actually run before a real restoration — that is a runtime/process fact our schema doesn't capture."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Provide evidence that backup integrity is verified as part of the restore procedure, and the date of the last verified restore test."
+    attestation_validity_months: null
+
+  - id: backup_creation_and_testing
+    framework_ref: "PR.DS-11"
+    parameter_name: "Backup creation, protection, testing"
+    weight: null
+    description: "Backups of data are created, protected, maintained, and tested."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "services[].backup.exists, .last_tested_at"
+      logic: "Every in-scope service must have a backup that exists and was tested within core.assumptions.BACKUP_TEST_RECENCY_DAYS."
+      check_type: "backup_tested_within_days"
+      check_params: { days: null }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: network_segmentation
+    framework_ref: "PR.IR-01"
+    parameter_name: "Networks and environments protected from unauthorized access"
+    weight: null
+    description: "Networks and environments are protected from unauthorized logical access and usage."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: null
+      logic: "No network-segmentation/architecture field exists anywhere in schema/aggregated_assets.schema.json. internet_facing/open_ports describe exposure, not segmentation."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Provide network architecture/segmentation diagrams and evidence that critical systems are isolated from general-purpose networks."
+    attestation_validity_months: null
+
+  # --- Attestation-only ------------------------------------------------
+  - id: incident_response_testing
+    framework_ref: "ID.IM-02"
+    parameter_name: "Improvements from security tests/exercises"
+    weight: null
+    description: "Improvements are identified from security tests and exercises, including those done in coordination with suppliers and relevant third parties."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Describe the most recent incident response tabletop exercise or simulation: date conducted, scope, participants, and improvements identified."
+    attestation_validity_months: null
+
+  - id: bcp_dr_failover_testing
+    framework_ref: "ID.IM-02"
+    parameter_name: "BCP/DR failover testing"
+    weight: null
+    description: "Same subcategory as incident_response_testing, applied to full business-continuity/disaster-recovery failover, broader than a single service's backup-restore test."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Describe the most recent full BCP/DR failover test: date, scope (which services), RTO/RPO achieved vs. target, and any gaps found."
+    attestation_validity_months: null
+
+  - id: security_awareness_training_general
+    framework_ref: "PR.AT-01"
+    parameter_name: "General staff awareness training"
+    weight: null
+    description: "Personnel are provided with awareness and training so that they possess the knowledge and skills to perform general tasks with cybersecurity risks in mind."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide the completion rate and date of the most recent org-wide security awareness training cycle."
+    attestation_validity_months: null
+
+  - id: security_awareness_training_specialized
+    framework_ref: "PR.AT-02"
+    parameter_name: "Specialized-role training"
+    weight: null
+    description: "Individuals in specialized roles are provided with awareness and training so that they possess the knowledge and skills to perform relevant tasks with cybersecurity risks in mind."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "List specialized roles (e.g. developers, admins, incident responders) and their most recent role-specific security training dates."
+    attestation_validity_months: null
+
+  - id: leadership_accountability
+    framework_ref: "GV.RR-01"
+    parameter_name: "Board/leadership accountability"
+    weight: null
+    description: "Organizational leadership is responsible and accountable for cybersecurity risk and fosters a culture that is risk-aware, ethical, and continually improving."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide evidence of board/leadership-level cybersecurity risk ownership (charter, committee minutes, or equivalent)."
+    attestation_validity_months: null
+
+  - id: risk_appetite_statement
+    framework_ref: "GV.RM-02"
+    parameter_name: "Risk appetite/tolerance"
+    weight: null
+    description: "Risk appetite and risk tolerance statements are established, communicated, and maintained."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide the current documented risk appetite/tolerance statement and its last review date."
+    attestation_validity_months: null
+
+  - id: vendor_risk_assessment
+    framework_ref: "GV.SC-07"
+    parameter_name: "Ongoing supplier risk monitoring"
+    weight: null
+    description: "The risks posed by a supplier, their products and services, and other third parties are understood, recorded, prioritized, assessed, responded to, and monitored over the course of the relationship."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Provide the vendor risk assessment register and the date each critical third party was last reviewed."
+    attestation_validity_months: null
+
+  - id: vendor_due_diligence_onboarding
+    framework_ref: "GV.SC-06"
+    parameter_name: "Pre-onboarding due diligence"
+    weight: null
+    description: "Planning and due diligence are performed to reduce risks before entering into formal supplier or other third-party relationships."
+    maturity_bands: null
+    source: "NIST.CSWP.29, Appendix A"
+    confidence: high
+    verified_by_human: false
+    telemetry_check: { derivable_from_telemetry: false, source_field: null, logic: null, check_type: null, check_params: {} }
+    manual_attestation_required: true
+    attestation_prompt: "Describe the due-diligence process applied before onboarding a new critical supplier, and confirm it was followed for the most recent onboarding."
+    attestation_validity_months: null

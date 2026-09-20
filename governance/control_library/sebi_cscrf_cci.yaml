@@ -1,18 +1,150 @@
-# SEBI Cybersecurity and Cyber Resilience Framework (CSCRF) / Cyber
-# Capability Index (CCI) — skeleton, not real data.
-# See governance/control_library/README.md for the shape every file here follows.
+# SEBI Cybersecurity and Cyber Resilience Framework (CSCRF), Annexure-K —
+# Cyber Capability Index (CCI).
+#
+# ============================================================================
+# COVERAGE WARNING — ONLY 4 OF 23 CCI PARAMETERS COULD BE IDENTIFIED
+# ============================================================================
+# The framework's existence, title, circular number, and effective date are
+# CONFIRMED from SEBI's own circular page (primary source, sebi.gov.in) —
+# high confidence. But despite 3 direct PDF fetch attempts (all failed: 2
+# connection resets, 1 HTTP 403) and multiple secondary-source searches, the
+# full Annexure-K text enumerating all 23 weighted parameters was NOT
+# reachable this session. Only 4 parameter names could be corroborated (each
+# from a single secondary source, none with a confirmed weight) — see
+# `controls` below.
+#
+# The remaining 19 of 23 parameters are DELIBERATELY NOT included as
+# placeholder/guessed entries — inventing plausible-sounding parameter names
+# would misrepresent fabricated content as SEBI's actual regulatory text.
+# governance/library_loader.py's confidence-warning mechanism cannot warn
+# about entries that don't exist, so this gap must be tracked externally
+# (see the verification worksheet / coverage table delivered alongside this
+# implementation) until a human retrieves the primary Annexure-K text.
+#
+# Most promising unresolved lead found this session: a PDF at
+# https://www.lawrbit.com/wp-content/uploads/2026/02/annexure-k-cyber-capability-index-cci.pdf
+# — its filename suggests it IS the target document, but it returned HTTP
+# 403 to the automated fetcher and should be tried manually in a browser.
+#
+# Because only 4/23 parameters are populated and none has a confirmed
+# weight, `total_weight` for this framework will be null/zero until further
+# research — governance.mapper must not compute a CCI percentage score from
+# this file as though it were complete. See governance/mapper.py's
+# WeightedScoreResult and its `controls_excluded_no_weight` field.
+# ============================================================================
+#
+# CCI overall-score maturity bands (apply to the composite 0-100 CCI score,
+# not to any single parameter below) — found in ONE secondary source
+# (cybernx.com), NOT cross-checked against a second, confidence: medium:
+#   Exceptional 91-100 | Optimal 81-90 | Manageable 71-80 | Developing 61-70
+#   | Bare Minimum 51-60 | Fail <=50
+# Not implemented as executable logic in this codebase: classifying a
+# 4-of-23-parameter score into these bands would overstate what an
+# incomplete index can honestly claim. Revisit once parameter coverage is
+# materially more complete.
+#
+# See governance/library_loader.py for how `telemetry_check` is actually
+# evaluated (check_type/check_params, not the `logic` prose).
 
 framework: sebi_cscrf_cci
-# TODO: set to the actual CSCRF circular version/date in use.
-version: null
-effective_from: null
+version: "SEBI/HO/ITD-1/ITD_CSC_EXT/P/CIR/2024/113 — Cybersecurity and Cyber Resilience Framework (CSCRF) for SEBI Regulated Entities (REs)"
+effective_from: "2024-08-20"
 effective_to: null
 supersedes: null
 
-controls: []
-  # TODO: populate. One example entry, for shape reference only:
-  # - control_id: "SEBI-CSCRF-GOVERNANCE-01"
-  #   title: "Board-approved cybersecurity policy"
-  #   description: "TODO: full control text from the current CSCRF circular."
-  #   maps_to_finding_types: []
-  #   cci_weight: null  # TODO: if this control contributes to the Cyber Capability Index score, record its weight here.
+sources:
+  - url_or_citation: "https://www.sebi.gov.in/legal/circulars/aug-2024/cybersecurity-and-cyber-resilience-framework-cscrf-for-sebi-regulated-entities-res-_85964.html"
+    retrieved: "2026-09-20"
+    covers: "Framework title, circular number, effective_from date (all high confidence, primary source)"
+  - url_or_citation: "https://www.sebi.gov.in/legal/circulars/dec-2024/clarifications-to-cybersecurity-and-cyber-resilience-framework-cscrf-for-sebi-regulated-entities-res-_90401.html ; https://www.sebi.gov.in/legal/circulars/aug-2025/technical-clarifications-to-cybersecurity-and-cyber-resilience-framework-cscrf-for-sebi-regulated-entities-res-_96329.html"
+    retrieved: "2026-09-20"
+    covers: "Existence of amending circulars (dates only — content not fetched this session)"
+  - url_or_citation: "https://securitybrigade.com/resources/sebi-cscrf-checklist/ ; https://www.bitscore.in/resources/sebi-cscrf-compliance"
+    retrieved: "2026-09-20"
+    covers: "Assessment cadence (MII half-yearly, qualified RE annual self-assessment) — two independent secondary sources, consistent"
+  - url_or_citation: "https://www.cybernx.com/cyber-capability-index-cci-as-per-sebis-cscrf/"
+    retrieved: "2026-09-20"
+    covers: "Overall CCI maturity bands (single secondary source, not cross-checked)"
+  - url_or_citation: "https://seconize.co/blog/sebi-cyber-capability-index-cci/"
+    retrieved: "2026-09-20"
+    covers: "The only 4 of 23 parameter names/descriptions found this session — see controls below"
+  - url_or_citation: "Attempted and failed: NSDL mirror PDF (connection reset), lawrbit.com Annexure-K PDF (HTTP 403), NCDEX mirror PDF (connection reset)"
+    retrieved: "2026-09-20"
+    covers: "Full 23-parameter Annexure-K text — NOT retrieved; see coverage warning above"
+
+controls:
+  - id: security_budget_allocation
+    framework_ref: "Annexure-K (unnumbered — parameter number not found)"
+    parameter_name: "Security Budget Allocation"
+    weight: null
+    description: "Proportion of total IT budget devoted to cybersecurity."
+    maturity_bands: null
+    source: "https://seconize.co/blog/sebi-cyber-capability-index-cci/ (single secondary source, name/description only, no weight found)"
+    confidence: low
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: null
+      logic: "No budget/spend data exists anywhere in schema/aggregated_assets.schema.json."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "What percentage of total IT budget was allocated to cybersecurity this reporting period?"
+    attestation_validity_months: null
+
+  - id: sebi_vulnerability_management
+    framework_ref: "Annexure-K (unnumbered — parameter number not found)"
+    parameter_name: "Vulnerability Management"
+    weight: null
+    description: "Percentage of identified vulnerabilities mitigated within a defined timeframe (the timeframe itself was not found in any accessible source)."
+    maturity_bands: null
+    source: "https://seconize.co/blog/sebi-cyber-capability-index-cci/ (single secondary source, name/description only, no weight or SLA window found)"
+    confidence: low
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: true
+      source_field: "assets[].findings[] where type==\"cve\" and kev_listed==true, .remediated_at"
+      logic: "No unremediated finding may be both type=cve and kev_listed=true — reuses the actively-exploited-vulnerability check used elsewhere pending a sourced SLA window for this specific parameter."
+      check_type: "no_unremediated_findings"
+      check_params: { match: { type: "cve", kev_listed: true } }
+    manual_attestation_required: false
+    attestation_prompt: null
+    attestation_validity_months: null
+
+  - id: soc_technology_coverage
+    framework_ref: "Annexure-K (unnumbered — parameter number not found)"
+    parameter_name: "Implementation of SOC Technologies"
+    weight: null
+    description: "Coverage of IT assets by Security Operations Center technologies (log ingestion, correlation, alerting) — broader than endpoint agent coverage alone."
+    maturity_bands: null
+    source: "https://seconize.co/blog/sebi-cyber-capability-index-cci/ (single secondary source, name/description only, no weight found)"
+    confidence: low
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: "assets[].edr.agent_installed"
+      logic: "agent_installed is an EDR-coverage proxy only — it cannot confirm true SOC/SIEM coverage (log ingestion, correlation rules), which our schema has no field for at all."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "What proportion of monitored assets are covered by SOC/SIEM technologies beyond endpoint agents?"
+    attestation_validity_months: null
+
+  - id: third_party_risk_management
+    framework_ref: "Annexure-K (unnumbered — parameter number not found)"
+    parameter_name: "Third-party Risk Management"
+    weight: null
+    description: "Evaluation of security measures employed by third-party providers."
+    maturity_bands: null
+    source: "https://seconize.co/blog/sebi-cyber-capability-index-cci/ (single secondary source, name/description only, no weight found)"
+    confidence: low
+    verified_by_human: false
+    telemetry_check:
+      derivable_from_telemetry: false
+      source_field: null
+      logic: "No vendor/third-party risk fields exist anywhere in schema/aggregated_assets.schema.json."
+      check_type: null
+      check_params: {}
+    manual_attestation_required: true
+    attestation_prompt: "Has a security assessment of critical third-party/vendor providers been completed in the last 12 months? Attach evidence."
+    attestation_validity_months: null
