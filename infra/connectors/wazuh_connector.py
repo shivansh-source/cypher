@@ -164,7 +164,9 @@ class WazuhConnector(Connector):
         try:
             return response.json()
         except ValueError as exc:
-            raise WazuhConnectorError(f"{self.name}: {endpoint} returned a non-JSON response") from exc
+            raise WazuhConnectorError(
+                f"{self.name}: {endpoint} returned a non-JSON response"
+            ) from exc
 
     def _get_affected_items(self, endpoint: str, token: str) -> list[dict[str, Any]]:
         """GET ``endpoint`` and return its ``data.affected_items`` list.
@@ -210,9 +212,7 @@ class WazuhConnector(Connector):
                 non-2xx status, or the response lacks ``hits.hits``.
         """
         endpoint = f"{indexer_url}/wazuh-alerts-*/_search"
-        lookback_start = (
-            datetime.now(UTC) - timedelta(hours=ALERT_LOOKBACK_HOURS)
-        ).isoformat()
+        lookback_start = (datetime.now(UTC) - timedelta(hours=ALERT_LOOKBACK_HOURS)).isoformat()
         query = {"query": {"range": {"timestamp": {"gte": lookback_start}}}}
 
         try:

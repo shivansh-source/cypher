@@ -81,7 +81,9 @@ class ProwlerConnector(Connector):
         try:
             return _object_store.read_latest(self.name, STALENESS_THRESHOLD_SECONDS)
         except _object_store.ObjectStoreError as exc:
-            raise ProwlerConnectorError(f"{self.name}: could not read latest Prowler output: {exc}") from exc
+            raise ProwlerConnectorError(
+                f"{self.name}: could not read latest Prowler output: {exc}"
+            ) from exc
 
     def normalize(self, raw: Any) -> list[dict[str, Any]]:
         """Map Prowler check results to schema-shaped finding fragments.

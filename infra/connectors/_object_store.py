@@ -179,7 +179,9 @@ def read_latest_text(connector_name: str, staleness_threshold_seconds: int) -> s
     try:
         text: str = body_bytes.decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise ObjectStoreError(f"{connector_name}: s3://{bucket}/{key} is not valid UTF-8: {exc}") from exc
+        raise ObjectStoreError(
+            f"{connector_name}: s3://{bucket}/{key} is not valid UTF-8: {exc}"
+        ) from exc
     return text
 
 

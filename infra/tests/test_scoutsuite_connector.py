@@ -61,7 +61,9 @@ def test_run_skips_good_level_and_produces_schema_valid_snapshot(
     assert all(not any(key.startswith("_") for key in f) for f in fragments)
 
     danger_fragment = next(
-        f for f in fragments if f["asset_id"] == "cloud:s3.buckets.example-bucket"
+        f
+        for f in fragments
+        if f["asset_id"] == "cloud:s3.buckets.example-bucket"
         and f["findings"][0]["criticality"] == "high"
     )
     assert danger_fragment["findings"][0]["type"] == "misconfiguration"

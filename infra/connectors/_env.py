@@ -44,7 +44,5 @@ def require(name: str, connector_name: str, error_type: type[Exception]) -> str:
     """
     value = get_optional(name)
     if value is None:
-        raise error_type(
-            f"{connector_name}: required environment variable {name} is not set"
-        )
+        raise error_type(f"{connector_name}: required environment variable {name} is not set")
     return value
