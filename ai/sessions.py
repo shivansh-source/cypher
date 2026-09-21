@@ -1,6 +1,6 @@
 """In-memory conversation state for the chat assistant.
 
-A session holds two things: the Messages API history (so a follow-up
+A session holds two things: the content-block history (so a follow-up
 question has the context of the turn before it), and every number real
 tools produced during the conversation. The second is what lets
 ``ai.numeric_guard`` verify a narration that refers back to a figure
@@ -41,9 +41,8 @@ class ChatSession:
     Attributes:
         session_id: Opaque identifier the client passes back to continue
             the conversation.
-        messages: Messages API history — user turns, assistant turns
-            (content blocks preserved verbatim, including thinking and
-            tool_use blocks), and tool_result turns.
+        messages: Conversation history — user turns, assistant turns
+            (content blocks preserved verbatim, including tool_use blocks), and tool_result turns.
         ground_truth: Every number produced by a real tool call in this
             conversation, keyed by dotted field path, for
             ``ai.numeric_guard``.
@@ -58,7 +57,7 @@ class ChatSession:
     last_active_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def append(self, message: dict[str, Any]) -> None:
-        """Append one Messages API turn and mark the session active."""
+        """Append one conversation turn and mark the session active."""
         self.messages.append(message)
         self.last_active_at = datetime.now(UTC)
 

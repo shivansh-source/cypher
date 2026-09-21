@@ -19,7 +19,7 @@ from ai.groq_transport import (
     to_groq_tool_choice,
     to_groq_tools,
 )
-from ai.llm_client import LLMConfigurationError, build_transport
+from ai.llm_client import LLMConfigurationError, get_transport, set_transport
 from ai.sessions import InMemorySessionStore
 
 
@@ -103,7 +103,6 @@ def test_history_with_a_tool_round_trip_converts_to_groq_messages() -> None:
         {
             "role": "assistant",
             "content": [
-                {"type": "thinking", "thinking": "private"},
                 {"type": "text", "text": "Checking."},
                 {
                     "type": "tool_use",
@@ -124,7 +123,7 @@ def test_history_with_a_tool_round_trip_converts_to_groq_messages() -> None:
     assert converted[0] == {"role": "system", "content": "SYS"}
     assert converted[1] == {"role": "user", "content": "exposure?"}
     assistant = converted[2]
-    assert assistant["content"] == "Checking."  # thinking dropped
+    assert assistant["content"] == "Checking."
     assert assistant["tool_calls"][0]["id"] == "call_1"
     assert json.loads(assistant["tool_calls"][0]["function"]["arguments"]) == {"scope": "s"}
     assert converted[3] == {"role": "tool", "tool_call_id": "call_1", "content": "{}"}
@@ -249,9 +248,9 @@ def test_missing_api_key_is_a_configuration_error(monkeypatch: pytest.MonkeyPatc
         GroqTransport().create_message(system="S", messages=[{"role": "user", "content": "hi"}])
 
 
-def test_build_transport_selects_by_name() -> None:
-    assert isinstance(build_transport("groq"), GroqTransport)
-    assert isinstance(build_transport("GROQ"), GroqTransport)
-    assert type(build_transport("anthropic")).__name__ == "AnthropicTransport"
-    with pytest.raises(LLMConfigurationError, match="Unknown LLM_PROVIDER"):
-        build_transport("openai")
+def test_default_transport_is_groq(monkeypatch: pytest.MonkeyPatch) -> None:
+    set_transport(None)
+    try:
+        assert isinstance(get_transport(), GroqTransport)
+    finally:
+        set_transport(None)

@@ -364,8 +364,8 @@ def tool_names() -> list[str]:
     return list(tool_specs())
 
 
-def anthropic_tool_definitions() -> list[dict[str, Any]]:
-    """Render the registry as Messages API tool definitions.
+def tool_definitions() -> list[dict[str, Any]]:
+    """Render the registry as provider-neutral tool definitions.
 
     Returns:
         One definition per registered tool, in a stable order so the tool

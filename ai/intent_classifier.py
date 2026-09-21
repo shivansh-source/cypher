@@ -7,8 +7,8 @@ statement, never prose. See repo-root ``CLAUDE.md`` principle 2.
 
 This is single-shot routing: one message in, one tool call out. The chat
 assistant (``ai/chat.py``) does not use it — a conversation needs several
-tools and follow-ups on their results, which is what the Messages API's
-own tool-calling loop is for. This function stays for callers that want
+tools and follow-ups on their results, which is what the chat
+engine's own tool-calling loop is for. This function stays for callers that want
 cheap routing without a conversation (a CLI one-liner, a search box).
 """
 
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai.llm_client import LLMTransport, get_transport
-from ai.tool_registry import anthropic_tool_definitions, tool_names
+from ai.tool_registry import tool_definitions, tool_names
 
 #: The single tool the classifier is allowed to call. Routing is expressed
 #: as one structured call rather than free text so the model cannot answer
@@ -126,7 +126,7 @@ def classify_intent_with(
 
     catalogue = [
         definition
-        for definition in anthropic_tool_definitions()
+        for definition in tool_definitions()
         if definition["name"] in set(available_tools)
     ]
     prompt = (

@@ -175,7 +175,7 @@ def chat_route() -> Any:
     ``ai.intent_classifier``, the relevant ``ai.tools`` module, and
     ``ai.numeric_guard`` before returning a response.
 
-    Routing is done by the Messages API's own tool-calling loop in
+    Routing is done by the model's own tool-calling loop in
     ``ai.chat`` rather than by ``ai.intent_classifier``'s single-shot
     router, so that one question may use several tools and follow up on
     their results; the classifier remains available for one-shot callers.

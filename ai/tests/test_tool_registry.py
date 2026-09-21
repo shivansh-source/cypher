@@ -14,9 +14,9 @@ import pytest
 
 from ai import tool_registry
 from ai.tool_registry import (
-    anthropic_tool_definitions,
     available_frameworks,
     execute_tool,
+    tool_definitions,
     tool_names,
     tool_specs,
 )
@@ -33,7 +33,7 @@ def test_every_declared_tool_has_a_schema_and_a_handler() -> None:
 
 def test_tool_definitions_match_the_modules_under_ai_tools() -> None:
     """The registry is the single list of tools; nothing may be declared twice."""
-    definitions = anthropic_tool_definitions()
+    definitions = tool_definitions()
     assert [definition["name"] for definition in definitions] == tool_names()
     assert len({definition["name"] for definition in definitions}) == len(definitions)
 
