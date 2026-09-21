@@ -341,8 +341,7 @@ def _build_specs() -> dict[str, ToolSpec]:
             },
             handler=explain_number,
             unavailable_hint=(
-                "No figure has been computed yet, so there is no derivation trail "
-                "to explain."
+                "No figure has been computed yet, so there is no derivation trail to explain."
             ),
         ),
     ]

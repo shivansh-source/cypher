@@ -8,3 +8,11 @@
 # gitleaks' generic-api-key rule pattern-matches on `key:` + a quoted string
 # regardless of context.
 4307e6d9300b97fa2437be685d02eefd35ee5811:interfaces/dashboard/src/app/compliance/page.tsx:generic-api-key:15
+
+# .gitleaksignore:6 (commit f7562a4) — the explanatory comment above, which
+# quotes the `{ key: "...", label: ... }` shape it is describing. It is prose
+# inside this ignore file, so the scanner flags the file that documents the
+# false positive. Not a secret: the quoted value is a control-library
+# filename. Fingerprint pinned to that commit, so it cannot mask a future
+# real secret on a different line or in a different commit.
+f7562a4de86fb974bbc43c0dcda2b6b55c393d7d:.gitleaksignore:generic-api-key:6

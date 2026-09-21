@@ -76,7 +76,9 @@ def _completion(
 
 def test_tools_become_groq_function_tools() -> None:
     schema = {"type": "object", "properties": {"scope": {"type": "string"}}, "required": []}
-    converted = to_groq_tools([{"name": "get_exposure", "description": "d", "input_schema": schema}])
+    converted = to_groq_tools(
+        [{"name": "get_exposure", "description": "d", "input_schema": schema}]
+    )
     assert converted == [
         {
             "type": "function",
@@ -103,7 +105,12 @@ def test_history_with_a_tool_round_trip_converts_to_groq_messages() -> None:
             "content": [
                 {"type": "thinking", "thinking": "private"},
                 {"type": "text", "text": "Checking."},
-                {"type": "tool_use", "id": "call_1", "name": "get_exposure", "input": {"scope": "s"}},
+                {
+                    "type": "tool_use",
+                    "id": "call_1",
+                    "name": "get_exposure",
+                    "input": {"scope": "s"},
+                },
             ],
         },
         {
@@ -148,12 +155,14 @@ def test_malformed_tool_arguments_become_empty_input_not_a_crash() -> None:
 
 
 def test_finish_reasons_map_to_the_chat_loops_vocabulary() -> None:
-    assert from_groq_message(model="m", text="x", tool_calls=[], finish_reason="stop")[
-        "stop_reason"
-    ] == "end_turn"
-    assert from_groq_message(model="m", text="x", tool_calls=[], finish_reason="length")[
-        "stop_reason"
-    ] == "max_tokens"
+    assert (
+        from_groq_message(model="m", text="x", tool_calls=[], finish_reason="stop")["stop_reason"]
+        == "end_turn"
+    )
+    assert (
+        from_groq_message(model="m", text="x", tool_calls=[], finish_reason="length")["stop_reason"]
+        == "max_tokens"
+    )
 
 
 def test_create_message_returns_a_messages_api_shaped_reply() -> None:
@@ -216,7 +225,9 @@ def test_chat_engine_runs_a_full_turn_over_groq(monkeypatch: pytest.MonkeyPatch)
     transport, completions = _transport(
         [
             _completion(
-                tool_calls=[{"id": "call_1", "function": {"name": "get_exposure", "arguments": "{}"}}],
+                tool_calls=[
+                    {"id": "call_1", "function": {"name": "get_exposure", "arguments": "{}"}}
+                ],
                 finish_reason="tool_calls",
             ),
             _completion(content="Your exposure is about ₹4.2 crore."),

@@ -71,9 +71,7 @@ def _tool_message(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     return {
         "model": "scripted-model",
         "stop_reason": "tool_use",
-        "content": [
-            {"type": "tool_use", "id": "toolu_1", "name": tool_name, "input": arguments}
-        ],
+        "content": [{"type": "tool_use", "id": "toolu_1", "name": tool_name, "input": arguments}],
     }
 
 
