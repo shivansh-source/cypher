@@ -11,10 +11,8 @@ uvicorn --factory interfaces.api.app:create_app --reload --port 8000
 ```
 
 Configuration comes from the environment (see the repo-root `.env.example`):
-`CORS_ALLOWED_ORIGINS`, `LLM_PROVIDER` (`groq` by default, or `anthropic`),
-`GROQ_API_KEY`, `GROQ_MODEL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`,
-`ANTHROPIC_THINKING`, `ANTHROPIC_EFFORT`, `CHAT_SESSION_TTL_MINUTES`,
-`CHAT_MAX_SESSIONS`, `CHAT_MAX_TOOL_ITERATIONS`.
+`CORS_ALLOWED_ORIGINS`, `GROQ_API_KEY`, `GROQ_MODEL`,
+`CHAT_SESSION_TTL_MINUTES`, `CHAT_MAX_SESSIONS`, `CHAT_MAX_TOOL_ITERATIONS`.
 
 ## The chat assistant
 
@@ -89,7 +87,7 @@ or put a shared store behind `ai.sessions.InMemorySessionStore`'s interface.
       "result": null
     }
   ],
-  "model": "claude-opus-5",
+  "model": "llama-3.3-70b-versatile",
   "stop_reason": "end_turn"
 }
 ```
@@ -99,8 +97,8 @@ does not exist yet) or `error` (it exists and failed). `stop_reason` is the
 provider's, except `max_tool_iterations`, which is this backend stopping a
 turn that kept calling tools without answering.
 
-`503` means the assistant is not configured (no API key for the selected
-provider, SDK not installed); `502` means the provider call failed.
+`503` means the assistant is not configured (no `GROQ_API_KEY`, SDK not
+installed); `502` means the provider call failed.
 
 ### `POST /chat/stream`
 

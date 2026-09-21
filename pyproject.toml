@@ -9,10 +9,8 @@ license = { text = "Proprietary" }
 dependencies = [
     # TODO: pin real versions once implementation begins.
     "pydantic>=2",
-    # ai/: the LLM providers this codebase can call, selected by LLM_PROVIDER.
-    # See ai/llm_client.py and ai/groq_transport.py.
+    # ai/: the LLM provider. See ai/llm_client.py and ai/groq_transport.py.
     "groq>=1",
-    "anthropic>=1",
     "numpy",
     "jsonschema",
     "pyyaml",

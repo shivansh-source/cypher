@@ -39,9 +39,9 @@ from ai.numeric_guard import DEFAULT_TOLERANCE, collect_ground_truth, guard_narr
 from ai.sessions import ChatSession
 from ai.tool_registry import (
     ToolExecution,
-    anthropic_tool_definitions,
     available_frameworks,
     execute_tool,
+    tool_definitions,
 )
 
 #: How many times the model may call tools before the loop stops and
@@ -228,7 +228,7 @@ class ChatEngine:
             ai.llm_client.LLMProviderError: The provider call failed.
         """
         self._begin_turn(session, user_message)
-        tools = anthropic_tool_definitions()
+        tools = tool_definitions()
         records: list[ToolCallRecord] = []
         answer_parts: list[str] = []
         model = self.transport.model
@@ -277,7 +277,7 @@ class ChatEngine:
         """
         yield ChatEvent(type="session", data={"session_id": session.session_id})
         self._begin_turn(session, user_message)
-        tools = anthropic_tool_definitions()
+        tools = tool_definitions()
         records: list[ToolCallRecord] = []
         answer_parts: list[str] = []
         model = self.transport.model
@@ -364,7 +364,7 @@ class ChatEngine:
 
         Returns:
             The ``user`` message carrying every ``tool_result`` block — all
-            of them in a single message, as the Messages API requires — and
+            of them in a single message, as the provider requires — and
             a record per call for the client.
         """
         results: list[dict[str, Any]] = []

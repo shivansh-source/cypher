@@ -2,7 +2,7 @@
 
 Groq's chat API is OpenAI-shaped: tool calls live in ``message.tool_calls``
 and tool results are ``role: "tool"`` messages. The rest of ``ai/`` speaks
-the Messages API shape instead (``tool_use`` / ``tool_result`` content
+a content-block shape instead (``tool_use`` / ``tool_result``
 blocks), and the session store keeps history in that shape. This module is
 the whole translation boundary: it converts requests on the way out and
 responses on the way back, so ``ai/chat.py``, ``ai/sessions.py`` and
@@ -34,8 +34,7 @@ from ai.llm_client import (
 DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
 
 #: Output token ceiling per request. Well under the context limits of
-#: Groq-hosted models, unlike the far larger ceilings the Anthropic transport
-#: uses.
+#: Groq-hosted models.
 DEFAULT_GROQ_MAX_TOKENS = 8_192
 
 #: Provider ``finish_reason`` -> the stop_reason vocabulary ``ai/chat.py``
@@ -44,7 +43,7 @@ _STOP_REASONS = {"stop": "end_turn", "length": "max_tokens", "tool_calls": "tool
 
 
 def to_groq_tools(tools: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Convert Messages API tool definitions to Groq function tools."""
+    """Convert provider-neutral tool definitions to Groq function tools."""
     return [
         {
             "type": "function",
@@ -59,7 +58,7 @@ def to_groq_tools(tools: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def to_groq_tool_choice(tool_choice: dict[str, Any] | None) -> str | dict[str, Any] | None:
-    """Convert a Messages API ``tool_choice`` to Groq's."""
+    """Convert a provider-neutral ``tool_choice`` to Groq's."""
     if tool_choice is None:
         return None
     kind = tool_choice.get("type")
@@ -73,19 +72,18 @@ def to_groq_tool_choice(tool_choice: dict[str, Any] | None) -> str | dict[str, A
 
 
 def to_groq_messages(system: str, messages: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Convert a Messages API conversation to Groq chat messages.
+    """Convert a content-block conversation to Groq chat messages.
 
     Args:
         system: The system prompt.
-        messages: Messages API history. Assistant content may hold ``text``,
-            ``thinking`` and ``tool_use`` blocks; a user turn may hold
-            ``tool_result`` blocks.
+        messages: Conversation history. Assistant content may hold ``text``
+            and ``tool_use`` blocks; a user turn may hold ``tool_result``
+            blocks.
 
     Returns:
         Groq messages. Every ``tool_use`` becomes an entry in the assistant
         message's ``tool_calls`` and every ``tool_result`` becomes its own
-        ``role: "tool"`` message, matched by id. ``thinking`` blocks are
-        dropped — they are provider-private reasoning, not conversation.
+        ``role: "tool"`` message, matched by id.
     """
     converted: list[dict[str, Any]] = [{"role": "system", "content": system}]
     for message in messages:
@@ -151,7 +149,7 @@ def _parse_arguments(raw: str | None) -> dict[str, Any]:
 def from_groq_message(
     *, model: str, text: str, tool_calls: Sequence[dict[str, Any]], finish_reason: str | None
 ) -> dict[str, Any]:
-    """Assemble a Messages API-shaped message from a Groq completion's parts."""
+    """Assemble a content-block message from a Groq completion's parts."""
     content: list[dict[str, Any]] = []
     if text:
         content.append({"type": "text", "text": text})
