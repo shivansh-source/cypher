@@ -11,15 +11,21 @@ recommends where to spend a finite security budget for maximum risk
 reduction, and maps the underlying findings to Indian regulatory frameworks
 (RBI Directions 2026, SEBI CSCRF/CCI, CIS Controls, NIST CSF, ISO 27001).
 
-**This repository is partially implemented.** `governance/`, four of
-`infra/connectors/` (`wazuh_connector.py`, `greenbone_connector.py`,
-`prowler_connector.py`, `scoutsuite_connector.py`), the `ingest`
-command in `interfaces/cli/riskctl.py`, and `interfaces/dashboard/` are
-real; everything else
-(`core/`, `ai/`, `interfaces/api/`, the remaining connectors and CLI
-commands) still contains signatures and docstrings only — see `CLAUDE.md`
-for the design principles that govern how the remaining bodies must be
-implemented.
+**This repository is partially implemented.** `governance/`, `ai/`
+(LLM client, numeric guard, tool registry, chat assistant), the chat
+endpoints in `interfaces/api/`, four of `infra/connectors/`
+(`wazuh_connector.py`, `greenbone_connector.py`, `prowler_connector.py`,
+`scoutsuite_connector.py`), the `ingest` command in
+`interfaces/cli/riskctl.py`, and `interfaces/dashboard/` are real;
+everything else (`core/`, the thin wrappers in `ai/tools/` that call into
+it, the remaining connectors and CLI commands) still contains signatures
+and docstrings only — see `CLAUDE.md` for the design principles that
+govern how the remaining bodies must be implemented.
+
+Because `core/` is unimplemented, the chat assistant can be talked to
+today but cannot yet report a figure: every tool call comes back as an
+explicit "not computed yet, and here is why", which the assistant relays
+rather than filling in. See `interfaces/api/README.md`.
 
 ## Why rupees, and why not ML
 
@@ -91,6 +97,26 @@ npm run dev
 It talks to the backend only through the FastAPI app in
 `interfaces/api/app.py` (over HTTP) — never by importing Python modules
 directly.
+
+### Chat assistant (`ai/chat.py`, `interfaces/api/`)
+
+A natural-language front door to the same tools the dashboard reads. The
+model chooses which of `ai/tools/` answers a question and narrates what
+those tools returned; it never produces a figure, and every number in its
+prose is checked against real tool output by `ai/numeric_guard.py` before
+it is returned. Run it with:
+
+```
+source .venv/bin/activate
+uvicorn --factory interfaces.api.app:create_app --reload --port 8000
+curl -s localhost:8000/chat -H 'content-type: application/json' \
+  -d '{"message":"what is driving our exposure?"}'
+```
+
+`POST /chat` returns a complete turn; `POST /chat/stream` streams the same
+turn as Server-Sent Events. `interfaces/api/README.md` has the full
+contract, including why a streamed `text_delta` must never be displayed as
+the final answer.
 
 ### Do I need a venv per package?
 
