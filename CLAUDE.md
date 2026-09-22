@@ -128,7 +128,7 @@ that is separate from `pytest`/`mypy`/`ruff` above and never runs through them.
   passed through `ai/numeric_guard.py` first. A narration step is not allowed
   to round, restate, or "helpfully" recompute a figure. (Principle 2)
 - **Do not special-case a data source anywhere outside `infra/connectors/`.**
-  If `core/engine.py` or `governance/mapper.py` needs to know whether a
+  If `core/engine/` or `governance/mapper.py` needs to know whether a
   finding came from Nessus vs. Prowler, the connector didn't normalize
   correctly — fix the connector, not the consumer. (Principle 3)
 - **Do not mark a compliance control "met" because the optimizer recommended

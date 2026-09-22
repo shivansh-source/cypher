@@ -16,16 +16,25 @@ reduction, and maps the underlying findings to Indian regulatory frameworks
 endpoints in `interfaces/api/`, four of `infra/connectors/`
 (`wazuh_connector.py`, `greenbone_connector.py`, `prowler_connector.py`,
 `scoutsuite_connector.py`), the `ingest` command in
-`interfaces/cli/riskctl.py`, and `interfaces/dashboard/` are real;
-everything else (`core/`, the thin wrappers in `ai/tools/` that call into
-it, the remaining connectors and CLI commands) still contains signatures
-and docstrings only — see `CLAUDE.md` for the design principles that
-govern how the remaining bodies must be implemented.
+`interfaces/cli/riskctl.py`, `interfaces/dashboard/`, and `core/engine/`
+(the Open FAIR + Monte Carlo pipeline: scenario derivation,
+parameterization, simulation, and the final risk figure) are real;
+everything else (`core/optimizer.py`, `core/snapshot.py`, the thin
+wrappers in `ai/tools/` that call into `core/`, the remaining connectors
+and CLI commands) still contains signatures and docstrings only — see
+`CLAUDE.md` for the design principles that govern how the remaining
+bodies must be implemented, and `docs/ASSUMPTIONS.md` for every modelling
+constant `core/engine/` reads from and how far each is from being
+calibrated to a real organization.
 
-Because `core/` is unimplemented, the chat assistant can be talked to
-today but cannot yet report a figure: every tool call comes back as an
+Because `ai/tools/` and `core/optimizer.py`/`core/snapshot.py` are still
+unimplemented, the chat assistant can be talked to today but cannot yet
+report a real figure through that path: every tool call comes back as an
 explicit "not computed yet, and here is why", which the assistant relays
-rather than filling in. See `interfaces/api/README.md`.
+rather than filling in. `core.engine.compute_risk_figure` itself is
+runnable today given a snapshot (see `schema/sample_aggregated.json`) —
+it just isn't wired to the chat assistant or the dashboard's API yet. See
+`interfaces/api/README.md`.
 
 ## Why rupees, and why not ML
 
@@ -82,11 +91,16 @@ pytest
 A standalone Next.js app (TypeScript, App Router, Tailwind) with four routes:
 exposure (EAL/VaR and what drives them), investment (budget-constrained
 portfolio), compliance (control-by-control framework status), and data quality
-(snapshot provenance, quality gates, scanner coverage). Because `core/` and
-`interfaces/api/` are still unimplemented, it renders explicit "no figure
-computed yet" states rather than placeholder numbers; see
-`interfaces/dashboard/README.md` for the backend endpoint contract it expects
-and for the opt-in sample-data mode.
+(snapshot provenance, quality gates, scanner coverage). `interfaces/api/app.py`
+now registers `/exposure` and `/optimize` routes, and `core/engine/` can
+compute a real figure today — but those routes delegate through
+`ai/tools/get_exposure.py`/`ai/tools/optimize_investment.py` and
+`core/snapshot.py`'s (still unimplemented) current-committed-snapshot
+lookup, so calling them still errors rather than returning a figure. The
+dashboard renders explicit "no figure computed yet" states rather than
+placeholder numbers until that chain is wired end to end; see
+`interfaces/dashboard/README.md` for the backend endpoint contract it
+expects and for the opt-in sample-data mode.
 
 ```
 cd interfaces/dashboard
@@ -130,7 +144,11 @@ that venv; it manages its own dependencies via `package.json`/`node_modules`
 and is isolated by that mechanism instead.
 
 `riskctl ingest` (see `infra/README.md`) is runnable today against real
-Wazuh/Greenbone/Prowler/ScoutSuite output. The FAIR + Monte Carlo engine,
-the quality gates, and the optimizer are still unimplemented, so a
-committed snapshot has nowhere to go yet — see `.claude/commands/` for the
+Wazuh/Greenbone/Prowler/ScoutSuite output, and `core.engine.compute_risk_figure`
+is runnable today against a hand-authored snapshot (see
+`schema/sample_aggregated.json`) — but the two aren't connected yet: the
+quality gates and snapshot commit lifecycle in `core/snapshot.py` are
+still unimplemented, so an ingested snapshot has nowhere to go, and the
+optimizer in `core/optimizer.py` (which calls `compute_risk_figure`
+internally) is also still unimplemented. See `.claude/commands/` for the
 workflows a contributor will repeat as that lands.

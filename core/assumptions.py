@@ -20,7 +20,7 @@ a regulator or auditor without the calibration step described.
 
 This module intentionally contains no logic — only named, documented
 constants. Anything that transforms these constants into a risk figure
-belongs in ``core/engine.py`` or ``core/optimizer.py``.
+belongs in ``core/engine/`` or ``core/optimizer.py``.
 """
 
 from __future__ import annotations
@@ -30,16 +30,27 @@ from __future__ import annotations
 # ---------------------------------------------------------------------------
 # ASSUMPTION: relative strength (0-1) each control category contributes
 # toward resisting a threat event from becoming a loss event, keyed by
-# control category name as used in governance/control_library/.
-# JUSTIFICATION: PLACEHOLDER — no source yet.
+# control category name as used in governance/control_library/. Only the
+# two categories core/engine/ can currently observe directly from
+# schema/aggregated_assets.schema.json (assets[].identity_access.mfa_enforced,
+# assets[].edr.agent_installed/agent_healthy) are populated; "patch_current"
+# and "network_segmentation" stay unpopulated until a connector exposes a
+# per-asset signal for them, rather than guessing a value nothing reads yet.
+# JUSTIFICATION: PLACEHOLDER — no source yet. This is exactly the number the
+# lab described in the SIH105 Notion doc (page 11, "Experimental Protocol
+# and Lab Validation") is designed to measure: a graded attacker-capability
+# sweep with a control on vs off, common-random-number paired, gives the
+# shift in success rate as the control's efficacy in the same units used
+# here. Until that lab runs, these are illustrative placeholders only.
 # CALIBRATION: requires Open FAIR-style control-strength elicitation per
 # control category, ideally cross-checked against the organization's own
-# incident history (how often did this control actually stop an event?).
+# incident history (how often did this control actually stop an event?),
+# or — see JUSTIFICATION — the lab's capability-sweep measurement.
 CONTROL_RESISTANCE_STRENGTH: dict[str, float] = {
-    # "mfa_enforced": 0.0,          # TODO: calibrate
-    # "edr_active": 0.0,            # TODO: calibrate
-    # "patch_current": 0.0,         # TODO: calibrate
-    # "network_segmentation": 0.0,  # TODO: calibrate
+    "mfa_enforced": 0.4,
+    "edr_active": 0.5,
+    # "patch_current": 0.0,         # TODO: no per-asset patch-currency signal in schema yet
+    # "network_segmentation": 0.0,  # TODO: no per-asset segmentation signal in schema yet
 }
 
 # ---------------------------------------------------------------------------
@@ -48,14 +59,18 @@ CONTROL_RESISTANCE_STRENGTH: dict[str, float] = {
 # ASSUMPTION: multiplier applied to a service's baseline downtime-loss
 # estimate depending on its backup posture, keyed by a posture label the
 # engine derives from ``services[].backup`` in the aggregated schema.
-# JUSTIFICATION: PLACEHOLDER — no source yet.
+# 1.0 means "no additional penalty beyond the base estimate"; values above
+# 1.0 scale up loss magnitude as recovery confidence worsens.
+# JUSTIFICATION: PLACEHOLDER — no source yet. Relative ordering (worse
+# posture => larger multiplier) is the defensible part; the specific
+# magnitudes are illustrative only.
 # CALIBRATION: requires RTO/RPO data from real backup test results (not
 # vendor SLAs) across services of varying criticality.
 RTO_MULTIPLIER_BY_BACKUP_POSTURE: dict[str, float] = {
-    # "no_backup": 0.0,                    # TODO: calibrate
-    # "backup_untested": 0.0,              # TODO: calibrate
-    # "backup_tested_no_immutable": 0.0,   # TODO: calibrate
-    # "backup_tested_immutable": 0.0,      # TODO: calibrate
+    "backup_tested_immutable": 1.0,
+    "backup_tested_no_immutable": 1.3,
+    "backup_untested": 1.8,
+    "no_backup": 3.0,
 }
 
 # ---------------------------------------------------------------------------
@@ -63,7 +78,11 @@ RTO_MULTIPLIER_BY_BACKUP_POSTURE: dict[str, float] = {
 # ---------------------------------------------------------------------------
 # ASSUMPTION: expected direct cost (INR) per record compromised in a data
 # breach loss event, potentially segmented by data sensitivity class.
-# JUSTIFICATION: PLACEHOLDER — no source yet.
+# JUSTIFICATION: PLACEHOLDER — no source yet. Not yet wired into
+# core/engine/'s parameterize_scenario either: schema/aggregated_assets.schema.json
+# has no records-affected-count field on a finding or asset, so there is
+# nothing to multiply this by yet. Wiring this in requires a schema
+# addition, not just a value here.
 # CALIBRATION: requires an India-specific breach cost study (global
 # studies such as IBM's Cost of a Data Breach are not India-calibrated and
 # must not be used unadjusted) or the organization's own past incident
@@ -96,6 +115,12 @@ COST_PER_RECORD_INR: dict[str, float] = {
 # not to the 2026 Directions specifically, since no Directions-specific
 # penalty clause could be confirmed (see rbi_2026_directions.yaml's
 # top-of-file warning).
+# Not yet wired into core/engine/'s parameterize_scenario: these are
+# keyed by penalty_provisions[].id (a specific statute/section), but
+# schema/aggregated_assets.schema.json has no field naming which of these
+# provisions' regulatory regime a given service falls under, so there is
+# nothing to select a key with yet. Wiring this in requires a schema
+# addition, not just the values now present here.
 # CALIBRATION: converting a statutory ceiling into a true probability-
 # weighted "expected regulatory penalty" requires (1) the probability that
 # a given control failure is actually detected and enforced by the
@@ -128,15 +153,112 @@ EXPECTED_REGULATORY_PENALTY_INR: dict[str, float] = {
 # ---------------------------------------------------------------------------
 # ASSUMPTION: baseline annual frequency (events/year) of a threat actor
 # attempting a given threat event type against an asset of a given exposure
-# profile, before any control resistance is applied.
+# profile, before any control resistance is applied. Expressed as a
+# Beta-PERT three-point estimate (min/most_likely/max) rather than a single
+# point value — the frequency itself is uncertain, not just the loss
+# magnitude, and core/engine/'s run_monte_carlo already expects this
+# scenario-level structure (see its docstring). An asset counts as
+# "internet_facing_critical_asset" when assets[].network.internet_facing is
+# true and at least one of its related services[].criticality is "critical"
+# or "high"; every other asset is "internal_asset".
 # JUSTIFICATION: PLACEHOLDER — no source yet.
 # CALIBRATION: requires either the organization's own telemetry (attempted
 # intrusion counts) over a representative period, or a documented external
 # benchmark appropriate to the organization's sector and size — never an
 # arbitrary round number.
-BASELINE_THREAT_EVENT_FREQUENCY_PER_YEAR: dict[str, float] = {
-    # "internet_facing_critical_asset": 0.0,  # TODO: calibrate
-    # "internal_asset": 0.0,                  # TODO: calibrate
+BASELINE_THREAT_EVENT_FREQUENCY_PER_YEAR: dict[str, dict[str, float]] = {
+    "internet_facing_critical_asset": {"min": 6.0, "most_likely": 12.0, "max": 24.0},
+    "internal_asset": {"min": 1.0, "most_likely": 2.0, "max": 6.0},
+}
+
+# ---------------------------------------------------------------------------
+# Vulnerability (probability a threat event becomes a loss event)
+# ---------------------------------------------------------------------------
+# ASSUMPTION: baseline exploit probability used for a finding that has no
+# EPSS score (EPSS only scores CVE-backed findings; a misconfiguration
+# finding's epss_score is null per schema/aggregated_assets.schema.json).
+# JUSTIFICATION: PLACEHOLDER — no source yet. Chosen well below a typical
+# scored CVE's EPSS value so that an unscored finding doesn't silently
+# outrank a scored one just because EPSS couldn't be computed for it.
+# CALIBRATION: requires either an EPSS-equivalent scoring method for
+# non-CVE finding types, or an empirical exploitation-rate study for
+# misconfiguration-class findings specifically.
+BASELINE_EXPLOIT_PROBABILITY_FOR_UNSCORED_FINDING: float = 0.05
+
+# ASSUMPTION: floor applied to a finding's exploit probability when
+# CISA KEV lists it — a KEV listing means active exploitation has already
+# been observed in the wild, which should never be allowed to round down to
+# a low probability just because the finding's own EPSS score is old or low.
+# JUSTIFICATION: PLACEHOLDER — no source yet, but the direction (KEV floor
+# should be materially higher than typical unscored/low-EPSS values) is
+# defensible on its face: KEV listing is itself real-signal evidence of
+# active exploitation, not a modelled estimate.
+# CALIBRATION: requires a study of observed loss-event rates specifically
+# for KEV-listed CVEs versus non-KEV CVEs of similar EPSS score.
+KEV_LISTED_MINIMUM_EXPLOIT_PROBABILITY: float = 0.5
+
+# ---------------------------------------------------------------------------
+# Shared latent control-health factors (C3 scenario correlation)
+# ---------------------------------------------------------------------------
+# ASSUMPTION: per-simulated-year realized effectiveness of a control
+# category, as a multiplier on its assumed CONTROL_RESISTANCE_STRENGTH
+# value (1.0 = performed exactly as assumed; below 1.0 = degraded that
+# year, e.g. an EDR fleet's detection engine missing an update, an
+# identity provider outage). Expressed as a Beta-PERT three-point estimate.
+# This is the model's resolution of the SIH105 Notion doc's Conflict
+# Register item C3 ("scenario independence in aggregation"): rather than
+# treating each scenario's control resistance as fixed and independent,
+# core/engine/'s run_monte_carlo samples ONE value per control category
+# per Monte Carlo iteration and applies it to every scenario relying on
+# that control in that iteration — a shared latent factor, in the sense
+# the C3 resolution document (see /outputs/C3_Scenario_Aggregation_Resolution.md,
+# referenced from a comment on Notion page 5) uses the term. This induces
+# genuine positive correlation between scenarios that share a control (a
+# firewall/EDR/identity-system failure affects every scenario depending on
+# it simultaneously, not just one), which is what makes the simulated tail
+# heavier than naive independent summation — the actual defect C3 names.
+# JUSTIFICATION: PLACEHOLDER — no source yet. Only categories also present
+# in CONTROL_RESISTANCE_STRENGTH are used; a category missing here falls
+# back to being treated as independent (no shared-factor adjustment),
+# which is a known simplification, not a claim that no correlation exists.
+# CALIBRATION: requires either the organization's own history of
+# control-wide degradation events (an EDR engine failing fleet-wide, an
+# identity provider outage) or expert elicitation of how often "the
+# control behaves worse than assumed, for every asset relying on it at
+# once" occurs in a given year.
+SHARED_CONTROL_HEALTH_PERT: dict[str, dict[str, float]] = {
+    "mfa_enforced": {"min": 0.5, "most_likely": 1.0, "max": 1.05},
+    "edr_active": {"min": 0.4, "most_likely": 1.0, "max": 1.05},
+}
+
+# ---------------------------------------------------------------------------
+# Primary loss magnitude by service criticality tier
+# ---------------------------------------------------------------------------
+# ASSUMPTION: base primary loss magnitude (INR), as a Beta-PERT three-point
+# estimate, for a loss event materializing on a service of a given
+# criticality tier, before the RTO_MULTIPLIER_BY_BACKUP_POSTURE scaling
+# above is applied. Keyed by services[].criticality as populated in
+# schema/aggregated_assets.schema.json (that field's allowed value set is
+# itself still a schema TODO — see the schema file — so "unknown" exists
+# here as a deliberately conservative fallback tier for any value not yet
+# recognized, or for a scenario whose asset has no resolvable related
+# service at all). "unknown" is deliberately mid-range (matching "medium"),
+# not the lowest tier — an unknown criticality must never be silently
+# treated as trivially low-impact just because it wasn't classified.
+# JUSTIFICATION: PLACEHOLDER — no source yet. Ordering (critical > high >
+# medium > low > unknown) is the defensible part; magnitudes are
+# illustrative only, and deliberately do not yet decompose into FAIR's own
+# primary loss forms (productivity, response, replacement, competitive
+# advantage, fines/judgments, reputation) — see docs/ASSUMPTIONS.md.
+# CALIBRATION: requires the organization's own business-impact-analysis
+# figures per criticality tier (ideally decomposed into the FAIR primary
+# loss forms above rather than one blended number per tier).
+BASE_LOSS_MAGNITUDE_BY_CRITICALITY_INR: dict[str, dict[str, float]] = {
+    "critical": {"min": 5_000_000.0, "most_likely": 20_000_000.0, "max": 80_000_000.0},
+    "high": {"min": 1_000_000.0, "most_likely": 5_000_000.0, "max": 20_000_000.0},
+    "medium": {"min": 200_000.0, "most_likely": 1_000_000.0, "max": 5_000_000.0},
+    "low": {"min": 50_000.0, "most_likely": 200_000.0, "max": 1_000_000.0},
+    "unknown": {"min": 200_000.0, "most_likely": 1_000_000.0, "max": 5_000_000.0},
 }
 
 # ---------------------------------------------------------------------------
@@ -144,20 +266,46 @@ BASELINE_THREAT_EVENT_FREQUENCY_PER_YEAR: dict[str, float] = {
 # ---------------------------------------------------------------------------
 # ASSUMPTION: number of Monte Carlo iterations used to propagate uncertainty
 # through the FAIR model into an EAL/VaR distribution.
-# JUSTIFICATION: PLACEHOLDER — chosen for convergence stability, not
-# calibrated to any external source.
+# JUSTIFICATION: 10,000 matches the iteration count used in the published
+# FAIR worked example this engine's golden test reproduces (see
+# core/tests/test_engine.py::test_run_monte_carlo_matches_published_fair_worked_example),
+# so the engine's own convergence can be checked against a known-good
+# external result at this exact count. Still a PLACEHOLDER in the sense
+# that it has not been separately verified as sufficient for this
+# organization's own scenario population.
 # CALIBRATION: requires a convergence study (does the VaR estimate stop
-# moving materially beyond N iterations?) rather than an arbitrary round
-# number.
-MONTE_CARLO_ITERATIONS: int = 0  # TODO: set and justify via convergence study
+# moving materially beyond N iterations, for this organization's actual
+# scenario count and distribution shapes?) rather than reusing the golden
+# example's count indefinitely.
+MONTE_CARLO_ITERATIONS: int = 10_000
 
 # ASSUMPTION: percentile used to express Value at Risk (e.g. 0.95 for VaR95).
-# JUSTIFICATION: PLACEHOLDER — must match whatever percentile is disclosed
-# to stakeholders; changing this without updating every report/UI label
-# would silently misrepresent the figure.
+# JUSTIFICATION: 0.95 is the percentile reported in the published FAIR
+# worked example this engine's golden test reproduces, and is also the
+# most common convention in FAIR/actuarial reporting generally.
 # CALIBRATION: a business/reporting decision, not a statistical one —
-# confirm with stakeholders which percentile they expect to see.
-VALUE_AT_RISK_PERCENTILE: float = 0.0  # TODO: set (e.g. 0.95) and keep in sync with reporting
+# confirm with stakeholders which percentile they expect to see; changing
+# this without updating every report/UI label would silently misrepresent
+# the figure.
+VALUE_AT_RISK_PERCENTILE: float = 0.95
+
+# ---------------------------------------------------------------------------
+# Beta-PERT distribution shape
+# ---------------------------------------------------------------------------
+# ASSUMPTION: the confidence/shape factor (commonly called lambda) used to
+# convert a (min, most_likely, max) three-point estimate into a Beta-PERT
+# distribution for any FAIR factor expressed that way (loss event frequency,
+# loss magnitude, etc). Higher values concentrate more probability mass
+# around most_likely.
+# JUSTIFICATION: 4 is the standard default confidence factor used across
+# PERT-based risk-analysis tooling (including the published FAIR worked
+# example this engine's golden test reproduces) when no source-specific
+# reason to weight the most-likely estimate more or less heavily has been
+# elicited.
+# CALIBRATION: revisit per-factor if a subject-matter expert elicitation
+# session justifies a sharper or flatter distribution than the default for
+# a specific factor.
+PERT_CONFIDENCE_FACTOR: float = 4.0
 
 # ---------------------------------------------------------------------------
 # Governance / attestation constants

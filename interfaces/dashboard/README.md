@@ -54,11 +54,16 @@ Design rules the UI enforces, each tracing to a principle in the repo-root
 
 ## Missing figures are a first-class state
 
-`core/` and `interfaces/api/` are still unimplemented, so there is currently no
-real number to display. Rather than filling that gap, every API call returns a
-discriminated `ApiResult` (`ok` / `unavailable` / `error`, see `src/lib/api.ts`)
-and the UI renders an explicit explanation of why there is no figure and what
-would produce one.
+`core/engine.py` can compute a real figure today given a snapshot (see
+repo-root `README.md` and `docs/ASSUMPTIONS.md`), and `interfaces/api/app.py`
+now registers `/exposure` and `/optimize` routes — but those routes
+delegate through `ai/tools/` wrappers and `core/snapshot.py`'s
+current-committed-snapshot lookup, both still unimplemented, so calling
+either route errors rather than returning a figure. There is currently no
+real number to display. Rather than filling that gap, every API call
+returns a discriminated `ApiResult` (`ok` / `unavailable` / `error`, see
+`src/lib/api.ts`) and the UI renders an explicit explanation of why there
+is no figure and what would produce one.
 
 A missing figure is never rendered as a zero, an em dash, an unresolving
 spinner, or a remembered previous value — any of which a reader could mistake
@@ -76,9 +81,13 @@ engine and none of it may be cited as a result.
 
 ## Backend endpoint contract
 
-The dashboard expects these endpoints from `interfaces/api/app.py`. They do not
-exist yet — this table is the contract to implement against, and the response
-shapes are mirrored in `src/lib/types.ts`.
+The dashboard expects these endpoints from `interfaces/api/app.py`. `/exposure`
+and `/optimize` are now registered there, but error today because their
+backing tools (`ai/tools/get_exposure.py`, `ai/tools/optimize_investment.py`,
+and `core/snapshot.py`'s current-snapshot lookup) are still unimplemented;
+the remaining three routes below don't exist at all yet. This table is the
+contract to implement against, and the response shapes are mirrored in
+`src/lib/types.ts`.
 
 | Method | Path | Returns | Backing tool |
 |---|---|---|---|
