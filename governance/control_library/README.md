@@ -82,7 +82,49 @@ controls:
     manual_attestation_required: <bool>
     attestation_prompt: <string|null>
     attestation_validity_months: <int|null>   # overrides core.assumptions.DEFAULT_ATTESTATION_VALIDITY_MONTHS
+
+penalty_provisions:                     # sourced statutory monetary penalties — see below
+  - id: <stable snake_case id, unique within this file>
+    statute: <the act/regulation creating this penalty power>
+    provision_ref: <specific section/clause>
+    description: <what triggers this penalty, our own words>
+
+    penalty_amount_inr: <float|null>    # statutory ceiling, or null if no single figure applies
+    penalty_formula: <string>           # human-readable, e.g. "greater of X or 2x gain, plus Y/day"
+    currently_in_force: <bool>          # a provision can be enacted but not yet commenced
+    in_force_from: <ISO 8601 date|null> # commencement date, if known
+
+    source: <citation for this specific provision>
+    confidence: high | medium | low
+    verified_by_human: false
 ```
+
+## Penalty provisions
+
+`penalty_provisions` is a **separate, optional list**, distinct from
+`controls`, that carries sourced statutory monetary fine/penalty amounts a
+regulator can impose for non-compliance under this framework. It exists
+because `core.assumptions.EXPECTED_REGULATORY_PENALTY_INR` needs a sourced,
+versioned figure to be calibrated against, per repo-root `CLAUDE.md`'s
+no-magic-numbers rule.
+
+**This must never be confused with a compliance verdict.** A
+`penalty_provision` is a fact about what a regulator *can* fine an entity
+for a category of failure — it carries no `telemetry_check`, no
+"met"/"not_met" status, and `governance/mapper.py` never reads it. Only
+`core/`'s FAIR/Monte Carlo modelling (once implemented) is the intended
+consumer, as an input to the "regulatory penalty" loss-magnitude factor —
+never as a compliance signal (CLAUDE.md principle 6).
+
+Not every framework has a direct statutory penalty of its own. CIS
+Controls, NIST CSF, and ISO 27001 are voluntary frameworks — no regulator
+fines an organization for failing a specific safeguard/subcategory/control
+in them directly — so their files carry `penalty_provisions: []` (or omit
+the key). Only frameworks backed by an actual Indian statute with monetary
+penalty powers (RBI, SEBI, and the DPDP Act) carry populated entries. A
+provision can also be enacted but not yet enforceable —
+`currently_in_force: false` / `in_force_from` exists precisely for the DPDP
+Act's phased commencement (see `dpdp_act_2023.yaml`).
 
 `telemetry_check.check_type`/`check_params` is what `governance/mapper.py`
 actually executes against a snapshot — `source_field`/`logic` are
@@ -99,8 +141,9 @@ always resolves to `"unknown"`, never `"not_met"`.
 | `cis_controls.yaml` | CIS Critical Security Controls v8.1 | 12 telemetry-derivable + 6 attestation-only controls; safeguard text not independently verified against a primary PDF (fetch failed) — confidence capped at medium |
 | `nist_csf.yaml` | NIST Cybersecurity Framework 2.0 | 11 telemetry-derivable + 8 attestation-only subcategories; read directly from the primary NIST document — confidence high throughout |
 | `iso_27001.yaml` | ISO/IEC 27001:2022 Annex A | 9 telemetry-derivable + 14 attestation-only controls; standard text is paywalled, IDs/titles cross-checked against 2+ public sources — confidence capped at medium |
-| `rbi_2026_directions.yaml` | RBI entity-specific Directions, 2026 (NBFC-ML) | 5 telemetry-derivable + 5 attestation-only entries; **the regulation's own existence could not be confirmed against any RBI primary source** — every entry confidence: low, see the file's top-of-file warning |
-| `sebi_cscrf_cci.yaml` | SEBI CSCRF Annexure-K (Cyber Capability Index) | Framework metadata confirmed (primary, sebi.gov.in); **only 4 of the 23 defined parameters could be sourced at all**, none with a confirmed weight — see the file's coverage warning |
+| `rbi_2026_directions.yaml` | RBI entity-specific Directions, 2026 (NBFC-ML) | 5 telemetry-derivable + 5 attestation-only entries; **the regulation's own existence could not be confirmed against any RBI primary source** — every entry confidence: low, see the file's top-of-file warning. Carries 1 penalty provision (RBI Act s.58G, confidence: medium — general NBFC penalty power, not specific to the unconfirmed 2026 Directions) |
+| `sebi_cscrf_cci.yaml` | SEBI CSCRF Annexure-K (Cyber Capability Index) | Framework metadata confirmed (primary, sebi.gov.in); **only 4 of the 23 defined parameters could be sourced at all**, none with a confirmed weight — see the file's coverage warning. Carries 1 penalty provision (SEBI Act s.15HB, confidence: high, fetched directly from sebi.gov.in) |
+| `dpdp_act_2023.yaml` | Digital Personal Data Protection Act, 2023 | **Penalty schedule only** — no per-asset `controls` (see file's own explanation). 4 penalty provisions (security safeguard failure ₹250cr, breach notification failure ₹200cr, Significant Data Fiduciary breach ₹150cr, residual ₹50cr), confidence: medium (Gazette PDF unreachable this session, corroborated via multiple secondary sources). **All 4 currently NOT in force** — Section 33 (the penalty machinery) commences 2027-05-13 |
 
 None of these files should be treated as legally authoritative without a
 human review against the actual current text of each framework — that is

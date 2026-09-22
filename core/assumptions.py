@@ -77,20 +77,50 @@ COST_PER_RECORD_INR: dict[str, float] = {
 # ---------------------------------------------------------------------------
 # Expected regulatory penalty
 # ---------------------------------------------------------------------------
-# ASSUMPTION: expected regulatory penalty (INR), potentially expressed as a
-# distribution rather than a point value, keyed by the regulatory regime a
-# service/entity falls under (RBI-regulated entity, SEBI-regulated market
-# infrastructure, etc — see governance/control_library/).
-# JUSTIFICATION: PLACEHOLDER — no source yet. RBI's 2016 Cyber Security
-# Framework was repealed 31 July 2026 and replaced by entity-specific
-# Directions, 2026 — any penalty figure keyed to the old framework is
-# stale by construction. See governance/control_library/rbi_2026_directions.yaml.
-# CALIBRATION: requires legal/compliance review of actual penalty
-# schedules under the current, effective-dated regulatory instrument — not
-# the repealed 2016 framework.
+# ASSUMPTION: statutory penalty CEILINGS (INR) sourced from
+# governance/control_library/*.yaml `penalty_provisions`, keyed by the
+# `penalty_provisions[].id` that sources each figure. These are the maximum
+# amount a regulator is empowered to impose per provision — NOT a
+# probability-weighted expected value. Real imposed RBI penalties, for
+# example, are typically far below the statutory ceiling (recent orders
+# against named NBFCs ran ₹2.7-8.1 lakh against a ₹10 lakh/violation
+# ceiling — see rbi_2026_directions.yaml's penalty_provisions source note).
+# JUSTIFICATION: each figure traces to a specific statute/section, sourced
+# and dated in the corresponding control library file — see
+# governance/control_library/rbi_2026_directions.yaml,
+# governance/control_library/sebi_cscrf_cci.yaml, and
+# governance/control_library/dpdp_act_2023.yaml for full citations and
+# confidence levels. RBI's 2016 Cyber Security Framework was repealed 31
+# July 2026 and replaced by entity-specific Directions, 2026 — the RBI
+# figure below is keyed to the general RBI Act penalty power (Section 58G),
+# not to the 2026 Directions specifically, since no Directions-specific
+# penalty clause could be confirmed (see rbi_2026_directions.yaml's
+# top-of-file warning).
+# CALIBRATION: converting a statutory ceiling into a true probability-
+# weighted "expected regulatory penalty" requires (1) the probability that
+# a given control failure is actually detected and enforced by the
+# regulator at all, and (2) the distribution of actually-imposed amounts
+# conditional on enforcement (see the RBI example above) — neither of
+# which is captured by using the ceiling as a point estimate. Treat these
+# as upper-bound inputs to a Monte Carlo draw, never as the loss figure
+# itself, until that calibration work is done.
 EXPECTED_REGULATORY_PENALTY_INR: dict[str, float] = {
-    # "rbi_regulated_entity": 0.0,   # TODO: calibrate against current Directions, 2026
-    # "sebi_regulated_entity": 0.0,  # TODO: calibrate against current CSCRF/CCI
+    # RBI Act, 1934, Section 58G(1)(b) — ceiling only; also carries a
+    # ₹1,00,000/day continuing-default penalty not represented here.
+    # See governance/control_library/rbi_2026_directions.yaml:
+    #   penalty_provisions[id=rbi_nbfc_58g_noncompliance]
+    "rbi_nbfc_58g_noncompliance": 1_000_000.0,
+    # SEBI Act, 1992, Section 15HB — ceiling, confirmed directly against
+    # sebi.gov.in. See governance/control_library/sebi_cscrf_cci.yaml:
+    #   penalty_provisions[id=sebi_15hb_noncompliance]
+    "sebi_15hb_noncompliance": 10_000_000.0,
+    # DPDP Act, 2023, Schedule item 1 (s.8(5) security safeguards) — ceiling.
+    # NOT CURRENTLY IN FORCE: Section 33 (the penalty machinery) commences
+    # 2027-05-13. Do not use this figure for a present-day loss estimate
+    # without accounting for currently_in_force=false. See
+    # governance/control_library/dpdp_act_2023.yaml:
+    #   penalty_provisions[id=dpdp_security_safeguard_failure]
+    "dpdp_security_safeguard_failure": 2_500_000_000.0,
 }
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,111 @@
+# Digital Personal Data Protection Act, 2023 (No. 22 of 2023) — penalty
+# schedule only.
+#
+# ============================================================================
+# WHY THIS FILE HAS NO `controls` ENTRIES
+# ============================================================================
+# The DPDP Act imposes org-wide data-fiduciary obligations (consent,
+# purpose limitation, breach notification, children's data, significant
+# data fiduciary duties) rather than the kind of per-asset/per-service
+# technical control this project's `telemetry_check` machinery evaluates.
+# This file exists solely to give `core.assumptions.py` a sourced, cited
+# home for DPDP's statutory penalty ceilings (per repo-root `CLAUDE.md`: no
+# magic numbers, and see `governance/library_loader.PenaltyProvision`).
+# `controls: []` below is deliberate, not an oversight.
+#
+# ============================================================================
+# CRITICAL IN-FORCE WARNING — READ BEFORE USING ANY VALUE IN THIS FILE
+# ============================================================================
+# The Act received presidential assent on 2023-08-11, but its substantive
+# provisions commence in three notified phases (per the 2025-11-13
+# notification alongside the DPDP Rules, 2025): 2025-11-14, 2026-11-14, and
+# 2027-05-13. Section 8 (data fiduciary obligations, incl. 8(5) security
+# safeguards and 8(6) breach notification) and Section 33 (the penalty
+# machinery itself) both sit in the LAST phase, commencing 2027-05-13. As of
+# this file's research date (2026-09-22), NO penalty under this Act can
+# actually be imposed — the Data Protection Board of India exists (formed
+# 2025-11-13) but Section 33 has not commenced. Every penalty_provision
+# below carries `currently_in_force: false` for this reason. Do not treat
+# any figure here as presently enforceable.
+#
+# Direct fetches of the Act's own gazette PDF (meity.gov.in, two different
+# URLs) and indiacode.nic.in both returned HTTP 403 to the automated
+# fetcher this session — the Schedule amounts below are corroborated across
+# many consistent secondary/compliance-tracker sources (dpdpa.com,
+# dcomply.in, compliance.hjlabs.in, and others) but were not read from the
+# Gazette text directly. Confidence: medium, not high, for this reason.
+# ============================================================================
+
+framework: dpdp_act_2023
+version: "The Digital Personal Data Protection Act, 2023 (No. 22 of 2023), read with DPDP Rules, 2025 commencement notification dated 2025-11-13"
+effective_from: "2023-08-11"
+effective_to: null
+supersedes: null
+
+sources:
+  - url_or_citation: "https://www.meity.gov.in/writereaddata/files/Digital Personal Data Protection Act 2023.pdf ; https://www.meity.gov.in/static/uploads/2024/06/2bf1f0e9f04e6fb4f8fef35e82c42aa5.pdf ; https://www.indiacode.nic.in/handle/123456789/20182 — all returned HTTP 403 to the automated fetcher this session; NOT independently confirmed against the Gazette text directly"
+    retrieved: "2026-09-22"
+    covers: "Attempted primary source for Act text and Schedule — unreachable"
+  - url_or_citation: "https://www.dpdpa.com/theschedule.html (secondary reference site, quotes the Schedule table verbatim)"
+    retrieved: "2026-09-22"
+    covers: "Schedule penalty amounts below — corroborated by multiple other consistent secondary sources (dcomply.in, compliance.hjlabs.in, tcsa.in, unifiedchambers.com) but not read from the Gazette PDF directly"
+  - url_or_citation: "https://static.pib.gov.in/WriteReadData/specificdocs/documents/2025/nov/doc20251117695301.pdf (PIB press release on DPDP Rules, 2025 notification and phased commencement dates)"
+    retrieved: "2026-09-22"
+    covers: "Phased commencement dates (2025-11-14 / 2026-11-14 / 2027-05-13) and the in-force status of Section 8/Section 33 specifically"
+
+controls: []
+
+# ---------------------------------------------------------------------------
+# Penalty provisions
+# ---------------------------------------------------------------------------
+# See the CRITICAL IN-FORCE WARNING above: none of these are currently
+# enforceable. `in_force_from: "2027-05-13"` on every entry reflects the
+# last-phase commencement date for Sections 8 and 33.
+penalty_provisions:
+  - id: dpdp_security_safeguard_failure
+    statute: "Digital Personal Data Protection Act, 2023"
+    provision_ref: "Schedule, item 1 (breach of Section 8(5) reasonable security safeguards obligation)"
+    description: "Failure of a Data Fiduciary to implement reasonable security safeguards to prevent a personal data breach, where that failure results in a breach."
+    penalty_amount_inr: 2500000000.0
+    penalty_formula: "May extend to ₹250,00,00,000 (₹250 crore)."
+    currently_in_force: false
+    in_force_from: "2027-05-13"
+    source: "https://www.dpdpa.com/theschedule.html (secondary; Gazette PDF unreachable this session — see file-level source notes)"
+    confidence: medium
+    verified_by_human: false
+
+  - id: dpdp_breach_notification_failure
+    statute: "Digital Personal Data Protection Act, 2023"
+    provision_ref: "Schedule, item 2 (breach of Section 8(6) breach-notification obligation)"
+    description: "Failure to notify the Data Protection Board of India and/or affected Data Principals of a personal data breach as required."
+    penalty_amount_inr: 2000000000.0
+    penalty_formula: "May extend to ₹200,00,00,000 (₹200 crore)."
+    currently_in_force: false
+    in_force_from: "2027-05-13"
+    source: "https://www.dpdpa.com/theschedule.html (secondary; Gazette PDF unreachable this session — see file-level source notes)"
+    confidence: medium
+    verified_by_human: false
+
+  - id: dpdp_significant_data_fiduciary_failure
+    statute: "Digital Personal Data Protection Act, 2023"
+    provision_ref: "Schedule, item 4 (breach of Section 10 additional Significant Data Fiduciary obligations)"
+    description: "Failure of an entity designated a Significant Data Fiduciary to observe its additional statutory obligations (e.g. independent data auditor, DPIA)."
+    penalty_amount_inr: 1500000000.0
+    penalty_formula: "May extend to ₹150,00,00,000 (₹150 crore)."
+    currently_in_force: false
+    in_force_from: "2027-05-13"
+    source: "https://www.dpdpa.com/theschedule.html (secondary; Gazette PDF unreachable this session — see file-level source notes)"
+    confidence: medium
+    verified_by_human: false
+
+  - id: dpdp_other_provision_breach
+    statute: "Digital Personal Data Protection Act, 2023"
+    provision_ref: "Schedule, item 7 (residual/catch-all)"
+    description: "Breach of any other provision of the Act or its Rules not separately listed in the Schedule."
+    penalty_amount_inr: 500000000.0
+    penalty_formula: "May extend to ₹50,00,00,000 (₹50 crore)."
+    currently_in_force: false
+    in_force_from: "2027-05-13"
+    source: "https://www.dpdpa.com/theschedule.html (secondary; Gazette PDF unreachable this session — see file-level source notes)"
+    confidence: medium
+    verified_by_human: false

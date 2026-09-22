@@ -49,6 +49,9 @@ sources:
   - url_or_citation: "rbidocs.rbi.org.in DAKSH press release; Business Standard coverage of DAKSH (both confirm DAKSH platform itself is real)"
     retrieved: "2026-09-20"
     covers: "DAKSH platform existence only — NOT the specific 6-hour reporting SLA claimed by secondary sources"
+  - url_or_citation: "https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx (RBI's own NBFC Master Directions search page — fetched directly, no 2026 cybersecurity Direction found there); https://indiankanoon.org/doc/... and https://kanoongpt.in/bare-acts/the-reserve-bank-of-india-act-1934/chapter-v-section-58g-7dfd4a6ef8c5f72d (secondary, Section 58G text); corroborated by multiple 2025-2026 real RBI penalty orders against named NBFCs (e.g. studycafe.in, fintechbiznews.com, tradersunion.com, policypulsemedia.com reporting amounts of ₹2.7-8.1 lakh)"
+    retrieved: "2026-09-22"
+    covers: "penalty_provisions below — the general Section 58G penalty power, NOT a penalty specific to the unconfirmed 2026 Directions"
 
 controls:
   # --- Telemetry-derivable (all confidence: low — see warning above) -----
@@ -219,3 +222,29 @@ controls:
     manual_attestation_required: true
     attestation_prompt: "Confirm business continuity and disaster recovery plans for critical services have been tested within the attestation validity window, with test reports as evidence."
     attestation_validity_months: null
+
+# ---------------------------------------------------------------------------
+# Penalty provisions
+# ---------------------------------------------------------------------------
+# IMPORTANT: this is the GENERAL RBI Act penalty power for non-compliance
+# with any RBI direction applicable to an NBFC — it is NOT a penalty
+# specific to the unconfirmed 2026 Directions described above (no such
+# specific penalty clause could be found for the reason given in the
+# top-of-file warning). Confidence is medium, not low, because Section 58G
+# itself and its amount are corroborated by real, recent RBI penalty orders
+# against named NBFCs (typically ₹2.7-8.1 lakh in practice — well below the
+# statutory ceiling, since RBI applies the greater-of-two-amounts formula
+# per violation and most publicized orders involve a single quantifiable
+# violation, not the maximum stackable case).
+penalty_provisions:
+  - id: rbi_nbfc_58g_noncompliance
+    statute: "Reserve Bank of India Act, 1934"
+    provision_ref: "Section 58G(1)(b) read with Section 58B(5)"
+    description: "General penalty power for an NBFC's non-compliance with any direction issued by RBI under the Act — the applicable power for non-compliance with IT/cybersecurity governance directions since no more specific penalty clause could be confirmed for the 2026 Directions specifically."
+    penalty_amount_inr: 1000000.0
+    penalty_formula: "₹10,00,000 (₹10 lakh) or twice the quantifiable amount involved in the contravention, whichever is higher; plus a continuing-default penalty of ₹1,00,000 (₹1 lakh) per day for as long as the default continues."
+    currently_in_force: true
+    in_force_from: null
+    source: "Section 58G/58B text via indiankanoon.org and kanoongpt.in (secondary, not fetched from rbi.org.in's own Act text this session); amount corroborated by multiple real 2025-2026 RBI penalty orders against named NBFCs (studycafe.in, fintechbiznews.com, tradersunion.com, policypulsemedia.com)"
+    confidence: medium
+    verified_by_human: false
