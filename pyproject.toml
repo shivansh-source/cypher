@@ -17,6 +17,8 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "typer",
+    # httpx also backs ai/jev_transport.py's calls to TypeSafe AI's Jev —
+    # no separate typesafe-sdk dependency; see that module's docstring for why.
     "httpx",
     "requests",
     "boto3",
