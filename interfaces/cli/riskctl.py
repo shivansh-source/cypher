@@ -7,6 +7,7 @@ LLM logic of its own.
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,6 +47,15 @@ _DEFAULT_EDR: dict[str, Any] = {
     "recent_alerts": None,
 }
 
+#: Matches SNAPSHOT_STORE_PATH's default in .env.example.
+_DEFAULT_SNAPSHOT_STORE_PATH = "./data/snapshots"
+
+#: Matches ATTESTATION_STORE_PATH's default in .env.example.
+_DEFAULT_ATTESTATION_STORE_PATH = "./data/attestations.json"
+
+#: Where the versioned control library YAML files live.
+_CONTROL_LIBRARY_DIR = Path(__file__).resolve().parents[2] / "governance" / "control_library"
+
 
 def validate_snapshot_command(candidate_path: str) -> None:
     """CLI command: validate a candidate snapshot file against the 5 quality gates.
@@ -57,7 +67,22 @@ def validate_snapshot_command(candidate_path: str) -> None:
         Commit the candidate itself — this command only reports gate
         results, matching ``.claude/commands/validate-snapshot.md``.
     """
-    raise NotImplementedError
+    from core.snapshot import validate_snapshot
+    from core.snapshot_store import load_current_snapshot
+
+    candidate = json.loads(Path(candidate_path).read_text())
+    store_path = Path(os.environ.get("SNAPSHOT_STORE_PATH", _DEFAULT_SNAPSHOT_STORE_PATH))
+    previous = load_current_snapshot(store_path)
+
+    results = validate_snapshot(candidate, previous)
+    for result in results:
+        status = "PASS" if result.passed else "FAIL"
+        typer.echo(f"[{status}] {result.gate_name}: {result.detail}")
+
+    if all(result.passed for result in results):
+        typer.echo("all gates passed")
+    else:
+        typer.echo("one or more gates failed; candidate would not be committed")
 
 
 def run_engine_command(snapshot_path: str) -> None:
@@ -66,7 +91,23 @@ def run_engine_command(snapshot_path: str) -> None:
     Args:
         snapshot_path: Path to a committed aggregated-snapshot JSON file.
     """
-    raise NotImplementedError
+    from core.engine import compute_risk_figure
+
+    snapshot = json.loads(Path(snapshot_path).read_text())
+    risk_figure = compute_risk_figure(snapshot)
+
+    typer.echo(f"snapshot_id: {risk_figure.snapshot_id}")
+    typer.echo(f"expected_annual_loss_inr: {risk_figure.expected_annual_loss_inr:,.2f}")
+    typer.echo(
+        f"value_at_risk_inr (p{risk_figure.value_at_risk_percentile:.0%}): "
+        f"{risk_figure.value_at_risk_inr:,.2f}"
+    )
+    typer.echo("top contributors:")
+    for contributor in risk_figure.top_contributors:
+        typer.echo(
+            f"  {contributor.scenario_id}: {contributor.expected_annual_loss_inr:,.2f} INR "
+            f"— {contributor.description}"
+        )
 
 
 def optimize_command(budget_inr: float, snapshot_path: str) -> None:
@@ -86,7 +127,28 @@ def framework_status_command(framework: str) -> None:
         framework: Framework key matching a filename under
             ``governance/control_library/``.
     """
-    raise NotImplementedError
+    from core.snapshot_store import load_current_snapshot
+    from governance.attestations import load_attestations
+    from governance.library_loader import load_control_library
+    from governance.mapper import compute_all_control_statuses
+
+    store_path = Path(os.environ.get("SNAPSHOT_STORE_PATH", _DEFAULT_SNAPSHOT_STORE_PATH))
+    snapshot = load_current_snapshot(store_path)
+    if snapshot is None:
+        typer.echo("no snapshot has been committed yet")
+        raise typer.Exit(code=1)
+
+    as_of = datetime.now(UTC)
+    library = load_control_library(_CONTROL_LIBRARY_DIR / f"{framework}.yaml", as_of.date())
+    attestation_store = Path(
+        os.environ.get("ATTESTATION_STORE_PATH", _DEFAULT_ATTESTATION_STORE_PATH)
+    )
+    attestations = load_attestations(attestation_store)
+
+    statuses = compute_all_control_statuses(snapshot, library, attestations, as_of)
+    typer.echo(f"{library.framework} ({library.version})")
+    for status in statuses:
+        typer.echo(f"  [{status.status}] {status.control_id} (confidence={status.confidence})")
 
 
 def _default_asset(asset_id: str) -> dict[str, Any]:
@@ -383,6 +445,7 @@ def ingest_command(commit: bool = True) -> None:
         ``core/snapshot.py``'s own contract.
     """
     from core.snapshot import commit_snapshot, validate_snapshot
+    from core.snapshot_store import load_current_snapshot, save_snapshot
 
     connectors: list[tuple[Any, type[Exception]]] = [
         (WazuhConnector(), WazuhConnectorError),
@@ -442,10 +505,8 @@ def ingest_command(commit: bool = True) -> None:
         "endpoints": endpoints,
     }
 
-    # TODO: read the actual current snapshot once a snapshot store exists;
-    # out of scope for this command — every ingest run is validated as if
-    # it were the first snapshot ever committed.
-    previous: dict[str, Any] | None = None
+    store_path = Path(os.environ.get("SNAPSHOT_STORE_PATH", _DEFAULT_SNAPSHOT_STORE_PATH))
+    previous = load_current_snapshot(store_path)
 
     gate_results = validate_snapshot(candidate, previous)
     failed_gates = [gate for gate in gate_results if not gate.passed]
@@ -459,8 +520,9 @@ def ingest_command(commit: bool = True) -> None:
         typer.echo("all quality gates passed; not committing (commit=False)")
         return
 
-    commit_snapshot(candidate, previous)
-    typer.echo("candidate snapshot committed")
+    committed = commit_snapshot(candidate, previous)
+    save_snapshot(store_path, committed)
+    typer.echo(f"candidate snapshot committed: {committed['snapshot_id']}")
 
 
 def build_cli() -> Any:

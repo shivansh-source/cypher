@@ -8,7 +8,11 @@ principles 1 and 2.
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
+
+from ai.tools._snapshot import current_snapshot_or_unavailable
+from core.engine import compute_risk_figure
 
 
 def get_top_contributors(limit: int = 10) -> dict[str, Any]:
@@ -27,4 +31,9 @@ def get_top_contributors(limit: int = 10) -> dict[str, Any]:
         truncating to ``limit`` — the ranking comes entirely from
         ``core.engine``.
     """
-    raise NotImplementedError
+    snapshot = current_snapshot_or_unavailable()
+    risk_figure = compute_risk_figure(snapshot)
+    return {
+        "snapshot_id": risk_figure.snapshot_id,
+        "top_contributors": [asdict(c) for c in risk_figure.top_contributors[:limit]],
+    }

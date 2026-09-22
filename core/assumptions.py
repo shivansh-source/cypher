@@ -359,3 +359,23 @@ BACKUP_TEST_RECENCY_DAYS: int = 90
 # expected-ports allowlist per asset once that data is available from a
 # connector, rather than a single global blocklist.
 DANGEROUS_INTERNET_FACING_PORTS: list[int] = [21, 22, 23, 445, 3306, 3389, 5432, 6379, 27017]
+
+# ---------------------------------------------------------------------------
+# Snapshot quality gate tolerances
+# ---------------------------------------------------------------------------
+# ASSUMPTION: maximum fractional change in total asset count, between a
+# candidate snapshot and the previous committed one, that
+# core.snapshot.check_asset_count_delta will still pass. 0.5 means the
+# candidate's asset count may shrink or grow by up to 50% of the previous
+# count before this gate fails it.
+# JUSTIFICATION: PLACEHOLDER — no source yet. Deliberately loose rather than
+# tight: the gate exists to catch a connector that failed partway through
+# aggregation (asset count collapsing toward zero) or duplicated output
+# (asset count spiking), not to police normal estate churn, and a false
+# gate failure blocks every snapshot behind it (fail-safe means the
+# previous snapshot stays current, which is itself a real availability
+# cost if the tolerance is too tight for an organization's actual churn).
+# CALIBRATION: requires the organization's actual asset churn rate (adds/
+# decommissions per snapshot interval) to set a tolerance that only trips
+# on a genuine aggregation defect, not routine change.
+ASSET_COUNT_DELTA_TOLERANCE_FRACTION: float = 0.5

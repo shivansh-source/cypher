@@ -7,7 +7,24 @@ requested framework. See repo-root ``CLAUDE.md`` principles 1, 2, and 6.
 
 from __future__ import annotations
 
+import os
+from dataclasses import asdict
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
+
+from ai.tools._snapshot import current_snapshot_or_unavailable
+from governance.attestations import load_attestations
+from governance.library_loader import load_control_library
+from governance.mapper import compute_all_control_statuses
+
+#: Where the versioned control library YAML files live.
+_CONTROL_LIBRARY_DIR = (
+    Path(__file__).resolve().parent.parent.parent / "governance" / "control_library"
+)
+
+#: Matches ATTESTATION_STORE_PATH's default in .env.example.
+_DEFAULT_ATTESTATION_STORE_PATH = "./data/attestations.json"
 
 
 def get_framework_status(framework: str) -> dict[str, Any]:
@@ -28,4 +45,25 @@ def get_framework_status(framework: str) -> dict[str, Any]:
         "compliant"/"non-compliant" verdict. Must never include or imply
         anything derived from ``core.optimizer`` output — see principle 6.
     """
-    raise NotImplementedError
+    library_path = _CONTROL_LIBRARY_DIR / f"{framework}.yaml"
+    if not library_path.is_file():
+        raise NotImplementedError(f"no control library file for framework {framework!r}")
+
+    snapshot = current_snapshot_or_unavailable()
+    as_of = datetime.now(UTC)
+    library = load_control_library(library_path, as_of.date())
+
+    attestation_store = Path(
+        os.environ.get("ATTESTATION_STORE_PATH", _DEFAULT_ATTESTATION_STORE_PATH)
+    )
+    attestations = load_attestations(attestation_store)
+
+    statuses = compute_all_control_statuses(snapshot, library, attestations, as_of)
+    return {
+        "framework": library.framework,
+        "version": library.version,
+        "effective_from": library.effective_from,
+        "effective_to": library.effective_to,
+        "snapshot_id": snapshot["snapshot_id"],
+        "controls": [asdict(status) for status in statuses],
+    }
