@@ -8,7 +8,11 @@ came from). See repo-root ``CLAUDE.md`` principles 1 and 2.
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
+
+from ai.tools._snapshot import current_snapshot_or_unavailable
+from core.engine import compute_risk_figure
 
 
 def get_exposure(scope: str | None = None) -> dict[str, Any]:
@@ -31,4 +35,12 @@ def get_exposure(scope: str | None = None) -> dict[str, Any]:
         body is a call into ``core.engine`` (and, for scoping, whatever
         snapshot-filtering utility exists there) plus reshaping the result.
     """
-    raise NotImplementedError
+    snapshot = current_snapshot_or_unavailable()
+    risk_figure = compute_risk_figure(snapshot)
+    result = asdict(risk_figure)
+    if scope is not None:
+        result["top_contributors"] = [
+            c for c in result["top_contributors"] if c["asset_id"] == scope
+        ]
+        result["scope"] = scope
+    return result
