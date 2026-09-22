@@ -72,9 +72,7 @@ def test_build_loss_event_scenarios_empty_for_no_findings() -> None:
 
 
 def _scenario_for(asset_id: str, snapshot: dict[str, Any]) -> dict[str, Any]:
-    (scenario,) = [
-        s for s in build_loss_event_scenarios(snapshot) if s["asset_id"] == asset_id
-    ]
+    (scenario,) = [s for s in build_loss_event_scenarios(snapshot) if s["asset_id"] == asset_id]
     return scenario
 
 
@@ -300,11 +298,21 @@ def test_compute_risk_figure_never_invokes_an_llm_or_ml_model() -> None:
     of input.
     """
     package_dir = Path(engine_module.__file__).parent
-    forbidden_substrings = ["import ai", "from ai", "openai", "anthropic", "torch", "sklearn", "tensorflow"]
+    forbidden_substrings = [
+        "import ai",
+        "from ai",
+        "openai",
+        "anthropic",
+        "torch",
+        "sklearn",
+        "tensorflow",
+    ]
     for module_path in package_dir.glob("*.py"):
         lowered = module_path.read_text().lower()
         for forbidden in forbidden_substrings:
-            assert forbidden not in lowered, f"{module_path.name} must never reference {forbidden!r}"
+            assert forbidden not in lowered, (
+                f"{module_path.name} must never reference {forbidden!r}"
+            )
 
 
 def test_top_contributors_are_ranked_and_sum_consistently() -> None:

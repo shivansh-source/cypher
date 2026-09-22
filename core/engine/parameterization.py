@@ -80,7 +80,10 @@ def _active_control_resistances(asset: dict[str, Any]) -> dict[str, float]:
     """
     active: dict[str, float] = {}
     identity_access = asset.get("identity_access") or {}
-    if identity_access.get("mfa_enforced") is True and "mfa_enforced" in CONTROL_RESISTANCE_STRENGTH:
+    if (
+        identity_access.get("mfa_enforced") is True
+        and "mfa_enforced" in CONTROL_RESISTANCE_STRENGTH
+    ):
         active["mfa_enforced"] = CONTROL_RESISTANCE_STRENGTH["mfa_enforced"]
     edr = asset.get("edr") or {}
     if (
@@ -152,7 +155,9 @@ def _scale_pert(pert: dict[str, float], factor: float) -> dict[str, float]:
     return {key: value * factor for key, value in pert.items()}
 
 
-def _describe_scenario(scenario: dict[str, Any], exposure_profile: str, criticality_tier: str) -> str:
+def _describe_scenario(
+    scenario: dict[str, Any], exposure_profile: str, criticality_tier: str
+) -> str:
     finding = scenario["finding"]
     identifier = finding.get("cve_id") or finding["finding_id"]
     return (

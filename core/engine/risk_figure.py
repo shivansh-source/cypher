@@ -51,7 +51,9 @@ def compute_risk_figure(snapshot: dict[str, Any]) -> RiskFigure:
             LossEventContribution(
                 scenario_id=scenario["scenario_id"],
                 asset_id=scenario["asset_id"],
-                expected_annual_loss_inr=float(np.mean(per_scenario_samples[scenario["scenario_id"]])),
+                expected_annual_loss_inr=float(
+                    np.mean(per_scenario_samples[scenario["scenario_id"]])
+                ),
                 description=scenario["description"],
             )
             for scenario in parameterized_scenarios

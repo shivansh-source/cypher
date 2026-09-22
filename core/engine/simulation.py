@@ -217,15 +217,21 @@ def run_monte_carlo(
         assumptions must be reproducible on rerun).
     """
     resolved_iterations = iterations if iterations is not None else MONTE_CARLO_ITERATIONS
-    resolved_seed = seed if seed is not None else _derive_deterministic_seed(parameterized_scenarios)
+    resolved_seed = (
+        seed if seed is not None else _derive_deterministic_seed(parameterized_scenarios)
+    )
     rng = np.random.default_rng(resolved_seed)
-    shared_health_samples = _sample_shared_control_health(parameterized_scenarios, resolved_iterations, rng)
+    shared_health_samples = _sample_shared_control_health(
+        parameterized_scenarios, resolved_iterations, rng
+    )
 
     per_scenario_losses: dict[str, np.ndarray] = {}
     for scenario in parameterized_scenarios:
         lm = scenario["loss_magnitude"]
 
-        rate_samples = _sample_scenario_rate(scenario, shared_health_samples, resolved_iterations, rng)
+        rate_samples = _sample_scenario_rate(
+            scenario, shared_health_samples, resolved_iterations, rng
+        )
         event_counts = rng.poisson(np.clip(rate_samples, 0, None))
 
         annual_losses = np.zeros(resolved_iterations)
