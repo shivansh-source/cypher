@@ -86,6 +86,7 @@ _CLASSIFIER_SYSTEM_PROMPT = (
     "arguments. ..."
 )
 
+
 def classify_intent_with(
     transport: LLMTransport, user_message: str, available_tools: list[str]
 ) -> ToolCall:
@@ -94,7 +95,7 @@ def classify_intent_with(
         system=_CLASSIFIER_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": prompt}],
         tools=[_router_tool(available_tools)],
-        tool_choice={"type": "any"},   # forced tool choice: must route, never answer
+        tool_choice={"type": "any"},  # forced tool choice: must route, never answer
     )
 ```
 
@@ -208,6 +209,7 @@ _FLAG_TEMPLATE = "[UNVERIFIED: {claim}]"
       asset_id: str
       expected_annual_loss_inr: float
       description: str
+
 
   @dataclass(frozen=True)
   class RiskFigure:

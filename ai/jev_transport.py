@@ -366,7 +366,9 @@ class JevTransport:
         try:
             response = client.post(JEV_API_URL, json=body)
         except httpx.TimeoutException as exc:
-            raise JevProviderError(f"Jev request timed out after {_REQUEST_TIMEOUT_SECONDS}s") from exc
+            raise JevProviderError(
+                f"Jev request timed out after {_REQUEST_TIMEOUT_SECONDS}s"
+            ) from exc
         except httpx.HTTPError as exc:
             raise JevProviderError(f"Jev request failed: {exc}") from exc
 

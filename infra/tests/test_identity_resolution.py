@@ -59,9 +59,24 @@ def test_parse_placeholder_asset_id_returns_none_for_non_placeholder_ids(asset_i
 
 def test_cmdb_records_from_endpoints_groups_by_resolved_asset_id() -> None:
     endpoints = [
-        {"endpoint_id": "e1", "address_type": "hostname", "address": "web-01", "resolved_asset_id": "cmdb:AST-04821"},
-        {"endpoint_id": "e2", "address_type": "ipv4", "address": "10.0.0.5", "resolved_asset_id": "cmdb:AST-04821"},
-        {"endpoint_id": "e3", "address_type": "cloud_instance_id", "address": "i-0abc123", "resolved_asset_id": "cmdb:AST-09911"},
+        {
+            "endpoint_id": "e1",
+            "address_type": "hostname",
+            "address": "web-01",
+            "resolved_asset_id": "cmdb:AST-04821",
+        },
+        {
+            "endpoint_id": "e2",
+            "address_type": "ipv4",
+            "address": "10.0.0.5",
+            "resolved_asset_id": "cmdb:AST-04821",
+        },
+        {
+            "endpoint_id": "e3",
+            "address_type": "cloud_instance_id",
+            "address": "i-0abc123",
+            "resolved_asset_id": "cmdb:AST-09911",
+        },
     ]
     records = {r.canonical_asset_id: r for r in cmdb_records_from_endpoints(endpoints)}
     assert set(records) == {"cmdb:AST-04821", "cmdb:AST-09911"}
@@ -71,7 +86,12 @@ def test_cmdb_records_from_endpoints_groups_by_resolved_asset_id() -> None:
 
 def test_cmdb_records_from_endpoints_skips_unresolved_endpoints() -> None:
     endpoints = [
-        {"endpoint_id": "e1", "address_type": "hostname", "address": "orphan", "resolved_asset_id": None}
+        {
+            "endpoint_id": "e1",
+            "address_type": "hostname",
+            "address": "orphan",
+            "resolved_asset_id": None,
+        }
     ]
     assert cmdb_records_from_endpoints(endpoints) == []
 
@@ -113,7 +133,9 @@ def test_find_candidate_merges_skips_already_canonical_ids() -> None:
     assert find_candidate_merges(placeholders, [_CMDB_RECORD]) == []
 
 
-def test_find_candidate_merges_multiple_shared_identifiers_produce_multiple_evidence_items() -> None:
+def test_find_candidate_merges_multiple_shared_identifiers_produce_multiple_evidence_items() -> (
+    None
+):
     """A pair sharing two identifiers is stronger evidence than sharing one."""
     placeholders = {"host:10.0.0.5": "wazuh_connector"}
     richer_record = CMDBIdentityRecord(

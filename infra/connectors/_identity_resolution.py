@@ -322,7 +322,9 @@ class MergeDecision:
     decided_at: datetime
 
 
-def decide_merge(candidate: CandidateMerge, jev_confidence: float, as_of: datetime) -> MergeDecision:
+def decide_merge(
+    candidate: CandidateMerge, jev_confidence: float, as_of: datetime
+) -> MergeDecision:
     """Apply :data:`MERGE_CONFIDENCE_THRESHOLD` to one candidate's Jev answer.
 
     Args:

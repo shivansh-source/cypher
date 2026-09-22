@@ -128,7 +128,9 @@ class CMDBConnector(Connector):
         try:
             records = response.json()
         except ValueError as exc:
-            raise CMDBConnectorError(f"{self.name}: {base_url} did not return valid JSON: {exc}") from exc
+            raise CMDBConnectorError(
+                f"{self.name}: {base_url} did not return valid JSON: {exc}"
+            ) from exc
         if not isinstance(records, list):
             raise CMDBConnectorError(
                 f"{self.name}: expected a JSON list of CMDB asset records, got {type(records).__name__}"

@@ -55,7 +55,9 @@ def test_fetch_requires_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @patch("infra.connectors.cmdb_connector.requests.get")
-def test_fetch_returns_parsed_json_list(mock_get: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fetch_returns_parsed_json_list(
+    mock_get: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
     connector = _patched_connector(monkeypatch)
     mock_get.return_value = _mock_response(_RAW_RECORDS)
 

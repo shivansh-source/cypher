@@ -99,9 +99,7 @@ def test_parse_response_enum_uses_confidence_field_if_present() -> None:
 
 def test_parse_response_enum_falls_back_to_probabilities_for_confidence() -> None:
     body = {
-        "answers": {
-            "team": {"type": "choice", "choice": "infra", "probabilities": {"infra": 0.6}}
-        }
+        "answers": {"team": {"type": "choice", "choice": "infra", "probabilities": {"infra": 0.6}}}
     }
     [answer] = _parse_response(body, [_ENUM_QUESTION])
     assert answer.confidence == 0.6
@@ -136,9 +134,7 @@ def test_parse_response_wrong_type_field_raises() -> None:
 @pytest.mark.parametrize("bad_confidence", [1.5, -0.1])
 def test_parse_response_confidence_out_of_range_raises(bad_confidence: float) -> None:
     body = {
-        "answers": {
-            "team": {"type": "choice", "choice": "billing", "confidence": bad_confidence}
-        }
+        "answers": {"team": {"type": "choice", "choice": "billing", "confidence": bad_confidence}}
     }
     with pytest.raises(JevProviderError, match=r"outside \[0, 1\]"):
         _parse_response(body, [_ENUM_QUESTION])
@@ -167,7 +163,9 @@ def test_classify_requires_at_least_one_question() -> None:
         transport.classify("state", [])
 
 
-def test_classify_without_api_key_raises_configuration_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_classify_without_api_key_raises_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     transport = JevTransport(api_key=None)
     with pytest.raises(JevConfigurationError, match="TYPESAFE_API_KEY"):
