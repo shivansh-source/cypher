@@ -209,6 +209,49 @@ Each assumption entry has four parts:
   for this organization's real scenario count) is still TODO.
 - **Known limitations:** None yet identified.
 
+### Identity-merge confidence threshold (`infra.connectors._identity_resolution.MERGE_CONFIDENCE_THRESHOLD`)
+
+Not a `core.assumptions` constant — this one is deliberately kept in
+`infra/connectors/_identity_resolution.py` instead, and is mirrored here
+only because this document's role ("no numeric judgement call ships without
+a visible ASSUMPTION/JUSTIFICATION/CALIBRATION trail") applies to it just
+as much as to anything in `core/`. It governs the ingestion pipeline's
+decision to collapse two observed identifiers into one asset *before*
+`core/` ever sees a snapshot — it is not a FAIR risk-modelling parameter,
+and changing it cannot change a rupee figure directly (though it can change
+*which* asset a finding ends up attributed to, which changes the figure
+indirectly).
+
+- **Assumption:** `0.85`. Jev (`ai.jev_transport`, TypeSafe AI's "System
+  One" model — see that module's docstring) must report at least this
+  confidence that a placeholder asset id (e.g. `host:10.0.0.5`, minted by
+  `wazuh_connector.py`/`greenbone_connector.py`/`prowler_connector.py`/
+  `scoutsuite_connector.py` per `infra/README.md`'s `_identity_hint`
+  convention) and a CMDB canonical asset id name the same real-world asset,
+  before `interfaces/cli/riskctl.py`'s `ingest_command` merges them. The
+  boundary is inclusive: confidence exactly `0.85` merges. Below it, the
+  candidate is left unmerged and the decision is recorded (with its full
+  evidence trail) via
+  `infra.connectors._identity_resolution.record_merge_decision` for later
+  human review — see `IDENTITY_RECONCILIATION_STORE_PATH` in
+  `.env.example`.
+- **Justification:** PLACEHOLDER — no source yet. Chosen deliberately high
+  because a false merge (two different real assets collapsed into one) is
+  worse than a false non-merge (two records left for one real asset,
+  correctable later): a false merge can make one asset's risk *look*
+  smaller or differently exposed than it really is, by attributing its
+  findings to a machine with different posture/exposure. A false
+  non-merge only duplicates an asset's risk contribution until corrected —
+  visible and self-correcting, not hidden.
+- **Sensitivity:** Not yet measurable — there is no labeled set of known
+  same-asset/different-asset pairs to score threshold choices against yet.
+- **Known limitations:** The threshold is a single global cutoff applied to
+  every candidate regardless of evidence kind (e.g. a shared cloud instance
+  ID is much stronger evidence than a shared hostname string, per
+  `infra.connectors._identity_resolution.EvidenceItem.same_kind`), rather
+  than varying by evidence strength. `MERGE_CONFIDENCE_THRESHOLD`'s own
+  module docstring block covers full CALIBRATION requirements.
+
 ## Known limitations of the model overall
 
 - No organization-specific loss history has been used to calibrate any
