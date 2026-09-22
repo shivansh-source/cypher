@@ -13,13 +13,25 @@ from core.engine.scenarios import build_loss_event_scenarios
 from core.engine.simulation import run_monte_carlo
 
 
-def compute_risk_figure(snapshot: dict[str, Any]) -> RiskFigure:
+def compute_risk_figure(snapshot: dict[str, Any], *, seed: int | None = None) -> RiskFigure:
     """Run the full engine pipeline against a committed snapshot.
 
     Args:
         snapshot: A committed, schema-shaped aggregated snapshot. Must have
             already passed all 5 quality gates in ``core/snapshot.py`` —
             this function does not re-validate.
+        seed: Override for ``run_monte_carlo``'s random seed. Defaults to a
+            value derived from this snapshot's own content (see
+            ``core.engine.simulation._derive_deterministic_seed``), which is
+            correct for computing one real, reproducible figure. Callers
+            comparing two *different* snapshots derived from the same base
+            (e.g. ``core.optimizer.evaluate_portfolio`` comparing a
+            candidate control portfolio against baseline) must pass the
+            same explicit seed to both calls — common random numbers —
+            since two independently-seeded runs of a low-probability
+            scenario can differ by more than the true effect of the
+            controls being compared, making a beneficial control look
+            harmful by sampling noise alone.
 
     Returns:
         A :class:`RiskFigure` with Expected Annual Loss, Value at Risk, and
@@ -41,7 +53,7 @@ def compute_risk_figure(snapshot: dict[str, Any]) -> RiskFigure:
     """
     scenarios = build_loss_event_scenarios(snapshot)
     parameterized_scenarios = [parameterize_scenario(scenario, snapshot) for scenario in scenarios]
-    simulation = run_monte_carlo(parameterized_scenarios)
+    simulation = run_monte_carlo(parameterized_scenarios, seed=seed)
 
     total_samples = simulation["total_annual_loss_samples_inr"]
     per_scenario_samples = simulation["per_scenario_annual_loss_samples_inr"]
