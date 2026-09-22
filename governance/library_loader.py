@@ -154,6 +154,63 @@ class ControlEntry:
 
 
 @dataclass(frozen=True)
+class PenaltyProvision:
+    """A statutory monetary penalty a regulator can impose under this framework.
+
+    This is entirely separate from control "met"/"not_met" status —
+    populating this must never be read as, and must never feed, a
+    compliance verdict (see repo-root ``CLAUDE.md`` principle 6). It exists
+    only so ``core.assumptions.EXPECTED_REGULATORY_PENALTY_INR`` has a
+    sourced, versioned home for the statutory ceiling it's calibrated
+    against, instead of a bare unsourced number.
+
+    Attributes:
+        id: Stable snake_case identifier, unique within this framework.
+        statute: The act/regulation that creates this penalty power (e.g.
+            "Reserve Bank of India Act, 1934").
+        provision_ref: The specific section/clause (e.g. "Section 58G(1)(b)
+            read with Section 58B(5)").
+        description: What triggers this penalty, in this project's own
+            words.
+        penalty_amount_inr: The statutory ceiling amount in INR, or None if
+            the provision is a formula without a single ceiling figure (see
+            ``penalty_formula``).
+        penalty_formula: Human-readable description of how the amount is
+            actually computed (e.g. "greater of X or 2x quantifiable gain,
+            plus Y/day for continuing default"). This is a STATUTORY
+            CEILING, not a calibrated expected value — real imposed
+            penalties are typically far below the ceiling (see the citing
+            control library file's sourcing notes for examples).
+        currently_in_force: Whether this penalty provision is actually
+            enforceable as of the date this entry was sourced — a
+            provision can exist in an enacted Act while its commencement is
+            deferred to a later notified date (e.g. DPDP Act 2023 Section
+            33 commences 2027-05-13, not on enactment).
+        in_force_from: The date this provision commences/commenced, or None
+            if that date could not be sourced or the provision is already
+            in force with no specific commencement date found.
+        source: Citation for this specific provision.
+        confidence: ``"high"``, ``"medium"``, or ``"low"`` — see
+            ``VALID_CONFIDENCE_LEVELS``.
+        verified_by_human: Always False until a human reviews this entry
+            against its source and flips it — never set True
+            programmatically.
+    """
+
+    id: str
+    statute: str
+    provision_ref: str
+    description: str
+    penalty_amount_inr: float | None
+    penalty_formula: str
+    currently_in_force: bool
+    in_force_from: date | None
+    source: str
+    confidence: str
+    verified_by_human: bool
+
+
+@dataclass(frozen=True)
 class ControlLibrary:
     """A fully parsed, versioned, effective-dated control library file.
 
@@ -168,6 +225,11 @@ class ControlLibrary:
         supersedes: The framework+version key this replaces, or None.
         sources: The file's top-level bibliography.
         controls: Every control entry in the file.
+        penalty_provisions: Sourced statutory monetary penalty provisions
+            for non-compliance under this framework, or an empty list if
+            this framework has no direct regulator-imposed fine (e.g. CIS
+            Controls, NIST CSF, ISO 27001 are voluntary frameworks with no
+            statutory penalty of their own).
     """
 
     framework: str
@@ -177,6 +239,7 @@ class ControlLibrary:
     supersedes: str | None
     sources: list[SourceCitation]
     controls: list[ControlEntry]
+    penalty_provisions: list[PenaltyProvision]
 
 
 @dataclass(frozen=True)
@@ -252,6 +315,38 @@ def _parse_control_entry(raw: dict[str, Any], framework: str) -> ControlEntry:
     )
 
 
+def _parse_penalty_provision(raw: dict[str, Any], framework: str) -> PenaltyProvision:
+    confidence = raw["confidence"]
+    if confidence not in VALID_CONFIDENCE_LEVELS:
+        raise ValueError(
+            f"{framework}/{raw.get('id')}: penalty provision confidence must be one of "
+            f"{VALID_CONFIDENCE_LEVELS}, got {confidence!r}."
+        )
+
+    verified_by_human = bool(raw.get("verified_by_human", False))
+    source = raw.get("source")
+    if verified_by_human and not source:
+        raise ValueError(
+            f"{framework}/{raw.get('id')}: penalty provision verified_by_human=true but no "
+            "source is recorded — nothing can be verified against nothing."
+        )
+
+    in_force_from = raw.get("in_force_from")
+    return PenaltyProvision(
+        id=raw["id"],
+        statute=raw["statute"],
+        provision_ref=raw["provision_ref"],
+        description=raw["description"],
+        penalty_amount_inr=raw.get("penalty_amount_inr"),
+        penalty_formula=raw["penalty_formula"],
+        currently_in_force=bool(raw["currently_in_force"]),
+        in_force_from=date.fromisoformat(in_force_from) if in_force_from else None,
+        source=source or "",
+        confidence=confidence,
+        verified_by_human=verified_by_human,
+    )
+
+
 def load_control_library(path: Path, as_of: date) -> ControlLibrary:
     """Load and validate one control library YAML file.
 
@@ -299,6 +394,9 @@ def load_control_library(path: Path, as_of: date) -> ControlLibrary:
         for s in raw.get("sources", [])
     ]
     controls = [_parse_control_entry(c, raw["framework"]) for c in raw.get("controls", [])]
+    penalty_provisions = [
+        _parse_penalty_provision(p, raw["framework"]) for p in raw.get("penalty_provisions", [])
+    ]
 
     raw_effective_from = raw.get("effective_from")
     return ControlLibrary(
@@ -309,6 +407,7 @@ def load_control_library(path: Path, as_of: date) -> ControlLibrary:
         supersedes=raw.get("supersedes"),
         sources=sources,
         controls=controls,
+        penalty_provisions=penalty_provisions,
     )
 
 
@@ -400,11 +499,12 @@ def collect_confidence_warnings(library: ControlLibrary) -> list[LoadWarning]:
         library: A loaded :class:`ControlLibrary`.
 
     Returns:
-        A :class:`LoadWarning` for every control with ``confidence: low``
-        and every control not yet ``verified_by_human`` (which, as of any
-        research-only session, is every control) — both conditions are
-        reported, since "unverified" and "low confidence" are different
-        risks a caller should be able to distinguish.
+        A :class:`LoadWarning` for every control (and every penalty
+        provision) with ``confidence: low``, and every one not yet
+        ``verified_by_human`` (which, as of any research-only session, is
+        every entry) — both conditions are reported, since "unverified" and
+        "low confidence" are different risks a caller should be able to
+        distinguish.
     """
     warnings_out: list[LoadWarning] = []
     for control in library.controls:
@@ -413,6 +513,13 @@ def collect_confidence_warnings(library: ControlLibrary) -> list[LoadWarning]:
         if not control.verified_by_human:
             warnings_out.append(
                 LoadWarning(control.id, library.framework, "not yet verified_by_human")
+            )
+    for penalty in library.penalty_provisions:
+        if penalty.confidence == "low":
+            warnings_out.append(LoadWarning(penalty.id, library.framework, "confidence=low"))
+        if not penalty.verified_by_human:
+            warnings_out.append(
+                LoadWarning(penalty.id, library.framework, "not yet verified_by_human")
             )
     return warnings_out
 
@@ -432,11 +539,11 @@ def emit_loud_confidence_warning(library: ControlLibrary) -> None:
     load_warnings = collect_confidence_warnings(library)
     low_confidence = sum(1 for w in load_warnings if w.reason == "confidence=low")
     unverified = sum(1 for w in load_warnings if w.reason == "not yet verified_by_human")
-    total = len(library.controls)
+    total = len(library.controls) + len(library.penalty_provisions)
     warnings.warn(
         f"governance control library '{library.framework}': {unverified}/{total} "
-        f"controls are not yet verified_by_human, {low_confidence}/{total} are "
-        "confidence=low. Treat every figure derived from this library as "
+        f"controls/penalty provisions are not yet verified_by_human, {low_confidence}/{total} "
+        "are confidence=low. Treat every figure derived from this library as "
         "provisional until a human review flips verified_by_human.",
         stacklevel=2,
     )

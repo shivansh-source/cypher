@@ -148,3 +148,25 @@ controls:
     manual_attestation_required: true
     attestation_prompt: "Has a security assessment of critical third-party/vendor providers been completed in the last 12 months? Attach evidence."
     attestation_validity_months: null
+
+# ---------------------------------------------------------------------------
+# Penalty provisions
+# ---------------------------------------------------------------------------
+# The CSCRF circular itself does not specify its own monetary penalty
+# schedule for a low/failing CCI score — SEBI's response to a low CCI score
+# is described in secondary sources as supervisory (referral to SEBI,
+# enhanced monitoring), not automatically a fine. The applicable monetary
+# penalty is the SEBI Act's own general contravention provision below,
+# confirmed directly against sebi.gov.in this session (high confidence).
+penalty_provisions:
+  - id: sebi_15hb_noncompliance
+    statute: "Securities and Exchange Board of India Act, 1992"
+    provision_ref: "Section 15HB"
+    description: "Catch-all penalty for failing to comply with any provision of the Act, rules, regulations, or a Board direction (including CSCRF circular obligations) for which no separate/more specific penalty has been provided elsewhere in the Act."
+    penalty_amount_inr: 10000000.0
+    penalty_formula: "Up to ₹1,00,00,000 (₹1 crore)."
+    currently_in_force: true
+    in_force_from: null
+    source: "https://www.sebi.gov.in/sebi_data/docfiles/10632_t.html (SEBI's own published Section 15HB text, fetched directly)"
+    confidence: high
+    verified_by_human: false

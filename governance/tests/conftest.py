@@ -69,6 +69,25 @@ def minimal_control(**overrides: Any) -> dict[str, Any]:
     return control
 
 
+def minimal_penalty_provision(**overrides: Any) -> dict[str, Any]:
+    """A minimal, valid penalty provision dict, with fields overridable for tests."""
+    provision: dict[str, Any] = {
+        "id": "test_penalty",
+        "statute": "Test Statute Act, 2026",
+        "provision_ref": "Section 1",
+        "description": "A penalty provision used only in tests.",
+        "penalty_amount_inr": 100_000.0,
+        "penalty_formula": "flat ₹1,00,000",
+        "currently_in_force": True,
+        "in_force_from": None,
+        "source": "test fixture, not a real citation",
+        "confidence": "medium",
+        "verified_by_human": False,
+    }
+    provision.update(overrides)
+    return provision
+
+
 def write_library_yaml(
     path: Path,
     framework: str = "test_framework",
@@ -77,6 +96,7 @@ def write_library_yaml(
     effective_to: str | None = None,
     supersedes: str | None = None,
     controls: list[dict[str, Any]] | None = None,
+    penalty_provisions: list[dict[str, Any]] | None = None,
 ) -> Path:
     """Write a minimal, valid control library YAML file to `path` and return it."""
     payload = {
@@ -93,6 +113,7 @@ def write_library_yaml(
             }
         ],
         "controls": controls if controls is not None else [minimal_control()],
+        "penalty_provisions": penalty_provisions if penalty_provisions is not None else [],
     }
     path.write_text(yaml.safe_dump(payload, sort_keys=False))
     return path

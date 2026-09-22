@@ -16,7 +16,11 @@ from governance.library_loader import (
     load_control_library,
     validate_source_fields,
 )
-from governance.tests.conftest import minimal_control, write_library_yaml
+from governance.tests.conftest import (
+    minimal_control,
+    minimal_penalty_provision,
+    write_library_yaml,
+)
 
 
 def test_rejects_framework_with_effective_to_in_the_past(tmp_path: Path, as_of_date: date) -> None:
@@ -101,7 +105,7 @@ def test_every_source_field_in_real_control_libraries_resolves_against_schema(
     reference real schema/aggregated_assets.schema.json fields."""
     control_library_dir = Path(__file__).resolve().parents[1] / "control_library"
     libraries = load_all_control_libraries(control_library_dir, date(2026, 9, 20))
-    assert len(libraries) == 5
+    assert len(libraries) == 6
 
     all_errors: list[str] = []
     for library in libraries.values():
@@ -157,3 +161,74 @@ def test_emit_loud_confidence_warning_actually_warns(tmp_path: Path, as_of_date:
         emit_loud_confidence_warning(library)
     assert len(caught) == 1
     assert "not yet verified_by_human" in str(caught[0].message)
+
+
+def test_penalty_provision_round_trips(tmp_path: Path, as_of_date: date) -> None:
+    provision = minimal_penalty_provision(
+        id="test_penalty",
+        penalty_amount_inr=10_000_000.0,
+        currently_in_force=False,
+        in_force_from="2027-05-13",
+    )
+    path = write_library_yaml(tmp_path / "penalty.yaml", penalty_provisions=[provision])
+    library = load_control_library(path, as_of_date)
+
+    assert len(library.penalty_provisions) == 1
+    loaded = library.penalty_provisions[0]
+    assert loaded.id == "test_penalty"
+    assert loaded.penalty_amount_inr == 10_000_000.0
+    assert loaded.currently_in_force is False
+    assert loaded.in_force_from == date(2027, 5, 13)
+
+
+def test_library_without_penalty_provisions_defaults_to_empty_list(
+    tmp_path: Path, as_of_date: date
+) -> None:
+    path = write_library_yaml(tmp_path / "no_penalties.yaml", penalty_provisions=[])
+    library = load_control_library(path, as_of_date)
+    assert library.penalty_provisions == []
+
+
+def test_penalty_provision_invalid_confidence_level_rejected(
+    tmp_path: Path, as_of_date: date
+) -> None:
+    provision = minimal_penalty_provision(confidence="extremely-confident")
+    path = write_library_yaml(tmp_path / "bad.yaml", penalty_provisions=[provision])
+    with pytest.raises(ValueError, match="confidence"):
+        load_control_library(path, as_of_date)
+
+
+def test_penalty_provision_verified_by_human_true_without_source_fails_validation(
+    tmp_path: Path, as_of_date: date
+) -> None:
+    provision = minimal_penalty_provision(verified_by_human=True, source="")
+    path = write_library_yaml(tmp_path / "bad.yaml", penalty_provisions=[provision])
+    with pytest.raises(ValueError, match="verified_by_human"):
+        load_control_library(path, as_of_date)
+
+
+def test_collect_confidence_warnings_covers_penalty_provisions(
+    tmp_path: Path, as_of_date: date
+) -> None:
+    provision = minimal_penalty_provision(id="p1", confidence="low")
+    path = write_library_yaml(tmp_path / "mixed.yaml", penalty_provisions=[provision])
+    library = load_control_library(path, as_of_date)
+
+    load_warnings = collect_confidence_warnings(library)
+    reasons = {w.reason for w in load_warnings if w.control_id == "p1"}
+    assert "confidence=low" in reasons
+    assert "not yet verified_by_human" in reasons
+
+
+def test_real_control_libraries_have_no_penalty_provision_marked_met_by_optimizer(
+    schema: dict[str, Any],
+) -> None:
+    """Penalty provisions must never carry telemetry_check/status fields that
+    could be mistaken for a compliance verdict — they are monetary facts
+    only, never a "met"/"not_met" signal (CLAUDE.md principle 6)."""
+    control_library_dir = Path(__file__).resolve().parents[1] / "control_library"
+    libraries = load_all_control_libraries(control_library_dir, date(2026, 9, 20))
+    for library in libraries.values():
+        for provision in library.penalty_provisions:
+            assert not hasattr(provision, "status")
+            assert not hasattr(provision, "telemetry_check")
