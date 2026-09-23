@@ -55,6 +55,81 @@
       <p><strong>Sample reference NBFC, not a real organization.</strong> <strong>Loss magnitudes use US-calibrated breach data</strong> (Cyentia IRIS) while the Indian incident corpus is being collected. Rupee figures may differ by 20–40% from actual Indian loss patterns. Business criticality and downtime costs are declared inputs, not measurements. <button class="linkbtn" data-goto="data">See every assumption</button></p>
     </div>
 
+    <!-- ============ OVERVIEW ============ -->
+    <section class="view" id="view-overview" data-title="Exposure overview" data-eyebrow="Executive view">
+      <div class="grid">
+        <div class="kpis" id="kpis"></div>
+
+        <div class="card">
+          <div class="card-h">
+            <div>
+              <h2 id="heroTitle">Expected annual loss over time, by vulnerability</h2>
+              <p id="heroSub">Each weekly snapshot is re-simulated in full. Shaded bands are the vulnerabilities driving loss; dashed lines project the next 8 weeks with planned fixes versus a 30-day delay.</p>
+            </div>
+            <div class="ctrls">
+              <div class="seg" role="group" aria-label="Break down by">
+                <button data-hero-mode="vuln" aria-pressed="true">By vulnerability</button>
+                <button data-hero-mode="type" aria-pressed="false">By loss type</button>
+                <button data-hero-mode="total" aria-pressed="false">Mean &amp; tail</button>
+              </div>
+              <div class="seg" role="group" aria-label="Measure">
+                <button data-hero-metric="rate" aria-pressed="true">Annual rate</button>
+                <button data-hero-metric="accrued" aria-pressed="false">Accrued loss</button>
+              </div>
+            </div>
+          </div>
+          <div class="legend" id="heroLegend"></div>
+          <div class="chart" id="heroChart"></div>
+          <div class="herofoot" id="heroFoot"></div>
+        </div>
+
+        <div class="grid g-2">
+          <div class="card">
+            <div class="card-h">
+              <div>
+                <h2>Loss exceedance curve</h2>
+                <p>Chance that total cyber loss this year exceeds each amount, from 4,000 simulated years. The mean hides the tail; this curve shows both.</p>
+              </div>
+            </div>
+            <div class="legend" id="lecLegend"></div>
+            <div class="chart" id="lecChart"></div>
+          </div>
+          <div class="card">
+            <div class="card-h">
+              <div>
+                <h2>Top risk contributors</h2>
+                <p>Open loss scenarios ranked by expected annual loss.</p>
+              </div>
+              <button class="btn ghost" data-goto="assets">Drill down</button>
+            </div>
+            <div class="rank" id="topList"></div>
+          </div>
+        </div>
+
+        <div class="grid g-2">
+          <div class="card">
+            <div class="card-h">
+              <div>
+                <h2>Cost of leaving vulnerabilities open</h2>
+                <p>Expected loss accrued by each open finding since it was first detected. The steeper the line, the more each day of delay costs.</p>
+              </div>
+            </div>
+            <div class="legend" id="accLegend"></div>
+            <div class="chart" id="accChart"></div>
+          </div>
+          <div class="card">
+            <div class="card-h">
+              <div>
+                <h2>Exposure by business unit</h2>
+                <p>Expected annual loss rolled up from asset-level scenarios.</p>
+              </div>
+            </div>
+            <div class="hbars" id="buBars"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 <div class="tip" id="tip" hidden></div>
@@ -64,3 +139,5 @@
 <script src="js/engine.js"></script>
 <script src="js/dom.js"></script>
 <script src="js/optimizer.js"></script>
+<script src="js/overview.js"></script>
+<script src="js/app.js"></script>
