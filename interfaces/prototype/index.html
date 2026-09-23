@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="css/panels.css">
 <link rel="stylesheet" href="css/charts.css">
 <link rel="stylesheet" href="css/lists.css">
+<link rel="stylesheet" href="css/scenarios.css">
 <link rel="stylesheet" href="css/tables.css">
 
 <div class="app" id="app">
@@ -106,6 +107,22 @@
           </div>
         </div>
 
+          <div class="card whatif">
+            <div class="card-h">
+              <div>
+                <h2>What-if scenarios</h2>
+                <p>Changes are applied to a copy of the current snapshot and re-simulated jointly on the same random draws, so the difference comes from the change, not from noise.</p>
+              </div>
+            </div>
+            <div class="toggles" id="toggles">
+              <label class="tg"><input type="checkbox" id="sc-mfa"><div><b>Enforce MFA on all privileged accounts</b><span>AD, payments gateway, lending DB, CI server</span></div></label>
+              <label class="tg"><input type="checkbox" id="sc-kev"><div><b>Patch every KEV-listed finding now</b><span>Known-exploited flaws still open today</span></div></label>
+              <label class="tg"><input type="checkbox" id="sc-edr"><div><b>Stress test: EDR fails across the fleet</b><span>Endpoint detection gives no resistance</span></div></label>
+              <label class="tg"><input type="checkbox" id="sc-delay"><div><b>Delay planned remediation by 30 days</b><span>Every scheduled fix slips four weeks</span></div></label>
+            </div>
+            <div class="cmp" id="scResult"></div>
+          </div>
+
         <div class="grid g-2">
           <div class="card">
             <div class="card-h">
@@ -140,4 +157,5 @@
 <script src="js/dom.js"></script>
 <script src="js/optimizer.js"></script>
 <script src="js/overview.js"></script>
+<script src="js/scenarios.js"></script>
 <script src="js/app.js"></script>

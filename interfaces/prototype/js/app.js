@@ -19,8 +19,9 @@ $$('.nav button').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)))
 $$('[data-goto]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.goto)));
 $$('[data-hero-mode]').forEach(b=>b.addEventListener('click',()=>{heroMode=b.dataset.heroMode;$$('[data-hero-mode]').forEach(x=>x.setAttribute('aria-pressed',x===b));renderHero();}));
 $$('[data-hero-metric]').forEach(b=>b.addEventListener('click',()=>{heroMetric=b.dataset.heroMetric;$$('[data-hero-metric]').forEach(x=>x.setAttribute('aria-pressed',x===b));renderHero();}));
+['sc-mfa','sc-kev','sc-edr','sc-delay'].forEach(id=>$('#'+id).addEventListener('change',renderScenario));
 let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>renderView(current),120);});
 
 const start=(location.hash||'').replace('#','')||'overview';
-go(start);
+go(start);renderScenario();
 runOptimizer(()=>{if(current==='overview')renderKPIs();});
