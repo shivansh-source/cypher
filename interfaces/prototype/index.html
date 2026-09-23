@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="css/tables.css">
 <link rel="stylesheet" href="css/investment.css">
 <link rel="stylesheet" href="css/compliance.css">
+<link rel="stylesheet" href="css/data-model.css">
 
 <div class="app" id="app">
   <aside class="side">
@@ -231,6 +232,50 @@
       </div>
     </section>
 
+    <!-- ============ DATA & MODEL ============ -->
+    <section class="view" id="view-data" hidden data-title="Data quality &amp; model" data-eyebrow="Provenance view">
+      <div class="grid">
+        <div class="grid g-2e">
+          <div class="card">
+            <div class="card-h"><div><h2>Quality gates</h2><p>A snapshot becomes current only if every gate passes. A failure keeps the previous snapshot in force.</p></div></div>
+            <div class="gates" id="gates"></div>
+            <div class="eyebrow" style="margin-top:14px">Last 26 weekly snapshots</div>
+            <div class="weeks" id="gateWeeks"></div>
+            <p class="small muted" style="margin-top:6px" id="gateNote"></p>
+          </div>
+          <div class="card">
+            <div class="card-h"><div><h2>Connectors &amp; input age</h2><p>The figure is current relative to what is known. Stale inputs widen their factor's uncertainty instead of being hidden.</p></div></div>
+            <div class="tbl"><table id="connTbl"></table></div>
+          </div>
+        </div>
+        <div class="grid g-2e">
+          <div class="card">
+            <div class="card-h"><div><h2>Sensitivity</h2><p>How far expected annual loss moves when each assumption swings across its plausible range. The widest bars are the assumptions this figure depends on most.</p></div></div>
+            <div class="legend"><span><i class="sw" style="background:var(--div-lo)"></i>Lower loss</span><span><i class="sw" style="background:var(--div-hi)"></i>Higher loss</span></div>
+            <div class="tor" id="tornado"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div><h2>Measured control efficacy · EDR</h2><p>Lab campaigns at six attacker skill levels, with EDR on and off. The gap between the curves is how much more skill an attacker needs once EDR is present.</p></div><span class="prov measured">MEASURED · SAMPLE</span></div>
+            <div class="legend"><span><i class="sw" style="background:var(--s2)"></i>EDR off</span><span><i class="sw" style="background:var(--s1)"></i>EDR on</span><span class="muted">Whiskers: Wilson 95% interval, n = 400 per point</span></div>
+            <div class="chart" id="labChart"></div>
+          </div>
+        </div>
+        <div class="grid g-2e">
+          <div class="card">
+            <div class="card-h"><div><h2>Identity resolution queue</h2><p>Merges are scored by evidence. Weak evidence is never merged silently; it waits for a person.</p></div></div>
+            <div class="rank" id="idq"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div><h2>Conflict register</h2><p>Where the source methods disagree and how the engine resolves each disagreement.</p></div></div>
+            <div class="cr" id="conflicts"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><div><h2>Assumption register</h2><p>Every constant the engine reads, with where it came from. Declared values are inputs for you to change, not findings.</p></div></div>
+          <div class="tbl"><table id="assumTbl"></table></div>
+        </div>
+      </div>
+    </section>
   </main>
 </div>
 <div class="modal" id="askModal" hidden>
@@ -270,4 +315,5 @@
 <script src="js/assets.js"></script>
 <script src="js/investment.js"></script>
 <script src="js/compliance.js"></script>
+<script src="js/data-model.js"></script>
 <script src="js/app.js"></script>

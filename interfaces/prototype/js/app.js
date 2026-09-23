@@ -7,6 +7,7 @@ function renderView(v){
   else if(v==='assets')renderAssets();
   else if(v==='investment')renderInvest();
   else if(v==='compliance')renderCompliance();
+  else if(v==='data')renderData();
   rendered[v]=true;
 }
 let current='overview';
