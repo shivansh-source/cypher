@@ -24,4 +24,5 @@ let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>
 
 const start=(location.hash||'').replace('#','')||'overview';
 go(start);renderScenario();
+ask(PRESETS[0][0],PRESETS[0][1]);
 runOptimizer(()=>{if(current==='overview')renderKPIs();});
