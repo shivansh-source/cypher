@@ -6,6 +6,7 @@ function renderView(v){
   if(v==='overview'){renderKPIs();renderHero();renderLEC();renderTop();renderAccrued();renderBU();}
   else if(v==='assets')renderAssets();
   else if(v==='investment')renderInvest();
+  else if(v==='compliance')renderCompliance();
   rendered[v]=true;
 }
 let current='overview';
