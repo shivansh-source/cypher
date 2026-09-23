@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="css/ask.css">
 <link rel="stylesheet" href="css/sidebar.css">
 <link rel="stylesheet" href="css/tables.css">
+<link rel="stylesheet" href="css/investment.css">
 
 <div class="app" id="app">
   <aside class="side">
@@ -177,6 +178,39 @@
       </div>
     </section>
 
+    <!-- ============ INVESTMENT ============ -->
+    <section class="view" id="view-investment" hidden data-title="Investment optimization" data-eyebrow="Budget decision">
+      <div class="grid">
+        <div class="card">
+          <div class="budget">
+            <div>
+              <label class="eyebrow" for="budget">Security budget, first-year cost</label>
+              <input type="range" id="budget" min="0" max="16000000" step="250000" value="10000000">
+            </div>
+            <div class="bv" id="budgetV">₹1.00 Cr</div>
+          </div>
+          <div class="stats" id="invStats"></div>
+          <div class="callout" id="naive"></div>
+        </div>
+        <div class="grid g-2">
+          <div class="card">
+            <div class="card-h">
+              <div><h2>Investment vs risk reduction</h2><p>Each dot is one of 1,024 possible portfolios, jointly re-simulated. The line is the best reduction reachable at each spend. Past the shaded zone, each extra rupee buys less than a rupee of reduced annual loss.</p></div>
+            </div>
+            <div class="legend" id="frLegend"></div>
+            <div class="chart" id="frChart"><p class="loading" id="optLoading">Simulating portfolios…</p></div>
+          </div>
+          <div class="card">
+            <div class="card-h">
+              <div><h2>Candidate controls</h2><p>Tick controls to build your own portfolio, or reset to the best one for the budget.</p></div>
+              <button class="btn ghost" id="resetOpt">Use optimal</button>
+            </div>
+            <div class="tbl"><table id="candTbl"></table></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 <div class="modal" id="askModal" hidden>
@@ -214,4 +248,5 @@
 <script src="js/shell.js"></script>
 <script src="js/ask.js"></script>
 <script src="js/assets.js"></script>
+<script src="js/investment.js"></script>
 <script src="js/app.js"></script>

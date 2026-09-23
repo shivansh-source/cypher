@@ -5,6 +5,7 @@ const rendered={};
 function renderView(v){
   if(v==='overview'){renderKPIs();renderHero();renderLEC();renderTop();renderAccrued();renderBU();}
   else if(v==='assets')renderAssets();
+  else if(v==='investment')renderInvest();
   rendered[v]=true;
 }
 let current='overview';
@@ -26,4 +27,4 @@ let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>
 const start=(location.hash||'').replace('#','')||'overview';
 go(start);renderScenario();
 ask(PRESETS[0][0],PRESETS[0][1]);
-runOptimizer(()=>{if(current==='overview')renderKPIs();});
+runOptimizer(()=>{if(current==='overview')renderKPIs();if(current==='investment')renderInvest();});
