@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Suraksha</title>
+<meta name="description" content="Suraksha — continuous cyber risk quantification in rupees.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/shell.css">
+
+<div class="app" id="app">
+  <aside class="side">
+    <div class="brand" aria-label="Suraksha">
+      <div class="mark" aria-hidden="true">₹</div>
+      <div class="brand-text">
+        <div class="word">Su<b>₹</b>aksha</div>
+        <div class="tag">CYBER RISK, IN RUPEES</div>
+      </div>
+    </div>
+    <nav class="nav" id="sideNav" aria-label="Views">
+      <button data-view="overview" title="Overview" aria-current="page"><svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span class="t">Overview</span></button>
+      <button data-view="assets" title="Assets & findings"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg><span class="t">Assets &amp; findings</span></button>
+      <button data-view="investment" title="Investment"><svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l4-5 3 3 5-7"/></svg><span class="t">Investment</span></button>
+      <button data-view="compliance" title="Compliance"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span class="t">Compliance</span></button>
+      <button data-view="data" title="Data & model"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg><span class="t">Data &amp; model</span></button>
+    </nav>
+    <div class="side-foot">
+      <div class="snapcard">
+        <div class="eyebrow">Current snapshot</div>
+        <div class="mono small" id="snapId" style="overflow-wrap:anywhere">sha256:4f9c…</div>
+        <div class="row"><span class="muted">Observed</span><span class="mono">21 Sep 2026, 09:40</span></div>
+        <div class="row"><span class="muted">Quality gates</span><span class="mono" style="color:var(--good)">5 / 5 passed</span></div>
+        <div class="row"><span class="muted">Simulated years</span><span class="mono">4,000</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div>
+        <div class="eyebrow" id="viewEyebrow">Executive view</div>
+        <h1 id="viewTitle">Exposure overview</h1>
+      </div>
+    </header>
+
+    <div class="caveat" role="note">
+      <span aria-hidden="true" style="color:var(--marigold);font-weight:700">!</span>
+      <p><strong>Sample reference NBFC, not a real organization.</strong> <strong>Loss magnitudes use US-calibrated breach data</strong> (Cyentia IRIS) while the Indian incident corpus is being collected. Rupee figures may differ by 20–40% from actual Indian loss patterns. Business criticality and downtime costs are declared inputs, not measurements. <button class="linkbtn" data-goto="data">See every assumption</button></p>
+    </div>
+
+  </main>
+</div>
+<div class="tip" id="tip" hidden></div>
