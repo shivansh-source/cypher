@@ -4,6 +4,7 @@
 const rendered={};
 function renderView(v){
   if(v==='overview'){renderKPIs();renderHero();renderLEC();renderTop();renderAccrued();renderBU();}
+  else if(v==='assets')renderAssets();
   rendered[v]=true;
 }
 let current='overview';
