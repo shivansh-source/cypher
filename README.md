@@ -84,8 +84,9 @@ pytest
 
 ### Frontend (`interfaces/dashboard/`)
 
-A standalone Next.js app (TypeScript, App Router), built from the design
-prototype in `interfaces/prototype/`, with five views: overview (EAL/VaR,
+A standalone Next.js app (TypeScript, App Router), built from an earlier
+standalone HTML/JS design prototype (removed; see `interfaces/prototype/` at
+commit `55ef517`), with five views: overview (EAL/VaR,
 their trend across committed snapshots, the loss exceedance curve, top
 contributors and a what-if lab), assets & findings (posture and the FAIR
 parameters behind each figure), investment (budget-constrained portfolio over

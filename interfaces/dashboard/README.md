@@ -3,8 +3,9 @@
 The Su₹aksha frontend: a Next.js 16 App Router app (TypeScript, plain CSS)
 that renders the rupee figures produced by `core/` and the compliance status
 produced by `governance/`. Its design — shell, tokens, cards, charts, the Ask
-Suraksha modal — is ported from the standalone prototype in
-`interfaces/prototype/`, with one fundamental difference: the prototype runs
+Suraksha modal — is ported from an earlier standalone HTML/JS prototype (removed; it lives
+on in git history as `interfaces/prototype/` at commit `55ef517`), with one
+fundamental difference: the prototype runs
 its own engine in the browser on sample data, and this app never computes a
 figure. Everything it shows arrives from the API.
 
