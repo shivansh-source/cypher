@@ -14,6 +14,9 @@ resource "aws_internet_gateway" "igw" {
 
 # Single public subnet: the Free Plan vCPU limit (8) leaves no room for a NAT instance.
 # Inbound access is still locked down by the security groups below.
+# Intentional: this is a deliberately exposed sandbox. The portal and bastion
+# are reached directly on their public IPs (no NAT, no private subnet).
+# nosemgrep: terraform.aws.security.aws-subnet-has-public-ip-address.aws-subnet-has-public-ip-address
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.loanease.id
   cidr_block              = var.public_cidr
