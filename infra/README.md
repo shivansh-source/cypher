@@ -15,8 +15,8 @@ workflow to follow when adding a new one.
 | `prowler_connector.py` | Prowler (CSPM) | `assets[].findings` (misconfigurations) |
 | `scoutsuite_connector.py` | ScoutSuite (CSPM) | `assets[].findings` (misconfigurations) |
 | `wazuh_connector.py` | Wazuh (EDR/SIEM) | `assets[].edr`, optionally `assets[].findings` |
-| `iam_connector.py` | IAM provider (Entra/AWS IAM/Okta) | `assets[].identity_access` |
-| `cmdb_connector.py` | CMDB | `services[]`, canonical asset identity |
+| `iam_connector.py` | AWS IAM via PMapper (`IAM_PMAPPER_OUTPUT_PATH`, a `pmapper analysis --output-type json` file) | `assets[].findings`, attached to the account-level asset |
+| `cmdb_connector.py` | CMDB REST API, or a JSON inventory file (`CMDB_EXPORT_PATH`, e.g. from `infra/inventory/export_ec2_inventory.py`) | `endpoints[]`, canonical asset identity |
 | `nmap_connector.py` | nmap | `assets[].network`, `endpoints[]` |
 | `threat_intel_connector.py` | EPSS + CISA KEV | enrichment of existing `findings[].epss_score` / `.kev_listed` |
 
@@ -144,3 +144,11 @@ persistence/scheduling (`db`, `connector-scheduler`). `dashboard` talks to
   result — the aggregation pipeline needs the failure to record the
   connector under `scan_scope.unreachable_scanners` (see
   `schema/README.md`).
+
+
+## Other folders
+
+- `infra/inventory/` — operator-run helpers that produce connector input files
+  (currently `export_ec2_inventory.py`, the AWS stand-in for a CMDB).
+- `infra/terraform/` — the LoanEase sandbox that generates the telemetry; see
+  its own `README.md` and `manifest.yaml`.

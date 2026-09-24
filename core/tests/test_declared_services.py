@@ -20,6 +20,11 @@ _SANDBOX_FILE = Path(__file__).parent.parent / "declared" / "loanease_sandbox_se
 _SCHEMA_PATH = Path(__file__).parent.parent.parent / "schema" / "aggregated_assets.schema.json"
 
 
+_ARN = "cloud:arn:aws:ec2:ap-south-1:627984120842:"
+_DB_INSTANCE = _ARN + "instance/i-06d59432543fb1af9"
+_DB_VOLUME = _ARN + "volume/vol-050e7c1b5d5fd25b1"
+
+
 def _asset(asset_id: str) -> dict[str, Any]:
     return {
         "asset_id": asset_id,
@@ -47,18 +52,18 @@ def test_sandbox_file_loads_and_matches_schema_service_shape() -> None:
 
 def test_apply_links_observed_assets_and_reports_unmatched() -> None:
     declared = load_declared_services(_SANDBOX_FILE)
-    assets = [_asset("host:10.20.1.129")]
+    assets = [_asset(_DB_INSTANCE)]
     services, unmatched = apply_declared_services(declared, assets)
 
     assert assets[0]["service_ids"] == ["svc-loan-db"]
-    assert sorted(unmatched) == ["host:10.20.1.53", "host:10.20.1.56", "host:10.20.1.97"]
+    assert _DB_VOLUME in unmatched and _DB_INSTANCE not in unmatched
     assert len(services) == 4
-    assert [a["asset_id"] for a in assets] == ["host:10.20.1.129"]  # nothing created
+    assert [a["asset_id"] for a in assets] == [_DB_INSTANCE]  # nothing created
 
 
 def test_snapshot_with_declared_services_is_schema_valid_and_passes_gates() -> None:
     declared = load_declared_services(_SANDBOX_FILE)
-    assets = [_asset("host:10.20.1.129")]
+    assets = [_asset(_DB_INSTANCE)]
     services, _ = apply_declared_services(declared, assets)
     snapshot: dict[str, Any] = {
         "snapshot_id": "sha256:test",

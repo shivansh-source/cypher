@@ -22,6 +22,9 @@ _ASSUMPTIONS_USED = {
     "BASELINE_EXPLOIT_PROBABILITY_FOR_UNSCORED_FINDING": (
         "Exploit probability used when this finding has no EPSS score."
     ),
+    "UNSCORED_EXPLOIT_PROBABILITY_SCALE_BY_CRITICALITY": (
+        "Multiplier on that baseline according to this finding's own criticality."
+    ),
     "KEV_LISTED_MINIMUM_EXPLOIT_PROBABILITY": (
         "Floor applied to exploit probability if this finding is CISA KEV-listed."
     ),

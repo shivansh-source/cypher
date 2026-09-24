@@ -18,6 +18,7 @@ from core.assumptions import (
     CONTROL_RESISTANCE_STRENGTH,
     KEV_LISTED_MINIMUM_EXPLOIT_PROBABILITY,
     RTO_MULTIPLIER_BY_BACKUP_POSTURE,
+    UNSCORED_EXPLOIT_PROBABILITY_SCALE_BY_CRITICALITY,
 )
 
 # Ordinal ranks used only to pick the worst-case tier/posture across an
@@ -56,14 +57,19 @@ def _exposure_profile(asset: dict[str, Any], related_services: list[dict[str, An
 def _exploit_probability(finding: dict[str, Any]) -> float:
     """This finding's own exploit probability, before any control discount.
 
-    Starts from the finding's own EPSS score (or a baseline for non-CVE
-    findings, which EPSS never scores), floored upward if CISA KEV lists it
+    Starts from the finding's own EPSS score (or, for non-CVE findings
+    which EPSS never scores, a baseline scaled by the finding's own
+    criticality), floored upward if CISA KEV lists it
     as actively exploited.
     """
     epss_score = finding.get("epss_score")
-    exploit_probability = (
-        epss_score if epss_score is not None else BASELINE_EXPLOIT_PROBABILITY_FOR_UNSCORED_FINDING
-    )
+    if epss_score is not None:
+        exploit_probability = epss_score
+    else:
+        scale = UNSCORED_EXPLOIT_PROBABILITY_SCALE_BY_CRITICALITY.get(
+            str(finding.get("criticality")), 1.0
+        )
+        exploit_probability = min(BASELINE_EXPLOIT_PROBABILITY_FOR_UNSCORED_FINDING * scale, 1.0)
     if finding.get("kev_listed"):
         exploit_probability = max(exploit_probability, KEV_LISTED_MINIMUM_EXPLOIT_PROBABILITY)
     return float(exploit_probability)

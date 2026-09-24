@@ -428,3 +428,27 @@ def test_expected_annual_loss_by_asset_partitions_the_headline_figure() -> None:
     assert set(by_asset) == {c.asset_id for c in figure.top_contributors}
     assert sum(by_asset.values()) == pytest.approx(figure.expected_annual_loss_inr)
     assert list(by_asset.values()) == sorted(by_asset.values(), reverse=True)
+
+
+def test_unscored_exploit_probability_scales_with_finding_criticality() -> None:
+    """Without EPSS, a critical finding must be likelier than a low one; an EPSS score overrides the scale."""
+    from core.assumptions import (
+        BASELINE_EXPLOIT_PROBABILITY_FOR_UNSCORED_FINDING,
+        UNSCORED_EXPLOIT_PROBABILITY_SCALE_BY_CRITICALITY,
+    )
+    from core.engine.parameterization import _exploit_probability
+
+    def probability(criticality: str, epss: float | None) -> float:
+        return _exploit_probability(
+            {"criticality": criticality, "epss_score": epss, "kev_listed": None}
+        )
+
+    assert probability("critical", None) == pytest.approx(
+        BASELINE_EXPLOIT_PROBABILITY_FOR_UNSCORED_FINDING
+        * UNSCORED_EXPLOIT_PROBABILITY_SCALE_BY_CRITICALITY["critical"]
+    )
+    assert probability("critical", None) > probability("medium", None) > probability("low", None)
+    assert probability("medium", None) == pytest.approx(
+        BASELINE_EXPLOIT_PROBABILITY_FOR_UNSCORED_FINDING
+    )
+    assert probability("low", 0.3) == pytest.approx(0.3)

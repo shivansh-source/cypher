@@ -346,6 +346,12 @@ def _resolve_identities(
         )
         try:
             [answer] = transport.classify(state, [question])
+        except JevConfigurationError as exc:
+            # The transport only checks its API key when first called, so a
+            # missing key surfaces here rather than at get_jev_transport().
+            # Keep any merges already decided; leave the rest undecided.
+            typer.echo(f"identity resolution skipped: {exc}")
+            break
         except JevProviderError as exc:
             typer.echo(
                 f"identity resolution: Jev call failed for "
@@ -504,9 +510,7 @@ def ingest_command(commit: bool = True) -> None:
             typer.echo(f"declared services not applied: {exc}")
         else:
             services, unmatched = apply_declared_services(declared, assets)
-            typer.echo(
-                f"applied {len(services)} manually-declared service(s) from {declared_path}"
-            )
+            typer.echo(f"applied {len(services)} manually-declared service(s) from {declared_path}")
             if unmatched:
                 typer.echo(
                     "declared assets no connector observed this run (not created): "

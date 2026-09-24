@@ -120,3 +120,19 @@ def test_empty_findings_list_yields_no_fragments() -> None:
     raw = _fixture()
     raw["findings"] = []
     assert IAMConnector().normalize(raw) == []
+
+
+def test_real_pmapper_output_normalizes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Captured from a real PMapper 1.1.5 run against the LoanEase sandbox (2026-09-24)."""
+    real = Path(__file__).parent / "fixtures" / "pmapper_real.json"
+    monkeypatch.setenv("IAM_PMAPPER_OUTPUT_PATH", str(real))
+
+    fragments = IAMConnector().run()
+
+    assert {f["asset_id"] for f in fragments} == {"cloud:aws-account:627984120842"}
+    assert [f["findings"][0]["finding_id"] for f in fragments] == [
+        "pmapper-iam-users-with-administrative-permissions-but-no-mfa-device",
+        "pmapper-administrative-iam-user-can-call-sensitive-actions-without-mfa",
+    ]
+    assert {f["findings"][0]["criticality"] for f in fragments} == {"medium"}
+    assert fragments[0]["findings"][0]["first_seen_at"] == "2026-09-24T13:50:34.122043+00:00"

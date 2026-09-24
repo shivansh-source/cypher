@@ -152,7 +152,10 @@ class ProwlerConnector(Connector):
                 continue
 
             generator_id = str(check.get("GeneratorId") or "")
-            if not generator_id.startswith(_GENERATOR_ID_PREFIX) or generator_id == _GENERATOR_ID_PREFIX:
+            if (
+                not generator_id.startswith(_GENERATOR_ID_PREFIX)
+                or generator_id == _GENERATOR_ID_PREFIX
+            ):
                 raise ProwlerConnectorError(
                     f"{self.name}: a FAILED finding has an unusable GeneratorId {generator_id!r}"
                 )
