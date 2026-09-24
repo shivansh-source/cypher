@@ -16,6 +16,15 @@ htmlcov/
 dist/
 build/
 
+# Terraform (infra/terraform/) — never commit state, plans, local variables or keys
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+terraform.tfvars
+*.pem
+
 # Local data / snapshots — never commit real telemetry or real rupee figures
 data/
 snapshots/

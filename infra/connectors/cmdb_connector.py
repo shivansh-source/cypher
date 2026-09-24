@@ -30,6 +30,8 @@ folded into this pass.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -44,6 +46,7 @@ _REQUEST_TIMEOUT_SECONDS: int = 30
 
 _CMDB_BASE_URL_ENV = "CMDB_BASE_URL"
 _CMDB_API_TOKEN_ENV = "CMDB_API_TOKEN"
+_CMDB_EXPORT_PATH_ENV = "CMDB_EXPORT_PATH"
 
 #: CMDB's own identifier-list field names -> the identifier kind used
 #: throughout infra/connectors/_identity_resolution.py and this connector's
@@ -90,24 +93,31 @@ class CMDBConnector(Connector):
     name: str = "cmdb_connector"
 
     def fetch(self) -> Any:
-        """Retrieve raw asset-identity records from the CMDB's REST API.
+        """Retrieve raw asset-identity records, from an export file or the CMDB's REST API.
 
-        Calls ``GET {CMDB_BASE_URL}/assets`` with a bearer token. Expected
-        shape (this connector's own contract with the CMDB, not a
-        schema-governed one): a JSON list of objects, each with an
-        ``id`` (CMDB's own stable identifier), and optionally
+        If ``CMDB_EXPORT_PATH`` is set, reads that JSON file (an operator-
+        produced inventory export, e.g. ``infra/inventory/export_ec2_inventory.py``;
+        the same "operator provides the file" pattern as ``iam_connector.py``).
+        Otherwise calls ``GET {CMDB_BASE_URL}/assets`` with a bearer token.
+        Either way the expected shape (this connector's own contract with its
+        source, not a schema-governed one) is a JSON list of objects, each
+        with an ``id`` (the source's own stable identifier), and optionally
         ``hostnames``, ``ip_addresses``, ``cloud_instance_ids`` — each a
         list of strings.
 
         Returns:
-            The parsed JSON list of raw CMDB asset records, untransformed.
+            The parsed JSON list of raw asset records, untransformed.
 
         Raises:
             CMDBConnectorError: If a required environment variable is
-                missing, the request fails, or the response is not a JSON
-                list. Must not return an empty result to mean "could not
-                fetch".
+                missing, the file or request cannot be read, or the payload
+                is not a JSON list. Must not return an empty result to mean
+                "could not fetch".
         """
+        export_path = _env.get_optional(_CMDB_EXPORT_PATH_ENV)
+        if export_path:
+            return self._read_export(Path(export_path))
+
         base_url = _env.require(_CMDB_BASE_URL_ENV, self.name, CMDBConnectorError)
         token = _env.require(_CMDB_API_TOKEN_ENV, self.name, CMDBConnectorError)
 
@@ -134,6 +144,21 @@ class CMDBConnector(Connector):
         if not isinstance(records, list):
             raise CMDBConnectorError(
                 f"{self.name}: expected a JSON list of CMDB asset records, got {type(records).__name__}"
+            )
+        return records
+
+    def _read_export(self, path: Path) -> Any:
+        """Read and validate an inventory export file (see :meth:`fetch`)."""
+        try:
+            records = json.loads(path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            raise CMDBConnectorError(f"{self.name}: could not read {path}: {exc}") from exc
+        except json.JSONDecodeError as exc:
+            raise CMDBConnectorError(f"{self.name}: {path} is not valid JSON: {exc}") from exc
+        if not isinstance(records, list):
+            raise CMDBConnectorError(
+                f"{self.name}: expected {path} to hold a JSON list of asset records, "
+                f"got {type(records).__name__}"
             )
         return records
 

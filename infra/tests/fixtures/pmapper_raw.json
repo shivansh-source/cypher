@@ -1,0 +1,21 @@
+{
+  "account": "111122223333",
+  "date_and_time": "2026-09-24T12:00:00+00:00",
+  "findings": [
+    {
+      "title": "IAM Users with Administrative Permissions but no MFA Device",
+      "severity": "Medium",
+      "impact": "Synthetic fixture text, not real PMapper output.",
+      "description": "The following principals have admin permissions but no MFA device:\n\n* user/example-admin\n",
+      "recommendation": "Synthetic fixture text."
+    },
+    {
+      "title": "Example Second Finding Category",
+      "severity": "High",
+      "impact": "Synthetic fixture text, not real PMapper output.",
+      "description": "* role/example-role\n",
+      "recommendation": "Synthetic fixture text."
+    }
+  ],
+  "source": "https://github.com/nccgroup/PMapper"
+}

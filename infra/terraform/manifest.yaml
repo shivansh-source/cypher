@@ -1,0 +1,175 @@
+# LoanEase AWS Sandbox — Injected Vulnerability & Misconfiguration Manifest
+#
+# Ground truth for validating that the FAIR engine's loss distribution tracks
+# a known, real risk level rather than plausible-looking numbers. Every item
+# below was planted deliberately and confirmed against the live account on
+# 2026-09-24. Terraform paths are relative to infra/terraform/.
+
+account_id: "627984120842"
+region: ap-south-1
+
+vulnerabilities:
+
+  - id: V-01
+    category: Vulnerable dependency
+    description: >
+      Outdated Werkzeug pinned on the loan portal (requirements.txt:
+      Werkzeug==2.2.2, alongside Flask==2.2.2).
+    feeds: [frequency (FAIR), OpenVAS + EPSS/KEV correlation]
+    asset:
+      host: loanease-portal
+      ip: 10.20.1.97
+      port: 80/tcp
+    cve:
+      id: CVE-2023-25577
+      title: High resource usage when parsing multipart form data with many fields
+      cvss_v3: 7.5
+      cvss_severity: High
+      cwe: CWE-770 (Allocation of Resources Without Limits or Throttling)
+      fixed_in: Werkzeug 2.2.3
+      epss: "look up live at first.org/epss at time of submission -- changes daily, not hardcoded"
+      sources:
+        - https://github.com/pallets/werkzeug/security/advisories/GHSA-xg9f-g7g7-2323
+        - https://nvd.nist.gov/vuln/detail/CVE-2023-25577
+    verification:
+      tool: Greenbone/OpenVAS (loanease-full-scan)
+      method: HTTP Server type and version (NVT OID 1.3.6.1.4.1.25623.1.0.10107)
+      result: 'Server: Werkzeug/2.2.2 Python/3.10.12'
+      severity_as_reported: Log (OpenVAS reports the banner as fact; it does not
+        auto-correlate library versions to CVEs -- that correlation is this file)
+      date: 2026-09-24
+    ingest_status: >
+      NOT in the ps105 snapshot: greenbone_connector cannot reach GMP (gvmd
+      publishes no ports in this deployment), so it is recorded unreachable.
+
+  - id: V-02
+    category: Network exposure
+    description: >
+      db_sg allows 5432/tcp from the entire VPC CIDR (10.20.0.0/16) instead of
+      being scoped to the portal's security group alone.
+    feeds: [network reachability field]
+    asset:
+      host: loanease-db
+      ip: 10.20.1.129
+      port: 5432/tcp
+    verification:
+      tool: Greenbone/OpenVAS (loanease-full-scan)
+      method: PostgreSQL Detection (TCP) / PostgreSQL Detection Consolidation
+      result: PostgreSQL confirmed reachable and fingerprinted from the scanner,
+        which shares the subnet with every other host (no NAT segregation in
+        this build). OpenVAS reports the open port as fact; judging it "too
+        broad" is this manifest's / the downstream pipeline's job.
+      severity_as_reported: Log
+      date: 2026-09-24
+    terraform: modules/network/main.tf -> aws_security_group.db_sg
+    ingest_status: Same as V-01 (Greenbone unreachable).
+
+  - id: V-03
+    category: IAM overprivileged role
+    description: >
+      loan-ops-analyst IAM role with an attached admin-equivalent managed
+      policy (AdministratorAccess) it doesn't need.
+    feeds: [IAM/access field, maps to a SEBI CCI parameter]
+    asset:
+      type: IAM role
+      name: loan-ops-analyst
+      arn: "arn:aws:iam::627984120842:role/loan-ops-analyst"
+    verification:
+      tool: Prowler 5.43.0
+      check_id: iam_role_administratoraccess_policy
+      check_title: IAM role does not have AdministratorAccess policy attached
+      status: FAIL
+      severity: high
+      date: 2026-09-24
+    terraform: modules/iam/main.tf -> aws_iam_role.loan_ops_analyst
+    ingest_status: Present in the ps105 snapshot via prowler_connector (finding id prowler-iam_role_administratoraccess_policy-<role arn>).
+
+  - id: V-04
+    category: IAM no MFA
+    description: >
+      loan-ops-no-mfa IAM user has console access (password set) with no MFA
+      device attached or enforced.
+    feeds: [IAM/access field, T1078 (valid accounts)]
+    asset:
+      type: IAM user
+      name: loan-ops-no-mfa
+    verification:
+      tool: Prowler 5.43.0
+      check_id: iam_user_mfa_enabled_console_access
+      check_title: IAM user has MFA enabled for console access or no console password is set
+      status: FAIL
+      severity: high
+      date: 2026-09-24
+    terraform: modules/iam/main.tf -> aws_iam_user.loan_ops_no_mfa, aws_iam_user_login_profile.loan_ops_no_mfa
+    ingest_status: Present in the ps105 snapshot via prowler_connector.
+
+  - id: V-05
+    category: IAM stale key
+    description: >
+      loan-ops-stale-key IAM user's access key was created during the build
+      and deliberately never rotated.
+    feeds: [IAM/access field]
+    asset:
+      type: IAM user
+      name: loan-ops-stale-key
+      access_key_id: "AKIA...GLKD5 (masked; see the IAM console)"
+      key_create_date: "2026-09-24T12:35:12Z"
+    verification:
+      tool: Prowler 5.43.0
+      check_id: iam_rotate_access_key_90_days
+      check_title: IAM user does not have active access keys older than 90 days
+      status: PASS (as of 2026-09-24 -- genuinely time-based, not faked; the
+        key's real CreateDate means it legitimately passes today and will
+        transition to FAIL on 2026-12-23, i.e. key_create_date + 90 days)
+      severity: medium
+      date: 2026-09-24
+      note: >
+        Prowler's iam_rotate_access_key_90_days has no configurable threshold
+        override, and AWS does not allow backdating an access key's
+        CreateDate. So this item is demonstrated honestly: real key, real
+        creation date, real (currently-passing) check output, with the exact
+        future flip date stated above -- rather than a fabricated live FAIL.
+    terraform: modules/iam/main.tf -> aws_iam_user.loan_ops_stale_key, aws_iam_access_key.stale
+    ingest_status: Absent from the snapshot by design (a PASS is not a finding).
+
+  - id: V-06
+    category: Backup gap
+    description: >
+      DB instance's EBS volume has daily snapshots scheduled via AWS DLM; the
+      endpoint-sim instance deliberately has no tag and no policy covering it.
+    feeds: [backup posture field, ties to BIA/RTO]
+    asset:
+      host: loanease-db
+      volume_id: vol-050e7c1b5d5fd25b1
+      dlm_policy_id: policy-06de07a9cecf77426
+    verification:
+      tool: AWS CLI (dlm get-lifecycle-policy, ec2 describe-volumes)
+      result: >
+        DLM policy state=ENABLED, target_tags={Backup=true}, daily at 03:00
+        UTC, retain 3. DB root volume carries Backup=true. The endpoint-sim
+        instance's volume carries no such tag and is targeted by nothing.
+      date: 2026-09-24
+    terraform: modules/backup/main.tf
+    ingest_status: >
+      Not read from DLM by any connector. Carried into the engine only via the
+      manually-declared services in core/declared/loanease_sandbox_services.json
+      (DB backup exists, endpoint none).
+
+# ---- Real, non-planted findings from this build (documented for honesty) ----
+#
+# Unprotected OSSEC/Wazuh ossec-authd on the bastion (10.20.1.56:1515):
+#   Greenbone flagged this at 7.5 (High) -- side effect of opening 1514-1515 to
+#   the whole VPC CIDR for agent enrollment, combined with authd's default
+#   no-auth behavior. Can be closed with /var/ossec/etc/authd.pass.
+#
+# tf-bootstrap IAM user (PMapper, 2026-09-24):
+#   PMapper reports two findings, both about tf-bootstrap: AdministratorAccess
+#   without an MFA device, and able to call sensitive actions without MFA. Real
+#   and independent of V-03/04/05 (PMapper's admin-without-MFA checks only
+#   evaluate principals already flagged as admin, so it cannot see the planted
+#   role/users).
+#
+# 4-instance layout instead of the runbook's original 7:
+#   The AWS Free Plan vCPU limit (8) forced consolidation: bastion + Greenbone
+#   + Wazuh manager share one host; no separate NAT instance; one endpoint-sim
+#   instead of two. See environments/dev/main.tf and modules/network/main.tf.

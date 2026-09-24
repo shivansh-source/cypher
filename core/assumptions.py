@@ -185,6 +185,28 @@ BASELINE_THREAT_EVENT_FREQUENCY_PER_YEAR: dict[str, dict[str, float]] = {
 # misconfiguration-class findings specifically.
 BASELINE_EXPLOIT_PROBABILITY_FOR_UNSCORED_FINDING: float = 0.05
 
+# ASSUMPTION: multiplier applied to BASELINE_EXPLOIT_PROBABILITY_FOR_UNSCORED_FINDING
+# according to the finding's own criticality, for findings with no EPSS
+# score. Without it every unscored finding — a critical admin-role
+# misconfiguration and an informational missing-alarm hygiene check alike —
+# gets the identical exploit probability, so the headline figure would track
+# finding *count* rather than what the findings are. "medium" and "unknown"
+# stay at 1.0 so the baseline above remains the anchor value.
+# JUSTIFICATION: PLACEHOLDER — no source yet. Only the ordering (critical >
+# high > medium > low > informational) is intended to be defensible; the
+# magnitudes are illustrative. Never applied to a finding that has an EPSS
+# score, since EPSS already carries that finding's own exploit signal.
+# CALIBRATION: requires observed exploitation rates for misconfiguration
+# findings bucketed by scanner-reported severity.
+UNSCORED_EXPLOIT_PROBABILITY_SCALE_BY_CRITICALITY: dict[str, float] = {
+    "critical": 4.0,
+    "high": 2.0,
+    "medium": 1.0,
+    "low": 0.4,
+    "informational": 0.1,
+    "unknown": 1.0,
+}
+
 # ASSUMPTION: floor applied to a finding's exploit probability when
 # CISA KEV lists it — a KEV listing means active exploitation has already
 # been observed in the wild, which should never be allowed to round down to

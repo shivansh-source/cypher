@@ -15,8 +15,14 @@ from typing import Any
 
 import typer
 
+from core.declared_services import (
+    DeclaredServicesError,
+    apply_declared_services,
+    load_declared_services,
+)
 from infra.connectors import (
     GreenboneConnector,
+    IAMConnector,
     ProwlerConnector,
     ScoutSuiteConnector,
     WazuhConnector,
@@ -32,6 +38,7 @@ from infra.connectors._identity_resolution import (
 )
 from infra.connectors.cmdb_connector import CMDBConnector, CMDBConnectorError
 from infra.connectors.greenbone_connector import GreenboneConnectorError
+from infra.connectors.iam_connector import IAMConnectorError
 from infra.connectors.prowler_connector import ProwlerConnectorError
 from infra.connectors.scoutsuite_connector import ScoutSuiteConnectorError
 from infra.connectors.wazuh_connector import WazuhConnectorError
@@ -339,6 +346,12 @@ def _resolve_identities(
         )
         try:
             [answer] = transport.classify(state, [question])
+        except JevConfigurationError as exc:
+            # The transport only checks its API key when first called, so a
+            # missing key surfaces here rather than at get_jev_transport().
+            # Keep any merges already decided; leave the rest undecided.
+            typer.echo(f"identity resolution skipped: {exc}")
+            break
         except JevProviderError as exc:
             typer.echo(
                 f"identity resolution: Jev call failed for "
@@ -453,6 +466,7 @@ def ingest_command(commit: bool = True) -> None:
         (GreenboneConnector(), GreenboneConnectorError),
         (ProwlerConnector(), ProwlerConnectorError),
         (ScoutSuiteConnector(), ScoutSuiteConnectorError),
+        (IAMConnector(), IAMConnectorError),
         (CMDBConnector(), CMDBConnectorError),
     ]
 
@@ -487,6 +501,24 @@ def ingest_command(commit: bool = True) -> None:
             f"applied, all decisions recorded to {store_path}"
         )
 
+    services: list[dict[str, Any]] = []
+    declared_path = os.environ.get("DECLARED_SERVICES_PATH")
+    if declared_path:
+        try:
+            declared = load_declared_services(Path(declared_path))
+        except DeclaredServicesError as exc:
+            typer.echo(f"declared services not applied: {exc}")
+        else:
+            services, unmatched = apply_declared_services(declared, assets)
+            typer.echo(f"applied {len(services)} manually-declared service(s) from {declared_path}")
+            if unmatched:
+                typer.echo(
+                    "declared assets no connector observed this run (not created): "
+                    + ", ".join(unmatched)
+                )
+    else:
+        typer.echo("DECLARED_SERVICES_PATH not set; services[] left empty")
+
     now = datetime.now(UTC).isoformat()
 
     candidate: dict[str, Any] = {
@@ -501,7 +533,7 @@ def ingest_command(commit: bool = True) -> None:
             "unreachable_scanners": unreachable_scanners,
             "coverage": [],
         },
-        "services": [],
+        "services": services,
         "assets": assets,
         "endpoints": endpoints,
     }

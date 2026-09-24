@@ -1,0 +1,73 @@
+{
+  "declared_by": "Su₹aksha team (manual declaration — NOT connector-observed)",
+  "declared_at": "2026-09-24T00:00:00Z",
+  "basis": "Business criticality tiers are human judgements for the LoanEase sandbox, not scan output. Backup facts come from loanease-sim's Terraform (modules/backup): a daily DLM policy (03:00 UTC, retain 3) targets volumes tagged Backup=true; only the DB volume carries the tag. No restore test has been run, so last_tested_at is null. Fields nothing establishes (rto_hours, immutable_copy) are null, not guessed. Asset links use the EC2 instance and root-volume ARNs Prowler observed (instance-to-name mapping read from `aws ec2 describe-instances`, 2026-09-25), because the host:<ip> assets need Wazuh/Greenbone, which are unreachable in this sandbox.",
+  "services": [
+    {
+      "service_id": "svc-loan-portal",
+      "name": "LoanEase customer loan portal",
+      "criticality": "high",
+      "backup": {
+        "exists": false,
+        "last_tested_at": null,
+        "rpo_hours": null,
+        "rto_hours": null,
+        "immutable_copy": null
+      }
+    },
+    {
+      "service_id": "svc-loan-db",
+      "name": "LoanEase loan database",
+      "criticality": "critical",
+      "backup": {
+        "exists": true,
+        "last_tested_at": null,
+        "rpo_hours": 24,
+        "rto_hours": null,
+        "immutable_copy": null
+      }
+    },
+    {
+      "service_id": "svc-endpoint-sim",
+      "name": "LoanEase employee endpoint (simulated)",
+      "criticality": "medium",
+      "backup": {
+        "exists": false,
+        "last_tested_at": null,
+        "rpo_hours": null,
+        "rto_hours": null,
+        "immutable_copy": null
+      }
+    },
+    {
+      "service_id": "svc-scanner-ops",
+      "name": "Bastion / scanner / Wazuh manager",
+      "criticality": "low",
+      "backup": {
+        "exists": false,
+        "last_tested_at": null,
+        "rpo_hours": null,
+        "rto_hours": null,
+        "immutable_copy": null
+      }
+    }
+  ],
+  "asset_links": {
+    "svc-loan-portal": [
+      "cloud:arn:aws:ec2:ap-south-1:627984120842:instance/i-018baad978b8d5eb3",
+      "cloud:arn:aws:ec2:ap-south-1:627984120842:volume/vol-014f68af9f59bbaa2"
+    ],
+    "svc-loan-db": [
+      "cloud:arn:aws:ec2:ap-south-1:627984120842:instance/i-06d59432543fb1af9",
+      "cloud:arn:aws:ec2:ap-south-1:627984120842:volume/vol-050e7c1b5d5fd25b1"
+    ],
+    "svc-endpoint-sim": [
+      "cloud:arn:aws:ec2:ap-south-1:627984120842:instance/i-021c0d2f51f818864",
+      "cloud:arn:aws:ec2:ap-south-1:627984120842:volume/vol-0e2b3235f401a684e"
+    ],
+    "svc-scanner-ops": [
+      "cloud:arn:aws:ec2:ap-south-1:627984120842:instance/i-056ceaa14f5f5f5e9",
+      "cloud:arn:aws:ec2:ap-south-1:627984120842:volume/vol-02a7fe30141e6abf0"
+    ]
+  }
+}

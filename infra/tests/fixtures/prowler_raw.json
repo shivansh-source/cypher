@@ -1,29 +1,41 @@
 [
   {
-    "CheckID": "s3_bucket_public_access",
-    "Status": "FAIL",
-    "Severity": "critical",
+    "SchemaVersion": "2018-10-08",
+    "Id": "prowler-iam_role_administratoraccess_policy-123456789012-ap-south-1-aaaa11111",
+    "GeneratorId": "prowler-iam_role_administratoraccess_policy",
+    "AwsAccountId": "123456789012",
+    "FirstObservedAt": "2026-09-24T14:07:22Z",
+    "Severity": { "Label": "HIGH" },
+    "Title": "IAM role does not have AdministratorAccess policy attached",
     "Resources": [
-      { "uid": "arn:aws:s3:::example-public-bucket" }
+      { "Type": "AwsIamRole", "Id": "arn:aws:iam::123456789012:role/example-admin-role", "Partition": "aws", "Region": "ap-south-1" }
     ],
-    "Timestamp": "2026-09-10T00:00:00Z"
+    "Compliance": { "Status": "FAILED" }
   },
   {
-    "CheckID": "iam_root_mfa_enabled",
-    "Status": "PASS",
-    "Severity": "high",
+    "SchemaVersion": "2018-10-08",
+    "Id": "prowler-iam_role_administratoraccess_policy-123456789012-ap-south-1-bbbb22222",
+    "GeneratorId": "prowler-iam_role_administratoraccess_policy",
+    "AwsAccountId": "123456789012",
+    "FirstObservedAt": "2026-09-24T14:07:22Z",
+    "Severity": { "Label": "HIGH" },
+    "Title": "IAM role does not have AdministratorAccess policy attached",
     "Resources": [
-      { "uid": "arn:aws:iam::123456789012:root" }
+      { "Type": "AwsIamRole", "Id": "arn:aws:iam::123456789012:role/example-clean-role", "Partition": "aws", "Region": "ap-south-1" }
     ],
-    "Timestamp": "2026-09-10T00:00:00Z"
+    "Compliance": { "Status": "PASSED" }
   },
   {
-    "CheckID": "ec2_security_group_open_ssh",
-    "Status": "FAIL",
-    "Severity": "medium",
+    "SchemaVersion": "2018-10-08",
+    "Id": "prowler-ec2_securitygroup_allow_ingress_from_internet_to_any_port-123456789012-ap-south-1-cccc33333",
+    "GeneratorId": "prowler-ec2_securitygroup_allow_ingress_from_internet_to_any_port",
+    "AwsAccountId": "123456789012",
+    "FirstObservedAt": "2026-09-24T14:07:23Z",
+    "Severity": { "Label": "MEDIUM" },
+    "Title": "Synthetic second FAILED finding",
     "Resources": [
-      { "uid": "arn:aws:ec2:us-east-1:123456789012:security-group/sg-0123456789abcdef0" }
+      { "Type": "AwsEc2SecurityGroup", "Id": "arn:aws:ec2:ap-south-1:123456789012:security-group/sg-0123456789abcdef0", "Partition": "aws", "Region": "ap-south-1" }
     ],
-    "Timestamp": "2026-09-11T00:00:00Z"
+    "Compliance": { "Status": "FAILED" }
   }
 ]

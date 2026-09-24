@@ -38,9 +38,13 @@ PROWLER_SEVERITY_TO_CRITICALITY: dict[str, str] = {
     "informational": "informational",
 }
 
-#: Prowler statuses that represent an actual finding. Everything else
-#: (PASS, INFO, MANUAL) is not a finding and must be skipped.
-_FAILING_STATUS: str = "FAIL"
+#: ``Compliance.Status`` value Prowler's ASFF output uses for an actual
+#: finding. Everything else (``PASSED`` and any other status) is not a
+#: finding and must be skipped.
+_FAILING_STATUS: str = "FAILED"
+
+#: Prefix Prowler puts on every ASFF ``GeneratorId`` (``prowler-<check id>``).
+_GENERATOR_ID_PREFIX: str = "prowler-"
 
 
 class ProwlerConnectorError(RuntimeError):
@@ -49,8 +53,7 @@ class ProwlerConnectorError(RuntimeError):
 
     Always names the underlying cause — a missing/stale S3 object (wrapping
     :class:`infra.connectors._object_store.ObjectStoreError`) or a Prowler
-    check result that does not match this connector's assumed native-JSON
-    shape.
+    finding that does not match this connector's expected ASFF shape.
     """
 
 
@@ -68,8 +71,9 @@ class ProwlerConnector(Connector):
 
         Returns:
             Parsed but untransformed per-check results across the scanned
-            cloud accounts (a JSON list of check-result dicts), exactly as
-            pushed to S3 by the CI job that ran Prowler.
+            cloud accounts (a JSON list of ASFF finding dicts), exactly as
+            pushed to S3 — i.e. the unmodified ``*.asff.json`` file
+            ``prowler aws --output-formats json-asff`` writes.
 
         Raises:
             ProwlerConnectorError: If the object store has no bucket
@@ -86,21 +90,27 @@ class ProwlerConnector(Connector):
             ) from exc
 
     def normalize(self, raw: Any) -> list[dict[str, Any]]:
-        """Map Prowler check results to schema-shaped finding fragments.
+        """Map Prowler ASFF findings to schema-shaped finding fragments.
 
-        Assumed Prowler native-JSON shape (adjust if the real CI output
-        differs): a top-level JSON list, each item a check-result dict with
-        at least:
+        Expected shape: Prowler 5.x ``json-asff`` output (verified against a
+        real 5.43.0 file) — a top-level JSON list, each item an ASFF finding
+        with:
 
-        * ``CheckID`` (str) — Prowler's check identifier.
-        * ``Status`` (str) — ``"PASS"`` / ``"FAIL"`` / ``"INFO"`` /
-          ``"MANUAL"``.
-        * ``Severity`` (str) — one of
-          :data:`PROWLER_SEVERITY_TO_CRITICALITY`'s keys.
-        * ``Resources`` (list[dict]) — each with a ``"uid"`` key holding the
-          affected resource's ARN/UID.
-        * ``Timestamp`` (str, ISO-8601) — when Prowler last evaluated/found
-          this check result.
+        * ``GeneratorId`` (str) — ``"prowler-<check id>"``.
+        * ``Compliance.Status`` (str) — ``"FAILED"`` marks a finding;
+          ``"PASSED"`` (and anything else) is skipped.
+        * ``Severity.Label`` (str) — ``CRITICAL``/``HIGH``/``MEDIUM``/
+          ``LOW``/``INFORMATIONAL``, matched case-insensitively against
+          :data:`PROWLER_SEVERITY_TO_CRITICALITY`.
+        * ``Resources`` (list[dict]) — each with an ``"Id"`` holding the
+          affected resource's ARN/id.
+        * ``FirstObservedAt`` (str, ISO-8601 with ``Z``) — used as
+          ``first_seen_at``.
+
+        The ``json-ocsf`` output is deliberately not used: its
+        ``finding_info.created_time_dt`` is a *naive local-time* string
+        (observed 5.5h ahead of the UTC ``FirstObservedAt`` for the same
+        finding), which would silently mis-date every finding.
 
         Args:
             raw: Exactly what :meth:`fetch` returned.
@@ -123,37 +133,47 @@ class ProwlerConnector(Connector):
         """
         if not isinstance(raw, list):
             raise ProwlerConnectorError(
-                f"{self.name}: expected a list of Prowler check results, got {type(raw).__name__}"
+                f"{self.name}: expected a list of Prowler ASFF findings, got {type(raw).__name__}"
             )
 
         fragments: list[dict[str, Any]] = []
         for check in raw:
             if not isinstance(check, dict):
                 raise ProwlerConnectorError(
-                    f"{self.name}: expected each Prowler check result to be an object, got {type(check).__name__}"
+                    f"{self.name}: expected each Prowler finding to be an object, got {type(check).__name__}"
                 )
 
-            status = check.get("Status")
+            status = (check.get("Compliance") or {}).get("Status")
+            if status is None:
+                raise ProwlerConnectorError(
+                    f"{self.name}: finding {check.get('Id')!r} has no Compliance.Status"
+                )
             if status != _FAILING_STATUS:
                 continue
 
-            check_id = check.get("CheckID")
-            if not check_id:
-                raise ProwlerConnectorError(f"{self.name}: a FAIL check result has no CheckID")
+            generator_id = str(check.get("GeneratorId") or "")
+            if (
+                not generator_id.startswith(_GENERATOR_ID_PREFIX)
+                or generator_id == _GENERATOR_ID_PREFIX
+            ):
+                raise ProwlerConnectorError(
+                    f"{self.name}: a FAILED finding has an unusable GeneratorId {generator_id!r}"
+                )
+            check_id = generator_id[len(_GENERATOR_ID_PREFIX) :]
 
-            severity = check.get("Severity")
+            severity = (check.get("Severity") or {}).get("Label")
             criticality = (
                 PROWLER_SEVERITY_TO_CRITICALITY.get(str(severity).lower()) if severity else None
             )
             if criticality is None:
                 raise ProwlerConnectorError(
-                    f"{self.name}: check {check_id} has an unrecognized Severity {severity!r}"
+                    f"{self.name}: check {check_id} has an unrecognized Severity.Label {severity!r}"
                 )
 
-            timestamp = check.get("Timestamp")
+            timestamp = check.get("FirstObservedAt")
             if not timestamp:
                 raise ProwlerConnectorError(
-                    f"{self.name}: check {check_id} has no Timestamp; refusing to fabricate first_seen_at"
+                    f"{self.name}: check {check_id} has no FirstObservedAt; refusing to fabricate first_seen_at"
                 )
 
             resources = check.get("Resources")
@@ -163,10 +183,10 @@ class ProwlerConnector(Connector):
                 )
 
             for resource in resources:
-                resource_uid = resource.get("uid") if isinstance(resource, dict) else None
+                resource_uid = resource.get("Id") if isinstance(resource, dict) else None
                 if not resource_uid:
                     raise ProwlerConnectorError(
-                        f"{self.name}: check {check_id} has a resource with no uid"
+                        f"{self.name}: check {check_id} has a resource with no Id"
                     )
 
                 fragments.append(
@@ -181,7 +201,7 @@ class ProwlerConnector(Connector):
                                 "criticality": criticality,
                                 "provenance": {
                                     "connector": self.name,
-                                    "raw_source_id": str(check_id),
+                                    "raw_source_id": check_id,
                                 },
                                 "first_seen_at": timestamp,
                                 "remediated_at": None,
