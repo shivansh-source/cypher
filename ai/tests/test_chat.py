@@ -16,7 +16,7 @@ import pytest
 
 from ai import tool_registry
 from ai.chat import ChatEngine
-from ai.llm_client import StreamChunk
+from ai.llm_client import LLMConfigurationError, StreamChunk
 from ai.sessions import InMemorySessionStore
 from ai.tool_registry import tool_specs
 
@@ -205,3 +205,103 @@ def test_stream_turn_reports_tool_progress(session_store: InMemorySessionStore) 
     result_event = next(event for event in events if event.type == "tool_result")
     assert result_event.data["status"] == "unavailable"
     assert events[-1].type == "final"
+
+
+def _multi_tool_message(calls: list[tuple[str, str, dict[str, Any]]]) -> dict[str, Any]:
+    return {
+        "model": "scripted-model",
+        "stop_reason": "tool_use",
+        "content": [
+            {"type": "tool_use", "id": call_id, "name": name, "input": arguments}
+            for call_id, name, arguments in calls
+        ],
+    }
+
+
+def test_stream_turn_reports_each_parallel_call_before_starting_the_next(
+    session_store: InMemorySessionStore,
+) -> None:
+    """Several calls in one round are announced and resolved one at a time, by id."""
+    transport = ScriptedTransport(
+        [
+            _multi_tool_message(
+                [
+                    ("toolu_a", "get_exposure", {}),
+                    ("toolu_b", "get_control_posture", {}),
+                    ("toolu_c", "get_exposure", {"scope": "crown-jewels"}),
+                ]
+            ),
+            _text_message("Nothing has been computed yet."),
+        ]
+    )
+    events = list(ChatEngine(transport=transport).stream_turn(session_store.create(), "overview?"))
+    progress = [
+        (event.type, event.data["tool_use_id"])
+        for event in events
+        if event.type in ("tool_call", "tool_result")
+    ]
+    assert progress == [
+        ("tool_call", "toolu_a"),
+        ("tool_result", "toolu_a"),
+        ("tool_call", "toolu_b"),
+        ("tool_result", "toolu_b"),
+        ("tool_call", "toolu_c"),
+        ("tool_result", "toolu_c"),
+    ]
+    assert all(
+        event.data["round"] == 0 for event in events if event.type in ("tool_call", "tool_result")
+    )
+    # The provider still receives every tool_result of the round in one message.
+    tool_turn = transport.requests[-1][-1]
+    assert [block["tool_use_id"] for block in tool_turn["content"]] == [
+        "toolu_a",
+        "toolu_b",
+        "toolu_c",
+    ]
+    final = events[-1]
+    assert final.type == "final"
+    assert [call["tool_name"] for call in final.data["tool_calls"]] == [
+        "get_exposure",
+        "get_control_posture",
+        "get_exposure",
+    ]
+
+
+def test_stream_turn_numbers_rounds_across_follow_up_calls(
+    session_store: InMemorySessionStore,
+) -> None:
+    transport = ScriptedTransport(
+        [
+            _multi_tool_message([("toolu_1", "get_exposure", {})]),
+            _multi_tool_message([("toolu_2", "get_top_contributors", {})]),
+            _text_message("Nothing has been computed yet."),
+        ]
+    )
+    events = list(ChatEngine(transport=transport).stream_turn(session_store.create(), "drivers?"))
+    rounds = [
+        (event.data["tool_use_id"], event.data["round"])
+        for event in events
+        if event.type == "tool_call"
+    ]
+    assert rounds == [("toolu_1", 0), ("toolu_2", 1)]
+    assert events[-1].type == "final"
+
+
+class _UnconfiguredTransport(ScriptedTransport):
+    """A transport whose construction-time lookup fails, like a missing API key."""
+
+    @property
+    def model(self) -> str:
+        raise LLMConfigurationError("GROQ_API_KEY is not set.")
+
+
+def test_stream_turn_ends_with_an_error_event_when_the_transport_is_unconfigured(
+    session_store: InMemorySessionStore,
+) -> None:
+    events = list(
+        ChatEngine(transport=_UnconfiguredTransport([])).stream_turn(
+            session_store.create(), "exposure?"
+        )
+    )
+    assert [event.type for event in events] == ["session", "error"]
+    assert events[-1].data["error"] == "LLMConfigurationError"
