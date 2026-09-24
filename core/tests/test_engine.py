@@ -9,6 +9,7 @@ core.assumptions rather than a bare literal.
 from __future__ import annotations
 
 import copy
+import itertools
 import json
 from pathlib import Path
 from typing import Any
@@ -24,7 +25,9 @@ from core.assumptions import (
 )
 from core.engine import (
     build_loss_event_scenarios,
+    compute_loss_exceedance_curve,
     compute_risk_figure,
+    expected_annual_loss_by_asset,
     parameterize_scenario,
     run_monte_carlo,
 )
@@ -369,3 +372,59 @@ def test_compute_risk_figure_against_sample_aggregated_fixture() -> None:
     assert figure.monte_carlo_iterations == MONTE_CARLO_ITERATIONS
     assert len(figure.top_contributors) == 2
     assert {c.asset_id for c in figure.top_contributors} == {"asset-web-01", "asset-hr-db-01"}
+
+
+def test_loss_exceedance_curve_reads_the_same_simulation_as_the_risk_figure() -> None:
+    """The curve must describe the very simulated years the headline figure summarizes."""
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    figure = compute_risk_figure(snapshot)
+    curve = compute_loss_exceedance_curve(snapshot)
+
+    scenarios = [parameterize_scenario(s, snapshot) for s in build_loss_event_scenarios(snapshot)]
+    samples = run_monte_carlo(scenarios)["total_annual_loss_samples_inr"]
+
+    assert curve.snapshot_id == figure.snapshot_id
+    assert curve.monte_carlo_iterations == figure.monte_carlo_iterations
+    assert curve.probability_of_any_loss == pytest.approx(float(np.mean(samples > 0)))
+    for point in curve.points:
+        assert point.exceedance_probability == pytest.approx(
+            float(np.mean(samples > point.loss_inr))
+        )
+
+
+def test_loss_exceedance_curve_is_ascending_in_loss_and_non_increasing_in_probability() -> None:
+    curve = compute_loss_exceedance_curve(copy.deepcopy(SAMPLE_SNAPSHOT), points=25)
+
+    assert len(curve.points) == 25
+    losses = [p.loss_inr for p in curve.points]
+    probabilities = [p.exceedance_probability for p in curve.points]
+    assert losses == sorted(losses)
+    assert all(a >= b for a, b in itertools.pairwise(probabilities))
+    assert probabilities[0] <= curve.probability_of_any_loss
+    assert probabilities[-1] == 0.0
+
+
+def test_loss_exceedance_curve_is_empty_when_there_is_nothing_to_lose() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    for asset in snapshot["assets"]:
+        asset["findings"] = []
+
+    curve = compute_loss_exceedance_curve(snapshot)
+
+    assert curve.points == []
+    assert curve.probability_of_any_loss == 0.0
+
+
+def test_loss_exceedance_curve_rejects_fewer_than_two_points() -> None:
+    with pytest.raises(ValueError):
+        compute_loss_exceedance_curve(copy.deepcopy(SAMPLE_SNAPSHOT), points=1)
+
+
+def test_expected_annual_loss_by_asset_partitions_the_headline_figure() -> None:
+    figure = compute_risk_figure(copy.deepcopy(SAMPLE_SNAPSHOT))
+
+    by_asset = expected_annual_loss_by_asset(figure)
+
+    assert set(by_asset) == {c.asset_id for c in figure.top_contributors}
+    assert sum(by_asset.values()) == pytest.approx(figure.expected_annual_loss_inr)
+    assert list(by_asset.values()) == sorted(by_asset.values(), reverse=True)

@@ -19,7 +19,7 @@ export function ProvenanceStrip({
 }) {
   if (result.state !== "ok") {
     return (
-      <p className="rounded-md border border-line bg-surface px-4 py-2.5 text-xs text-muted">
+      <p className="notice info">
         Snapshot provenance unavailable — {result.reason}
       </p>
     );
@@ -29,58 +29,53 @@ export function ProvenanceStrip({
   const unreachable = snapshot.scan_scope.unreachable_scanners;
 
   return (
-    <div className="rounded-md border border-line bg-surface px-4 py-3">
-      <dl className="flex flex-wrap gap-x-8 gap-y-2 text-xs">
+    <div className="card provstrip">
+      <dl>
         <Item label="Snapshot">
-          <span className="tnum font-mono" title={snapshot.snapshot_id}>
+          <span className="mono" title={snapshot.snapshot_id}>
             {shortSnapshotId(snapshot.snapshot_id)}
           </span>
         </Item>
         <Item label="Observed">
-          <span className="tnum">{formatTimestamp(snapshot.observed_at)}</span>
+          <span className="mono">{formatTimestamp(snapshot.observed_at)}</span>
         </Item>
-        <Item label="Status">
-          {snapshot.valid_to === null ? "Current" : "Superseded"}
-        </Item>
+        <Item label="Status">{snapshot.valid_to === null ? "Current" : "Superseded"}</Item>
         <Item label="Assets">
-          <span className="tnum">{formatCount(snapshot.asset_count)}</span>
+          <span className="mono">{formatCount(snapshot.asset_count)}</span>
         </Item>
         <Item label="Services">
-          <span className="tnum">{formatCount(snapshot.service_count)}</span>
+          <span className="mono">{formatCount(snapshot.service_count)}</span>
         </Item>
-        <Item label="Findings">
-          <span className="tnum">{formatCount(snapshot.finding_count)}</span>
+        <Item label="Open findings">
+          <span className="mono">
+            {formatCount(snapshot.open_finding_count)} of {formatCount(snapshot.finding_count)}
+          </span>
         </Item>
         <Item label="Scanners reporting">
-          <span className="tnum">
-            {snapshot.scan_scope.reachable_scanners.length}
+          <span className="mono">
+            {snapshot.scan_scope.reachable_scanners.length} of{" "}
+            {snapshot.scan_scope.reachable_scanners.length + unreachable.length}
           </span>
         </Item>
       </dl>
 
       {unreachable.length > 0 ? (
-        <p className="mt-3 border-t border-line pt-3 text-xs leading-relaxed text-warn">
-          <strong className="font-semibold">Coverage caveat:</strong>{" "}
-          {unreachable.join(", ")} did not report for this snapshot. Anything
-          these scanners would have found is missing from the figures above —
-          absence of a finding here is not evidence of remediation.
+        <p className="notice" style={{ marginTop: 12 }}>
+          <strong>Coverage caveat:</strong> {unreachable.join(", ")} did not
+          report for this snapshot. Anything these scanners would have found is
+          missing from the figures — absence of a finding here is not evidence
+          of remediation.
         </p>
       ) : null}
     </div>
   );
 }
 
-function Item({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Item({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-faint">{label}</dt>
-      <dd className="mt-0.5 text-ink">{children}</dd>
+      <dt>{label}</dt>
+      <dd>{children}</dd>
     </div>
   );
 }

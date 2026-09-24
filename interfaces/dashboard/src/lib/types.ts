@@ -1,10 +1,10 @@
 /**
- * TypeScript mirrors of the backend's Python contracts.
+ * TypeScript mirrors of the backend's response shapes.
  *
  * These are hand-maintained mirrors, not generated code. Each interface names
- * the Python dataclass it mirrors; if that dataclass changes, this file must
- * change with it. The dashboard talks to the backend only over HTTP (see
- * repo-root CLAUDE.md), so these shapes are the whole of what it knows.
+ * the Python type or route it mirrors; if that changes, this file must change
+ * with it. The dashboard talks to the backend only over HTTP (see repo-root
+ * CLAUDE.md), so these shapes are the whole of what it knows.
  */
 
 /** Mirrors `core.engine.LossEventContribution`. */
@@ -22,8 +22,156 @@ export interface RiskFigure {
   value_at_risk_inr: number;
   /** Copied from the engine at computation time — never assumed to match current config. */
   value_at_risk_percentile: number;
+  /** Every scenario the engine simulated, largest first — not a truncated top-N. */
   top_contributors: LossEventContribution[];
   monte_carlo_iterations: number;
+}
+
+/** Mirrors `core.engine.LossExceedancePoint`. */
+export interface LossExceedancePoint {
+  loss_inr: number;
+  exceedance_probability: number;
+}
+
+/** Mirrors `core.engine.LossExceedanceCurve` (`GET /exposure/exceedance`). */
+export interface LossExceedanceCurve {
+  snapshot_id: string;
+  monte_carlo_iterations: number;
+  probability_of_any_loss: number;
+  points: LossExceedancePoint[];
+}
+
+/** One entry of `GET /exposure/history`. */
+export interface ExposureHistoryEntry {
+  snapshot_id: string;
+  observed_at: string;
+  risk_figure: RiskFigure;
+}
+
+/** `GET /exposure/history` — oldest snapshot first. */
+export interface ExposureHistory {
+  snapshots: ExposureHistoryEntry[];
+}
+
+/** Mirrors `scan_scope` in schema/aggregated_assets.schema.json. */
+export interface ScanScope {
+  reachable_scanners: string[];
+  unreachable_scanners: string[];
+  coverage?: { scanner: string; asset_ids: string[] }[];
+}
+
+/** `GET /snapshot` — the bitemporal identity every figure on screen derives from. */
+export interface SnapshotProvenance {
+  snapshot_id: string;
+  observed_at: string;
+  valid_from: string;
+  valid_to: string | null;
+  scan_scope: ScanScope;
+  asset_count: number;
+  service_count: number;
+  finding_count: number;
+  open_finding_count: number;
+}
+
+/** Mirrors `core.snapshot.GateResult`. */
+export interface GateResult {
+  gate_name: string;
+  passed: boolean;
+  detail: string;
+}
+
+/** `GET /snapshot/gates` — the five gates re-run on the current snapshot. */
+export interface GateReport {
+  snapshot_id: string;
+  /** The snapshot the current one superseded; null if it was the first. */
+  compared_against_snapshot_id: string | null;
+  evaluated_at: string;
+  gates: GateResult[];
+}
+
+/** A Beta-PERT three-point estimate, as the engine parameterizes it. */
+export interface PertEstimate {
+  min: number;
+  most_likely: number;
+  max: number;
+}
+
+/** The scenario `core.engine.parameterize_scenario` built for one open finding. */
+export interface ScenarioParameters {
+  scenario_id: string;
+  description: string;
+  exposure_profile: string;
+  threat_event_frequency: PertEstimate;
+  exploit_probability: number;
+  active_control_resistances: Record<string, number>;
+  vulnerability: number;
+  loss_event_frequency: PertEstimate;
+  criticality_tier: string;
+  backup_posture: string;
+  loss_magnitude: PertEstimate;
+  expected_annual_loss_inr: number;
+}
+
+/** Mirrors `assets[].findings[]` in the schema. */
+export interface Finding {
+  finding_id: string;
+  type: string;
+  cve_id: string | null;
+  epss_score: number | null;
+  kev_listed: boolean | null;
+  criticality: string | null;
+  provenance: { connector: string; raw_source_id: string };
+  first_seen_at: string;
+  remediated_at: string | null;
+}
+
+export interface AssetFinding extends Finding {
+  /** Null when the finding is remediated — a fixed finding is not a loss path. */
+  scenario: ScenarioParameters | null;
+}
+
+/** Mirrors `services[]` in the schema. */
+export interface Service {
+  service_id: string;
+  name: string;
+  criticality: string;
+  backup: {
+    exists: boolean;
+    last_tested_at: string | null;
+    rpo_hours: number | null;
+    rto_hours: number | null;
+    immutable_copy: boolean | null;
+  };
+}
+
+export interface AssetView {
+  asset_id: string;
+  service_ids: string[];
+  services: Service[];
+  unresolved_service_ids: string[];
+  network: { internet_facing: boolean | null; open_ports: number[] | null } | null;
+  edr: {
+    agent_installed: boolean;
+    agent_healthy: boolean | null;
+    detection_rules_active: string[] | null;
+    recent_alerts: unknown[] | null;
+  } | null;
+  identity_access: {
+    privileged_accounts_count: number | null;
+    mfa_enforced: boolean | null;
+  } | null;
+  /** `core.engine.expected_annual_loss_by_asset`; null when no scenario is modelled on it. */
+  expected_annual_loss_inr: number | null;
+  findings: AssetFinding[];
+}
+
+/** `GET /assets`. */
+export interface AssetsResponse {
+  snapshot_id: string;
+  observed_at: string;
+  monte_carlo_iterations: number;
+  expected_annual_loss_inr: number;
+  assets: AssetView[];
 }
 
 /** Mirrors `core.optimizer.Control`. */
@@ -34,8 +182,23 @@ export interface Control {
   affected_asset_ids: string[];
 }
 
-/** Mirrors `core.optimizer.PortfolioRecommendation`. */
+/** Mirrors `core.optimizer.ControlGap` — carries no cost and no benefit. */
+export interface ControlGap {
+  control_id: string;
+  control_category: string;
+  affected_asset_ids: string[];
+}
+
+/** `GET /optimize/candidates`. */
+export interface ControlCandidates {
+  snapshot_id: string;
+  applicable_categories: string[];
+  gaps: ControlGap[];
+}
+
+/** Mirrors `core.optimizer.PortfolioRecommendation` (`POST /optimize`). */
 export interface PortfolioRecommendation {
+  snapshot_id: string;
   selected_controls: Control[];
   total_cost_inr: number;
   baseline_risk_figure: RiskFigure;
@@ -47,6 +210,17 @@ export interface PortfolioRecommendation {
   risk_reduction_inr: number;
 }
 
+/** `POST /simulate` — mirrors `ai.tools.simulate_scenario`'s result. */
+export interface HypotheticalComparison {
+  snapshot_id: string;
+  hypothetical_controls: Control[];
+  /** Re-simulated on the same random draws as `hypothetical`. */
+  baseline: RiskFigure;
+  hypothetical: RiskFigure;
+  expected_annual_loss_change_inr: number;
+  value_at_risk_change_inr: number;
+}
+
 /** Mirrors `governance.mapper.StatusValue`. */
 export type ControlStatusValue =
   | "met"
@@ -54,7 +228,7 @@ export type ControlStatusValue =
   | "unknown"
   | "expired_attestation";
 
-/** Mirrors `governance.mapper.ControlStatus`. */
+/** Mirrors `governance.mapper.ControlStatus`, plus the library entry's name. */
 export interface ControlStatus {
   control_id: string;
   framework: string;
@@ -63,6 +237,8 @@ export interface ControlStatus {
   evidence_refs: string[];
   confidence: string;
   verified_by_human: boolean;
+  parameter_name: string;
+  framework_ref: string;
 }
 
 /** Mirrors `governance.mapper.WeightedScoreResult`. */
@@ -77,41 +253,68 @@ export interface WeightedScoreResult {
   controls_excluded_no_weight: string[];
 }
 
-/** Mirrors the response of `ai.tools.get_framework_status.get_framework_status`. */
+/** `GET /frameworks/{framework}/status` — mirrors `ai.tools.get_framework_status`. */
 export interface FrameworkStatus {
   framework: string;
-  framework_version: string;
+  version: string;
   effective_from: string | null;
-  controls: ControlStatus[];
-  weighted_score: WeightedScoreResult | null;
-}
-
-/** Mirrors `scan_scope` in schema/aggregated_assets.schema.json. */
-export interface ScanScope {
-  reachable_scanners: string[];
-  unreachable_scanners: string[];
-  coverage?: { scanner: string; asset_ids: string[] }[];
-}
-
-/**
- * Snapshot provenance: the bitemporal identity of the snapshot every figure on
- * screen was computed from. Mirrors the top-level fields of
- * schema/aggregated_assets.schema.json plus counts the API derives from it.
- */
-export interface SnapshotProvenance {
+  effective_to: string | null;
   snapshot_id: string;
-  observed_at: string;
-  valid_from: string;
-  valid_to: string | null;
-  scan_scope: ScanScope;
-  asset_count: number;
-  service_count: number;
-  finding_count: number;
+  controls: ControlStatus[];
+  weighted_score: WeightedScoreResult;
 }
 
-/** Mirrors `core.snapshot.GateResult`. */
-export interface GateResult {
-  gate_name: string;
-  passed: boolean;
-  detail: string;
+/** Mirrors `governance.library_loader.PenaltyProvision` — a statutory ceiling. */
+export interface PenaltyProvision {
+  id: string;
+  statute: string;
+  provision_ref: string;
+  description: string;
+  penalty_amount_inr: number | null;
+  penalty_formula: string;
+  currently_in_force: boolean;
+  in_force_from: string | null;
+  source: string;
+  confidence: string;
+  verified_by_human: boolean;
+}
+
+/** One entry of `GET /frameworks`. */
+export interface FrameworkSummary {
+  framework: string;
+  version: string;
+  effective_from: string | null;
+  effective_to: string | null;
+  supersedes: string | null;
+  control_count: number;
+  penalty_provisions: PenaltyProvision[];
+}
+
+/** One entry of `GET /assumptions` — a live constant from core/assumptions.py. */
+export interface AssumptionEntry {
+  name: string;
+  value: unknown;
+  assumption: string | null;
+  justification: string | null;
+  calibration: string | null;
+}
+
+/** Mirrors `interfaces.api.app.ToolCallResponse`. */
+export interface ChatToolCall {
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  status: "ok" | "unavailable" | "error" | string;
+  detail: string | null;
+  result: Record<string, unknown> | null;
+}
+
+/** Mirrors `interfaces.api.app.ChatResponse` — `text` is already guarded. */
+export interface ChatResponse {
+  session_id: string;
+  text: string;
+  all_claims_verified: boolean;
+  unverified_claims: string[];
+  tool_calls: ChatToolCall[];
+  model: string;
+  stop_reason: string;
 }

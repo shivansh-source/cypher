@@ -9,46 +9,42 @@ import type { ControlStatusValue } from "@/lib/types";
  * rendering either as a pass would be the exact fail-open reading the
  * governance layer exists to prevent.
  */
-const CONTROL_STATUS_STYLES: Record<
+export const CONTROL_STATUS_STYLES: Record<
   ControlStatusValue,
-  { label: string; className: string }
+  { label: string; pill: string; icon: string; colour: string }
 > = {
-  met: { label: "Met", className: "border-ok/40 bg-ok/10 text-ok" },
-  not_met: {
-    label: "Not met",
-    className: "border-danger/40 bg-danger/10 text-danger",
-  },
-  unknown: {
-    label: "Unknown",
-    className: "border-line bg-surface-2 text-muted",
-  },
+  met: { label: "Met", pill: "good", icon: "✓", colour: "var(--good)" },
+  not_met: { label: "Not met", pill: "crit", icon: "✕", colour: "var(--crit)" },
   expired_attestation: {
     label: "Attestation expired",
-    className: "border-warn/40 bg-warn/10 text-warn",
+    pill: "warn",
+    icon: "◷",
+    colour: "var(--warn)",
   },
+  unknown: { label: "Undetermined", pill: "info", icon: "?", colour: "var(--other)" },
 };
+
+/** Worst first — the order statuses are listed, counted and stacked in. */
+export const CONTROL_STATUS_ORDER: ControlStatusValue[] = [
+  "not_met",
+  "expired_attestation",
+  "unknown",
+  "met",
+];
 
 export function ControlStatusPill({ status }: { status: ControlStatusValue }) {
   const style = CONTROL_STATUS_STYLES[status];
   return (
-    <span
-      className={`inline-block rounded border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${style.className}`}
-    >
-      {style.label}
+    <span className={`pill ${style.pill}`}>
+      <span aria-hidden="true">{style.icon}</span> {style.label}
     </span>
   );
 }
 
 export function PassFailPill({ passed }: { passed: boolean }) {
   return (
-    <span
-      className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${
-        passed
-          ? "border-ok/40 bg-ok/10 text-ok"
-          : "border-danger/40 bg-danger/10 text-danger"
-      }`}
-    >
-      {passed ? "Pass" : "Fail"}
+    <span className={`pill ${passed ? "good" : "crit"}`}>
+      <span aria-hidden="true">{passed ? "✓" : "✕"}</span> {passed ? "Pass" : "Fail"}
     </span>
   );
 }

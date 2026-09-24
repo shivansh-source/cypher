@@ -12,11 +12,13 @@ finding — see principle 3.
 
 Split across submodules by pipeline stage, each independently testable:
 
-- ``models`` — ``LossEventContribution``, ``RiskFigure``.
+- ``models`` — ``LossEventContribution``, ``RiskFigure``, ``LossExceedanceCurve``.
 - ``scenarios`` — ``build_loss_event_scenarios``: snapshot -> candidate scenarios.
 - ``parameterization`` — ``parameterize_scenario``: scenario -> FAIR distribution parameters.
 - ``simulation`` — ``run_monte_carlo``: parameterized scenarios -> joint loss distribution.
-- ``risk_figure`` — ``compute_risk_figure``: wires the above into one ``RiskFigure``.
+- ``risk_figure`` — ``compute_risk_figure``: wires the above into one ``RiskFigure``;
+  ``compute_loss_exceedance_curve`` reads the same simulation as a curve;
+  ``expected_annual_loss_by_asset`` rolls a figure up by asset.
 
 Every name below is re-exported here so existing call sites
 (``from core.engine import compute_risk_figure``, etc.) are unaffected by
@@ -25,17 +27,30 @@ this internal split.
 
 from __future__ import annotations
 
-from core.engine.models import LossEventContribution, RiskFigure
+from core.engine.models import (
+    LossEventContribution,
+    LossExceedanceCurve,
+    LossExceedancePoint,
+    RiskFigure,
+)
 from core.engine.parameterization import parameterize_scenario
-from core.engine.risk_figure import compute_risk_figure
+from core.engine.risk_figure import (
+    compute_loss_exceedance_curve,
+    compute_risk_figure,
+    expected_annual_loss_by_asset,
+)
 from core.engine.scenarios import build_loss_event_scenarios
 from core.engine.simulation import run_monte_carlo
 
 __all__ = [
     "LossEventContribution",
+    "LossExceedanceCurve",
+    "LossExceedancePoint",
     "RiskFigure",
     "build_loss_event_scenarios",
+    "compute_loss_exceedance_curve",
     "compute_risk_figure",
+    "expected_annual_loss_by_asset",
     "parameterize_scenario",
     "run_monte_carlo",
 ]

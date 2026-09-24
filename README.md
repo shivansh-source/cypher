@@ -12,29 +12,25 @@ reduction, and maps the underlying findings to Indian regulatory frameworks
 (RBI Directions 2026, SEBI CSCRF/CCI, CIS Controls, NIST CSF, ISO 27001).
 
 **This repository is partially implemented.** `governance/`, `ai/`
-(LLM client, numeric guard, tool registry, chat assistant), the chat
-endpoints in `interfaces/api/`, four of `infra/connectors/`
-(`wazuh_connector.py`, `greenbone_connector.py`, `prowler_connector.py`,
-`scoutsuite_connector.py`), the `ingest` command in
-`interfaces/cli/riskctl.py`, `interfaces/dashboard/`, and `core/engine/`
-(the Open FAIR + Monte Carlo pipeline: scenario derivation,
-parameterization, simulation, and the final risk figure) are real;
-everything else (`core/optimizer.py`, `core/snapshot.py`, the thin
-wrappers in `ai/tools/` that call into `core/`, the remaining connectors
-and CLI commands) still contains signatures and docstrings only — see
-`CLAUDE.md` for the design principles that govern how the remaining
-bodies must be implemented, and `docs/ASSUMPTIONS.md` for every modelling
-constant `core/engine/` reads from and how far each is from being
+(LLM client, numeric guard, tool registry, chat assistant), `interfaces/api/`,
+`interfaces/dashboard/`, `core/` (the snapshot quality gates and store, the
+Open FAIR + Monte Carlo engine, and the joint-simulation optimizer), four of
+`infra/connectors/` (`wazuh_connector.py`, `greenbone_connector.py`,
+`prowler_connector.py`, `scoutsuite_connector.py`) and the `ingest` command in
+`interfaces/cli/riskctl.py` are real. Still signatures and docstrings only:
+the `threat_intel`, `iam`, `nessus` and `nmap` connectors, the
+`optimize_investment` tool in `ai/tools/`, and `riskctl`'s `optimize`
+command — see `CLAUDE.md` for the design principles that govern how the
+remaining bodies must be implemented, and `docs/ASSUMPTIONS.md` for every
+modelling constant `core/engine/` reads from and how far each is from being
 calibrated to a real organization.
 
-Because `ai/tools/` and `core/optimizer.py`/`core/snapshot.py` are still
-unimplemented, the chat assistant can be talked to today but cannot yet
-report a real figure through that path: every tool call comes back as an
-explicit "not computed yet, and here is why", which the assistant relays
-rather than filling in. `core.engine.compute_risk_figure` itself is
-runnable today given a snapshot (see `schema/sample_aggregated.json`) —
-it just isn't wired to the chat assistant or the dashboard's API yet. See
-`interfaces/api/README.md`.
+Once a snapshot has been committed (`riskctl ingest`), the API, the
+dashboard and the chat assistant all report real figures from the engine.
+The one exception is `optimize_investment`: nothing in the system supplies
+candidate-control costs, so the assistant reports it as unavailable, and the
+dashboard's investment view asks the user to declare costs and calls the
+optimizer directly (`POST /optimize`). See `interfaces/api/README.md`.
 
 ## Why rupees, and why not ML
 
@@ -88,19 +84,18 @@ pytest
 
 ### Frontend (`interfaces/dashboard/`)
 
-A standalone Next.js app (TypeScript, App Router, Tailwind) with four routes:
-exposure (EAL/VaR and what drives them), investment (budget-constrained
-portfolio), compliance (control-by-control framework status), and data quality
-(snapshot provenance, quality gates, scanner coverage). `interfaces/api/app.py`
-now registers `/exposure` and `/optimize` routes, and `core/engine/` can
-compute a real figure today — but those routes delegate through
-`ai/tools/get_exposure.py`/`ai/tools/optimize_investment.py` and
-`core/snapshot.py`'s (still unimplemented) current-committed-snapshot
-lookup, so calling them still errors rather than returning a figure. The
-dashboard renders explicit "no figure computed yet" states rather than
-placeholder numbers until that chain is wired end to end; see
-`interfaces/dashboard/README.md` for the backend endpoint contract it
-expects and for the opt-in sample-data mode.
+A standalone Next.js app (TypeScript, App Router), built from the design
+prototype in `interfaces/prototype/`, with five views: overview (EAL/VaR,
+their trend across committed snapshots, the loss exceedance curve, top
+contributors and a what-if lab), assets & findings (posture and the FAIR
+parameters behind each figure), investment (budget-constrained portfolio over
+declared-cost candidates), compliance (control-by-control framework status
+and statutory penalty ceilings) and data & model (provenance, quality gates,
+scanner coverage, the live assumption register), plus the Ask Suraksha
+assistant. Every figure comes from an API endpoint over `core/`; with no
+committed snapshot or no backend it renders explicit "no figure" states, never
+placeholder numbers. See `interfaces/dashboard/README.md` for the endpoint
+contract and the opt-in sample-data mode.
 
 ```
 cd interfaces/dashboard

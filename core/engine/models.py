@@ -56,3 +56,43 @@ class RiskFigure:
     value_at_risk_percentile: float
     top_contributors: list[LossEventContribution]
     monte_carlo_iterations: int
+
+
+@dataclass(frozen=True)
+class LossExceedancePoint:
+    """One point on a loss exceedance curve.
+
+    Attributes:
+        loss_inr: A total annual loss threshold, in INR.
+        exceedance_probability: Fraction of simulated years whose total
+            loss was strictly greater than ``loss_inr``.
+    """
+
+    loss_inr: float
+    exceedance_probability: float
+
+
+@dataclass(frozen=True)
+class LossExceedanceCurve:
+    """The annual loss exceedance curve for one committed snapshot.
+
+    Read off the same joint total-loss distribution that
+    :class:`RiskFigure`'s Expected Annual Loss and Value at Risk come from
+    (same scenarios, same seed), so the curve and those two figures always
+    describe one simulation rather than two independent ones.
+
+    Attributes:
+        snapshot_id: The snapshot this curve was computed from.
+        monte_carlo_iterations: The iteration count actually used.
+        probability_of_any_loss: Fraction of simulated years with a total
+            loss above zero. The curve's points only span the years that
+            had a loss; this is the curve's value at its left edge.
+        points: Thresholds in ascending ``loss_inr`` order, log-spaced
+            between the smallest and largest non-zero simulated annual
+            loss. Empty when no simulated year had a loss at all.
+    """
+
+    snapshot_id: str
+    monte_carlo_iterations: int
+    probability_of_any_loss: float
+    points: list[LossExceedancePoint]

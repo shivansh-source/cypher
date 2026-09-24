@@ -35,7 +35,10 @@ from ai.sessions import (
     DEFAULT_SESSION_TTL_MINUTES,
     InMemorySessionStore,
 )
-from ai.tool_registry import ToolExecution, execute_tool, tool_specs
+from ai.tool_registry import execute_tool, tool_specs
+from interfaces._dotenv import load_dotenv
+from interfaces.api._http import execution_to_response
+from interfaces.api.dashboard_routes import register_dashboard_routes
 
 _store: InMemorySessionStore | None = None
 _engine: ChatEngine | None = None
@@ -128,17 +131,6 @@ def _sse(event: ChatEvent) -> str:
     return f"event: {event.type}\ndata: {json.dumps(event.data, default=str)}\n\n"
 
 
-def _execution_to_response(execution: ToolExecution) -> dict[str, Any]:
-    """Turn a tool execution into a JSON body, or raise the matching HTTP error."""
-    from fastapi import HTTPException
-
-    if execution.status == "ok":
-        return execution.result or {}
-    if execution.status == "unavailable":
-        raise HTTPException(status_code=501, detail=execution.detail)
-    raise HTTPException(status_code=400, detail=execution.detail)
-
-
 def get_exposure_route() -> Any:
     """HTTP route handler wrapping ``ai.tools.get_exposure.get_exposure``.
 
@@ -149,7 +141,7 @@ def get_exposure_route() -> Any:
 
     def handler(scope: str | None = None) -> dict[str, Any]:
         arguments: dict[str, Any] = {"scope": scope} if scope else {}
-        return _execution_to_response(execute_tool("get_exposure", arguments))
+        return execution_to_response(execute_tool("get_exposure", arguments))
 
     return handler
 
@@ -163,7 +155,7 @@ def optimize_investment_route() -> Any:
     """
 
     def handler(budget_inr: float) -> dict[str, Any]:
-        return _execution_to_response(
+        return execution_to_response(
             execute_tool("optimize_investment", {"budget_inr": budget_inr})
         )
 
@@ -314,6 +306,10 @@ def create_app() -> Any:
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
+    # Before anything reads configuration: fills os.environ from the
+    # repo-root .env without overriding variables the shell already set.
+    load_dotenv()
+
     app = FastAPI(
         title="Su₹aksha API",
         description=(
@@ -343,4 +339,5 @@ def create_app() -> Any:
     app.post("/chat/stream")(chat_stream_route())
     app.get("/chat/tools", response_model=list[ToolDescription])(chat_tools_route())
     app.delete("/chat/sessions/{session_id}")(delete_session_route())
+    register_dashboard_routes(app)
     return app

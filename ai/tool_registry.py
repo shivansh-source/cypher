@@ -6,8 +6,9 @@ and ``ai/intent_classifier.py`` both read this registry, so a tool is added
 to the assistant by adding one :class:`ToolSpec` here — never by teaching
 the chat loop about a specific tool.
 
-Execution is fail-explicit. Most of ``ai/tools/`` is still signatures and
-docstrings (``core/`` is unimplemented), so a call into one raises
+Execution is fail-explicit. A wrapper whose computation cannot run — no
+snapshot has been committed yet, or something it needs (such as candidate
+control costs for the optimizer) does not exist — raises
 ``NotImplementedError``. That is reported to the model as a structured
 "unavailable" result naming what would make it available — never as an
 empty result, a zero, or anything the model could narrate as a figure. See
@@ -30,6 +31,7 @@ from ai.tools.get_framework_status import get_framework_status
 from ai.tools.get_top_contributors import get_top_contributors
 from ai.tools.optimize_investment import optimize_investment
 from ai.tools.simulate_scenario import simulate_scenario
+from core.optimizer import APPLICABLE_CONTROL_CATEGORIES
 
 #: Where the versioned, effective-dated control libraries live. Used to
 #: enumerate the framework keys ``get_framework_status`` will accept, so
@@ -145,8 +147,8 @@ def _framework_schema() -> dict[str, Any]:
 def _build_specs() -> dict[str, ToolSpec]:
     """Declare every tool. Called once, lazily, by :func:`tool_specs`."""
     engine_hint = (
-        "The FAIR + Monte Carlo engine in core/ is not implemented yet, and no "
-        "snapshot has been committed, so no rupee figure exists to report."
+        "No snapshot has been committed yet, so the FAIR + Monte Carlo engine in "
+        "core/ has nothing to run against and no rupee figure exists to report."
     )
     specs = [
         ToolSpec(
@@ -221,8 +223,7 @@ def _build_specs() -> dict[str, ToolSpec]:
             },
             handler=get_control_posture,
             unavailable_hint=(
-                "No snapshot store exists yet, so there is no committed snapshot to "
-                "read posture from."
+                "No snapshot has been committed yet, so there is no posture to read."
             ),
         ),
         ToolSpec(
@@ -242,8 +243,8 @@ def _build_specs() -> dict[str, ToolSpec]:
             },
             handler=get_framework_status,
             unavailable_hint=(
-                "No snapshot store exists yet, so there is no committed snapshot to "
-                "evaluate the control library against."
+                "No snapshot has been committed yet (or no control library file exists "
+                "for that framework), so there is nothing to evaluate."
             ),
         ),
         ToolSpec(
@@ -276,8 +277,9 @@ def _build_specs() -> dict[str, ToolSpec]:
             },
             handler=optimize_investment,
             unavailable_hint=(
-                "The budget optimizer in core/ is not implemented yet, and it "
-                "depends on the engine, which is also unimplemented."
+                "The optimizer in core/ needs an estimated cost for every candidate "
+                "control, and nothing in the system supplies one yet, so there is no "
+                "portfolio to recommend."
             ),
         ),
         ToolSpec(
@@ -286,8 +288,10 @@ def _build_specs() -> dict[str, ToolSpec]:
                 "Answer a 'what if we did X' question by applying hypothetical "
                 "controls to the current snapshot and re-running the real "
                 "simulation on the result, returning both the baseline and the "
-                "post-hypothetical figures. Use this instead of reasoning about "
-                "what a control might save."
+                "post-hypothetical figures and the change between them. The baseline "
+                "is re-simulated on the same random draws as the hypothetical, so "
+                "compare against it, not against get_exposure's figure. Use this "
+                "instead of reasoning about what a control might save."
             ),
             input_schema={
                 "type": "object",
@@ -299,14 +303,26 @@ def _build_specs() -> dict[str, ToolSpec]:
                             "type": "object",
                             "properties": {
                                 "control_id": {"type": "string"},
-                                "control_category": {"type": "string"},
+                                "control_category": {
+                                    "type": "string",
+                                    "enum": list(APPLICABLE_CONTROL_CATEGORIES),
+                                },
                                 "estimated_cost_inr": {"type": "number"},
                                 "affected_asset_ids": {
                                     "type": "array",
                                     "items": {"type": "string"},
+                                    "minItems": 1,
+                                    "description": (
+                                        "asset_ids from the current snapshot (see "
+                                        "get_control_posture) the control applies to."
+                                    ),
                                 },
                             },
-                            "required": ["control_id", "control_category"],
+                            "required": [
+                                "control_id",
+                                "control_category",
+                                "affected_asset_ids",
+                            ],
                         },
                     }
                 },
@@ -314,8 +330,8 @@ def _build_specs() -> dict[str, ToolSpec]:
             },
             handler=simulate_scenario,
             unavailable_hint=(
-                "Joint re-simulation needs both core.optimizer and core.engine, "
-                "neither of which is implemented yet."
+                "No snapshot has been committed yet, so there is nothing to apply a "
+                "hypothetical control to."
             ),
         ),
         ToolSpec(
