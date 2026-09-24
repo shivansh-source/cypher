@@ -131,12 +131,19 @@ Same request body. Responds `text/event-stream`, with named events:
 |---|---|---|
 | `session` | `{session_id}` | First event, always |
 | `text_delta` | `{text}` | Raw, **unverified** model text |
-| `tool_call` | `{tool_name, arguments}` | A tool is about to run |
-| `tool_result` | `{tool_name, status, detail}` | How it went |
+| `tool_call` | `{tool_use_id, round, tool_name, arguments}` | A tool is about to run |
+| `tool_result` | `{tool_use_id, round, tool_name, status, detail}` | How it went |
 | `final` | The `POST /chat` body, plus `text_replaced` | The verified answer |
 | `error` | `{error, message}` | The turn failed |
 
 Every stream ends with exactly one `final` or one `error`.
+
+The model may call several tools in one round and follow up over several
+rounds (`round` counts from 0). Calls run one at a time, and each call's
+`tool_result` is sent before the next `tool_call`, so a client can show
+every call's progress live. Match a result to its call by `tool_use_id`,
+not by `tool_name`: the same tool can be called twice with different
+arguments in one round.
 
 **`text_delta` is not the answer.** Those deltas are the model's raw output,
 streamed before anything has been checked. When `final.text_replaced` is

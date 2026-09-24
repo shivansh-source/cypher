@@ -19,10 +19,14 @@
  */
 
 import { demoResult, demoUnavailable } from "./demo-data";
+import { parseSseFrames } from "./sse";
 import type {
   AssetsResponse,
   AssumptionEntry,
   ChatResponse,
+  ChatStreamFinal,
+  ChatToolCallEvent,
+  ChatToolResultEvent,
   Control,
   ControlCandidates,
   ExposureHistory,
@@ -272,6 +276,121 @@ export async function sendChat(
     { method: "POST", body: { message, session_id: sessionId } },
     CHAT_UNAVAILABLE_STATUSES,
   );
+}
+
+/** Progress callbacks for {@link streamChat}. */
+export interface ChatStreamHandlers {
+  /** A tool is about to run. */
+  onToolCall?: (event: ChatToolCallEvent) => void;
+  /** A tool finished; match it to its call by `tool_use_id`. */
+  onToolResult?: (event: ChatToolResultEvent) => void;
+  /**
+   * The model is producing prose. Deliberately carries no text: the streamed
+   * deltas are unverified, so the UI only learns *that* an answer is being
+   * written, never what it says, until the guarded `final` arrives.
+   */
+  onComposing?: () => void;
+}
+
+/**
+ * One assistant turn over `POST /chat/stream`, reporting tool calls live.
+ *
+ * Resolves with the `final` event — whose `text` has been through
+ * `ai.numeric_guard` — or with the reason the turn failed. `text_delta`
+ * payloads are dropped here on purpose (see {@link ChatStreamHandlers}), so
+ * unverified model output can never reach the screen through this function.
+ */
+export async function streamChat(
+  message: string,
+  sessionId: string | null,
+  handlers: ChatStreamHandlers = {},
+): Promise<ApiResult<ChatStreamFinal>> {
+  if (DEMO_MODE) return demoUnavailable("the Ask Suraksha assistant");
+  const path = "/chat/stream";
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: "POST",
+      cache: "no-store",
+      headers: { Accept: "text/event-stream", "Content-Type": "application/json" },
+      body: JSON.stringify({ message, session_id: sessionId }),
+    });
+  } catch (cause) {
+    return {
+      state: "error",
+      transport: true,
+      reason: `Could not reach the Su₹aksha API at ${API_BASE_URL}${path} (${
+        cause instanceof Error ? cause.message : "unknown transport error"
+      }).`,
+    };
+  }
+
+  if (CHAT_UNAVAILABLE_STATUSES.has(response.status)) {
+    const detail = await readDetail(response);
+    return { state: "unavailable", reason: detail ?? `The assistant is not configured (HTTP ${response.status}).` };
+  }
+  if (!response.ok || !response.body) {
+    const detail = response.ok ? null : await readDetail(response);
+    return {
+      state: "error",
+      reason: `${path} returned HTTP ${response.status}${detail ? `: ${detail}` : "."}`,
+    };
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+      // At end of stream, a final frame missing its blank line still counts.
+      const { frames, rest } = parseSseFrames(done ? `${buffer}\n\n` : buffer);
+      buffer = rest;
+      for (const frame of frames) {
+        let data: unknown;
+        try {
+          data = JSON.parse(frame.data);
+        } catch {
+          return { state: "error", reason: `${path} sent an unreadable "${frame.event}" event.` };
+        }
+        switch (frame.event) {
+          case "tool_call":
+            handlers.onToolCall?.(data as ChatToolCallEvent);
+            break;
+          case "tool_result":
+            handlers.onToolResult?.(data as ChatToolResultEvent);
+            break;
+          case "text_delta":
+            handlers.onComposing?.();
+            break;
+          case "final":
+            return { state: "ok", data: data as ChatStreamFinal };
+          case "error": {
+            const { error, message: detail } = data as { error?: string; message?: string };
+            const reason = detail || error || "The assistant turn failed.";
+            // A missing key or SDK is "not set up", not a failure of this turn.
+            return error === "LLMConfigurationError"
+              ? { state: "unavailable", reason }
+              : { state: "error", reason };
+          }
+        }
+      }
+      if (done) break;
+    }
+  } catch (cause) {
+    return {
+      state: "error",
+      transport: true,
+      reason: `The connection to ${path} dropped mid-answer (${
+        cause instanceof Error ? cause.message : "unknown transport error"
+      }).`,
+    };
+  } finally {
+    reader.releaseLock();
+  }
+  // The API guarantees a final or error event; anything else means the stream was cut.
+  return { state: "error", reason: `${path} ended without an answer. Please ask again.` };
 }
 
 /** Discard a conversation's server-side history. */

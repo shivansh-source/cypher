@@ -280,11 +280,14 @@ class ChatEngine:
         tools = tool_definitions()
         records: list[ToolCallRecord] = []
         answer_parts: list[str] = []
-        model = self.transport.model
+        model = ""
         stop_reason = "max_tool_iterations"
 
         try:
-            for _ in range(self._max_iterations):
+            # Resolved inside the try: a transport that cannot be built must
+            # still end the stream with an ``error`` event.
+            model = self.transport.model
+            for round_index in range(self._max_iterations):
                 message: dict[str, Any] | None = None
                 for chunk in self.transport.stream_message(
                     system=CHAT_SYSTEM_PROMPT,
@@ -307,26 +310,35 @@ class ChatEngine:
                 if stop_reason != "tool_use":
                     break
 
+                # Each call is announced, run and reported before the next one
+                # starts, so a client can show every call's progress live —
+                # including several calls the model made in one round.
+                results: list[dict[str, Any]] = []
                 for block in _tool_use_blocks(message):
+                    tool_use_id = str(block.get("id", ""))
                     yield ChatEvent(
                         type="tool_call",
                         data={
+                            "tool_use_id": tool_use_id,
+                            "round": round_index,
                             "tool_name": block.get("name", ""),
                             "arguments": block.get("input", {}),
                         },
                     )
-                tool_message, new_records = self._run_tool_calls(session, message)
-                records.extend(new_records)
-                session.append(tool_message)
-                for record in new_records:
+                    result_block, record = self._run_tool_call(session, block)
+                    results.append(result_block)
+                    records.append(record)
                     yield ChatEvent(
                         type="tool_result",
                         data={
+                            "tool_use_id": tool_use_id,
+                            "round": round_index,
                             "tool_name": record.tool_name,
                             "status": record.status,
                             "detail": record.detail,
                         },
                     )
+                session.append({"role": "user", "content": results})
             else:
                 stop_reason = "max_tool_iterations"
         except (LLMConfigurationError, LLMProviderError) as exc:
@@ -370,18 +382,29 @@ class ChatEngine:
         results: list[dict[str, Any]] = []
         records: list[ToolCallRecord] = []
         for block in _tool_use_blocks(message):
-            execution = execute_tool(str(block.get("name", "")), dict(block.get("input", {})))
-            session.record_ground_truth(execution.ground_truth)
-            results.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": block.get("id"),
-                    "content": execution.to_model_content(),
-                    "is_error": execution.is_error,
-                }
-            )
-            records.append(ToolCallRecord.from_execution(execution))
+            result_block, record = self._run_tool_call(session, block)
+            results.append(result_block)
+            records.append(record)
         return {"role": "user", "content": results}, records
+
+    def _run_tool_call(
+        self, session: ChatSession, block: dict[str, Any]
+    ) -> tuple[dict[str, Any], ToolCallRecord]:
+        """Execute one tool_use block and merge its output into ground truth.
+
+        Returns:
+            The ``tool_result`` block to send back to the model, and the
+            record for the client.
+        """
+        execution = execute_tool(str(block.get("name", "")), dict(block.get("input", {})))
+        session.record_ground_truth(execution.ground_truth)
+        result_block = {
+            "type": "tool_result",
+            "tool_use_id": block.get("id"),
+            "content": execution.to_model_content(),
+            "is_error": execution.is_error,
+        }
+        return result_block, ToolCallRecord.from_execution(execution)
 
     def _finalize(
         self,

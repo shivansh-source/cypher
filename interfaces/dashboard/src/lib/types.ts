@@ -318,3 +318,27 @@ export interface ChatResponse {
   model: string;
   stop_reason: string;
 }
+
+/** `final` event of `POST /chat/stream`: the verified turn, as `POST /chat` returns it. */
+export interface ChatStreamFinal extends ChatResponse {
+  /** The guard changed the model's streamed text; `text` is what to show. */
+  text_replaced: boolean;
+}
+
+/** `tool_call` event of `POST /chat/stream`: a tool is about to run. */
+export interface ChatToolCallEvent {
+  tool_use_id: string;
+  /** Model/tool round trip this call belongs to, counting from 0. */
+  round: number;
+  tool_name: string;
+  arguments: Record<string, unknown>;
+}
+
+/** `tool_result` event of `POST /chat/stream`: how that call went. */
+export interface ChatToolResultEvent {
+  tool_use_id: string;
+  round: number;
+  tool_name: string;
+  status: ChatToolCall["status"];
+  detail: string | null;
+}
