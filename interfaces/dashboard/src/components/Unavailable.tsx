@@ -19,28 +19,17 @@ export function Unavailable({
 }) {
   const isError = result.state === "error";
   return (
-    <div
-      role="status"
-      className={`rounded-md border border-dashed p-5 ${
-        isError ? "border-danger/40 bg-danger/5" : "border-line bg-surface-2"
-      }`}
-    >
-      <p
-        className={`text-sm font-semibold ${
-          isError ? "text-danger" : "text-ink"
-        }`}
-      >
-        {isError
-          ? `${what} could not be retrieved`
-          : `No ${what} has been computed yet`}
+    <div role="status" className={`unavail${isError ? " err" : ""}`}>
+      <p className="head">
+        {isError ? `${what} could not be retrieved` : `No ${what} to show yet`}
       </p>
-      <p className="mt-1.5 text-xs leading-relaxed text-muted">
-        {result.reason}
-      </p>
-      <p className="mt-3 text-xs leading-relaxed text-faint">
-        {isError
-          ? "Check that the FastAPI backend (interfaces/api) is running and reachable at the configured NEXT_PUBLIC_API_BASE_URL."
-          : "A figure appears here once a snapshot has passed the quality gates in core/snapshot.py and core/engine.py has run against it. Nothing is estimated or filled in meanwhile."}
+      <p className="why">{result.reason}</p>
+      <p className="next">
+        {isError && !(result.state === "error" && result.transport)
+          ? "The API answered, but could not produce this. The reason above is its own; if a newer snapshot was committed since this page loaded, reload the page."
+          : isError
+          ? "Check that the FastAPI backend (interfaces/api) is running and reachable at the configured NEXT_PUBLIC_API_BASE_URL, and that its CORS_ALLOWED_ORIGINS includes this dashboard."
+          : "Nothing is estimated or filled in meanwhile. Figures appear once a snapshot has passed the five quality gates and been committed (riskctl ingest)."}
       </p>
     </div>
   );

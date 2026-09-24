@@ -11,10 +11,20 @@ import { DEMO_MODE } from "@/lib/api";
 export function DemoBanner() {
   if (!DEMO_MODE) return null;
   return (
-    <div className="border-b border-sample/40 bg-sample/10 px-6 py-2.5 text-center text-xs text-sample">
-      <strong className="font-bold tracking-wide">SAMPLE DATA —</strong>{" "}
-      demo mode is on. Every figure shown is illustrative, was not produced by
-      the FAIR engine, and must not be cited as a result.
+    <div className="demo-banner" role="note">
+      <strong>SAMPLE DATA —</strong> demo mode is on. Every figure shown is
+      illustrative, was not produced by the FAIR engine, and must not be cited
+      as a result.
     </div>
   );
+}
+
+/**
+ * The per-figure `SAMPLE` tag. Attached next to figures rather than only at
+ * the page level, so that no figure can render in demo mode without carrying
+ * its own label.
+ */
+export function SampleTag() {
+  if (!DEMO_MODE) return null;
+  return <span className="sample-tag">SAMPLE</span>;
 }

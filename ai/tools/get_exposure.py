@@ -35,6 +35,10 @@ def get_exposure(scope: str | None = None) -> dict[str, Any]:
         body is a call into ``core.engine`` (and, for scoping, whatever
         snapshot-filtering utility exists there) plus reshaping the result.
     """
+    # A blank scope (models sometimes send "" for an optional argument) means
+    # the whole estate — filtering on it would silently drop every contributor.
+    if scope is not None and not scope.strip():
+        scope = None
     snapshot = current_snapshot_or_unavailable()
     risk_figure = compute_risk_figure(snapshot)
     result = asdict(risk_figure)

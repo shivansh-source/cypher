@@ -16,10 +16,13 @@ import pytest
 
 from core.engine import compute_risk_figure
 from core.optimizer import (
+    APPLICABLE_CONTROL_CATEGORIES,
     Control,
     _derive_comparison_seed,
     apply_controls_to_snapshot,
+    compare_hypothetical,
     evaluate_portfolio,
+    find_control_gaps,
     recommend_portfolio,
 )
 
@@ -217,3 +220,72 @@ def test_empty_candidate_controls_yields_zero_risk_reduction() -> None:
     assert recommendation.total_cost_inr == 0.0
     assert recommendation.baseline_risk_figure == recommendation.post_investment_risk_figure
     assert recommendation.risk_reduction_inr == 0.0
+
+
+def test_find_control_gaps_lists_only_controls_the_engine_does_not_credit() -> None:
+    """asset-web-01 has MFA and a healthy EDR agent; asset-hr-db-01 has neither."""
+    gaps = find_control_gaps(copy.deepcopy(SAMPLE_SNAPSHOT))
+
+    assert {(g.control_category, tuple(g.affected_asset_ids)) for g in gaps} == {
+        ("mfa_enforced", ("asset-hr-db-01",)),
+        ("edr_active", ("asset-hr-db-01",)),
+    }
+    assert all(g.control_id == f"{g.control_category}::{g.affected_asset_ids[0]}" for g in gaps)
+
+
+def test_unknown_mfa_posture_is_a_gap_not_a_pass() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    web = next(a for a in snapshot["assets"] if a["asset_id"] == "asset-web-01")
+    web["identity_access"]["mfa_enforced"] = None
+
+    gaps = find_control_gaps(snapshot)
+
+    assert "mfa_enforced::asset-web-01" in {g.control_id for g in gaps}
+
+
+def test_every_applicable_category_applies_and_closes_its_gap() -> None:
+    """APPLICABLE_CONTROL_CATEGORIES must stay in step with _apply_control_to_asset."""
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    gaps = find_control_gaps(snapshot)
+    assert {g.control_category for g in gaps} == set(APPLICABLE_CONTROL_CATEGORIES)
+
+    closed = apply_controls_to_snapshot(
+        snapshot,
+        [Control(g.control_id, g.control_category, 0.0, list(g.affected_asset_ids)) for g in gaps],
+    )
+
+    assert find_control_gaps(closed) == []
+
+
+def test_compare_hypothetical_uses_common_random_numbers_baseline() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    controls = [_mfa_control("asset-hr-db-01"), _edr_control("asset-hr-db-01")]
+
+    comparison = compare_hypothetical(snapshot, controls)
+
+    assert comparison.baseline_risk_figure == evaluate_portfolio(snapshot, [])
+    assert comparison.hypothetical_risk_figure == evaluate_portfolio(snapshot, controls)
+    assert comparison.expected_annual_loss_change_inr == pytest.approx(
+        comparison.hypothetical_risk_figure.expected_annual_loss_inr
+        - comparison.baseline_risk_figure.expected_annual_loss_inr
+    )
+    assert comparison.value_at_risk_change_inr == pytest.approx(
+        comparison.hypothetical_risk_figure.value_at_risk_inr
+        - comparison.baseline_risk_figure.value_at_risk_inr
+    )
+    assert comparison.expected_annual_loss_change_inr < 0
+
+
+@pytest.mark.parametrize(
+    "controls",
+    [
+        [],
+        [Control("mfa nowhere", "mfa_enforced", 0.0, [])],
+        [Control("mfa on a ghost", "mfa_enforced", 0.0, ["asset-does-not-exist"])],
+    ],
+)
+def test_compare_hypothetical_refuses_a_what_if_that_changes_nothing(
+    controls: list[Control],
+) -> None:
+    with pytest.raises(ValueError):
+        compare_hypothetical(copy.deepcopy(SAMPLE_SNAPSHOT), controls)

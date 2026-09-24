@@ -11,12 +11,26 @@
  * normal state of this system, not an error to be swallowed, and it must reach
  * the UI as its own case so a missing figure can never be rendered as a zero,
  * a dash, or a stale number.
+ *
+ * The same functions run in Server Components (page loads) and in Client
+ * Components (what-if, optimizer, chat), so the API must be reachable at
+ * `NEXT_PUBLIC_API_BASE_URL` from both the Next server and the browser, and
+ * its `CORS_ALLOWED_ORIGINS` must include the dashboard's origin.
  */
 
-import { DEMO_SNAPSHOT_PROVENANCE, demoResult } from "./demo-data";
+import { demoResult, demoUnavailable } from "./demo-data";
 import type {
+  AssetsResponse,
+  AssumptionEntry,
+  ChatResponse,
+  Control,
+  ControlCandidates,
+  ExposureHistory,
   FrameworkStatus,
-  GateResult,
+  FrameworkSummary,
+  GateReport,
+  HypotheticalComparison,
+  LossExceedanceCurve,
   PortfolioRecommendation,
   RiskFigure,
   SnapshotProvenance,
@@ -25,16 +39,17 @@ import type {
 /**
  * Outcome of one backend call.
  *
- * - `ok` — the backend returned a figure computed by `core/`.
- * - `unavailable` — the backend answered, but there is no figure to give
- *   (endpoint not implemented yet, engine has not run, no committed snapshot).
- *   Not a failure; a truthful "nothing to show".
- * - `error` — the backend could not be reached or answered unusably.
+ * - `ok` — the backend returned data computed by `core/` / `governance/`.
+ * - `unavailable` — the backend answered, but there is nothing to give (no
+ *   committed snapshot, or the computation cannot run yet). Not a failure; a
+ *   truthful "nothing to show".
+ * - `error` — the backend could not be reached, rejected the request, or
+ *   answered unusably.
  */
 export type ApiResult<T> =
   | { state: "ok"; data: T }
   | { state: "unavailable"; reason: string }
-  | { state: "error"; reason: string };
+  | { state: "error"; reason: string; transport?: boolean };
 
 /**
  * Whether the UI is showing illustrative sample data instead of engine output.
@@ -50,43 +65,79 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 /**
- * HTTP statuses that mean "no figure exists", as distinct from "the request
- * failed". 501 is what an unimplemented FastAPI route should return; 404/409
- * cover "no committed snapshot yet" and "engine has not run against it".
+ * HTTP statuses that mean "nothing to show", as distinct from "the request
+ * failed". The API answers 404 when no snapshot has been committed and 501
+ * when a computation cannot run yet; 409 is reserved for "engine has not run
+ * against it".
  */
 const NO_FIGURE_STATUSES = new Set([404, 409, 501]);
 
-async function getJson<T>(path: string): Promise<ApiResult<T>> {
+/** The API's own explanation from a FastAPI error body, if it sent one. */
+async function readDetail(response: Response): Promise<string | null> {
+  try {
+    const body: unknown = await response.json();
+    if (body && typeof body === "object" && "detail" in body) {
+      const detail = (body as { detail: unknown }).detail;
+      if (typeof detail === "string") return detail;
+      if (Array.isArray(detail)) {
+        // FastAPI request-validation errors: [{loc, msg, ...}, ...]
+        return detail
+          .map((item) =>
+            item && typeof item === "object" && "msg" in item
+              ? String((item as { msg: unknown }).msg)
+              : JSON.stringify(item),
+          )
+          .join("; ");
+      }
+    }
+  } catch {
+    // Not JSON — fall through to the status-only message.
+  }
+  return null;
+}
+
+async function request<T>(
+  path: string,
+  init: { method?: "GET" | "POST" | "DELETE"; body?: unknown } = {},
+  unavailableStatuses: ReadonlySet<number> = NO_FIGURE_STATUSES,
+): Promise<ApiResult<T>> {
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
+      method: init.method ?? "GET",
       // A risk figure must never be served from a cache: the whole point of
       // the snapshot lifecycle is that the current figure tracks the current
-      // committed snapshot. (Next 16 does not cache fetch by default; this is
-      // explicit so a future default change cannot silently stale the number.)
+      // committed snapshot.
       cache: "no-store",
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
+      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
     });
   } catch (cause) {
     return {
       state: "error",
+      transport: true,
       reason: `Could not reach the Su₹aksha API at ${API_BASE_URL}${path} (${
         cause instanceof Error ? cause.message : "unknown transport error"
       }).`,
     };
   }
 
-  if (NO_FIGURE_STATUSES.has(response.status)) {
+  if (unavailableStatuses.has(response.status)) {
+    const detail = await readDetail(response);
     return {
       state: "unavailable",
-      reason: `The API has no figure for ${path} yet (HTTP ${response.status}).`,
+      reason: detail ?? `The API has nothing for ${path} yet (HTTP ${response.status}).`,
     };
   }
 
   if (!response.ok) {
+    const detail = await readDetail(response);
     return {
       state: "error",
-      reason: `${path} returned HTTP ${response.status}.`,
+      reason: `${path} returned HTTP ${response.status}${detail ? `: ${detail}` : "."}`,
     };
   }
 
@@ -100,30 +151,49 @@ async function getJson<T>(path: string): Promise<ApiResult<T>> {
 /**
  * Current Expected Annual Loss and Value at Risk for the whole estate.
  *
- * Backed by `ai.tools.get_exposure`, which delegates to
- * `core.engine.compute_risk_figure`. The returned `top_contributors` are the
- * engine's own ranking and are never re-sorted here.
+ * Backed by `ai.tools.get_exposure` -> `core.engine.compute_risk_figure`. The
+ * returned `top_contributors` are the engine's own ranking and are never
+ * re-sorted here.
  */
 export async function fetchExposure(): Promise<ApiResult<RiskFigure>> {
   if (DEMO_MODE) return demoResult("exposure");
-  return getJson<RiskFigure>("/exposure");
+  return request<RiskFigure>("/exposure");
 }
 
-/**
- * A budget-constrained control portfolio recommendation.
- *
- * Backed by `ai.tools.optimize_investment` -> `core.optimizer.recommend_portfolio`.
- * The `risk_reduction_inr` in the response comes from the optimizer's joint
- * re-simulation; the dashboard displays it as given and never derives its own
- * benefit figure by summing per-control deltas (principle 7).
- */
-export async function fetchRecommendation(
-  budgetInr: number,
-): Promise<ApiResult<PortfolioRecommendation>> {
-  if (DEMO_MODE) return demoResult("recommendation");
-  return getJson<PortfolioRecommendation>(
-    `/optimize?budget_inr=${encodeURIComponent(budgetInr)}`,
-  );
+/** The engine's figure for every committed snapshot, oldest first. */
+export async function fetchExposureHistory(): Promise<ApiResult<ExposureHistory>> {
+  if (DEMO_MODE) return demoResult("history");
+  return request<ExposureHistory>("/exposure/history");
+}
+
+/** The current snapshot's loss exceedance curve (`core.engine`). */
+export async function fetchLossExceedance(): Promise<ApiResult<LossExceedanceCurve>> {
+  if (DEMO_MODE) return demoResult("exceedance");
+  return request<LossExceedanceCurve>("/exposure/exceedance");
+}
+
+/** Provenance of the currently committed snapshot every figure derives from. */
+export async function fetchSnapshotProvenance(): Promise<ApiResult<SnapshotProvenance>> {
+  if (DEMO_MODE) return demoResult("provenance");
+  return request<SnapshotProvenance>("/snapshot");
+}
+
+/** The five quality gates, re-run on the current snapshot and its predecessor. */
+export async function fetchQualityGates(): Promise<ApiResult<GateReport>> {
+  if (DEMO_MODE) return demoResult("gates");
+  return request<GateReport>("/snapshot/gates");
+}
+
+/** Every asset with its posture, findings and the engine's FAIR parameters. */
+export async function fetchAssets(): Promise<ApiResult<AssetsResponse>> {
+  if (DEMO_MODE) return demoResult("assets");
+  return request<AssetsResponse>("/assets");
+}
+
+/** Every versioned control library in force, with its statutory penalty ceilings. */
+export async function fetchFrameworks(): Promise<ApiResult<FrameworkSummary[]>> {
+  if (DEMO_MODE) return demoResult("frameworks");
+  return request<FrameworkSummary[]>("/frameworks");
 }
 
 /**
@@ -136,24 +206,81 @@ export async function fetchRecommendation(
 export async function fetchFrameworkStatus(
   framework: string,
 ): Promise<ApiResult<FrameworkStatus>> {
-  if (DEMO_MODE) return demoResult("frameworkStatus");
-  return getJson<FrameworkStatus>(
-    `/frameworks/${encodeURIComponent(framework)}/status`,
+  if (DEMO_MODE) return demoResult("frameworkStatus", framework);
+  return request<FrameworkStatus>(`/frameworks/${encodeURIComponent(framework)}/status`);
+}
+
+/** Control gaps the optimizer can close — no cost, no benefit attached. */
+export async function fetchControlGaps(): Promise<ApiResult<ControlCandidates>> {
+  if (DEMO_MODE) return demoResult("candidates");
+  return request<ControlCandidates>("/optimize/candidates");
+}
+
+/** Every constant in core/assumptions.py with its documented rationale. */
+export async function fetchAssumptions(): Promise<ApiResult<AssumptionEntry[]>> {
+  if (DEMO_MODE) return demoResult("assumptions");
+  return request<AssumptionEntry[]>("/assumptions");
+}
+
+/**
+ * A what-if: one joint re-simulation of the controls applied together, against
+ * a baseline on the same random draws (`ai.tools.simulate_scenario`).
+ */
+export async function simulateScenario(
+  controls: Pick<Control, "control_id" | "control_category" | "affected_asset_ids">[],
+): Promise<ApiResult<HypotheticalComparison>> {
+  if (DEMO_MODE) return demoUnavailable("what-if simulation");
+  return request<HypotheticalComparison>("/simulate", {
+    method: "POST",
+    body: { hypothetical_controls: controls },
+  });
+}
+
+/**
+ * A budget-constrained portfolio recommendation over declared-cost candidates.
+ *
+ * Backed by `core.optimizer.recommend_portfolio`. The `risk_reduction_inr` in
+ * the response comes from the optimizer's joint re-simulation; the dashboard
+ * displays it as given and never derives its own benefit figure by summing
+ * per-control deltas (principle 7).
+ */
+export async function recommendPortfolio(
+  budgetInr: number,
+  candidates: Control[],
+): Promise<ApiResult<PortfolioRecommendation>> {
+  if (DEMO_MODE) return demoUnavailable("portfolio optimization");
+  return request<PortfolioRecommendation>("/optimize", {
+    method: "POST",
+    body: { budget_inr: budgetInr, candidate_controls: candidates },
+  });
+}
+
+/** 503: the assistant is not configured (no LLM key) — nothing to show, not a failure. */
+const CHAT_UNAVAILABLE_STATUSES = new Set([503]);
+
+/**
+ * One assistant turn. The response `text` has already been through
+ * `ai.numeric_guard` on the server; render it verbatim, flags included.
+ */
+export async function sendChat(
+  message: string,
+  sessionId: string | null,
+): Promise<ApiResult<ChatResponse>> {
+  if (DEMO_MODE) return demoUnavailable("the Ask Suraksha assistant");
+  return request<ChatResponse>(
+    "/chat",
+    { method: "POST", body: { message, session_id: sessionId } },
+    CHAT_UNAVAILABLE_STATUSES,
   );
 }
 
-/** Provenance of the currently committed snapshot every figure derives from. */
-export async function fetchSnapshotProvenance(): Promise<
-  ApiResult<SnapshotProvenance>
-> {
-  if (DEMO_MODE) {
-    return { state: "ok", data: DEMO_SNAPSHOT_PROVENANCE };
-  }
-  return getJson<SnapshotProvenance>("/snapshot");
-}
-
-/** The 5 quality gates' results for the current candidate/committed snapshot. */
-export async function fetchQualityGates(): Promise<ApiResult<GateResult[]>> {
-  if (DEMO_MODE) return demoResult("gates");
-  return getJson<GateResult[]>("/snapshot/gates");
+/** Discard a conversation's server-side history. */
+export async function deleteChatSession(
+  sessionId: string,
+): Promise<ApiResult<{ session_id: string; deleted: boolean }>> {
+  if (DEMO_MODE) return demoUnavailable("the Ask Suraksha assistant");
+  return request<{ session_id: string; deleted: boolean }>(
+    `/chat/sessions/${encodeURIComponent(sessionId)}`,
+    { method: "DELETE" },
+  );
 }

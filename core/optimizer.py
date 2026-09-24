@@ -25,6 +25,17 @@ from typing import Any
 from core.assumptions import CONTROL_RESISTANCE_STRENGTH
 from core.engine import RiskFigure, compute_risk_figure
 
+# The engine's own rule for "is this control observed active on this
+# asset" — imported rather than restated so that what find_control_gaps
+# calls a gap can never drift from what the engine credits as resistance.
+from core.engine.parameterization import _active_control_resistances
+
+#: Control categories :func:`apply_controls_to_snapshot` knows how to
+#: express as a schema posture change. Must stay in step with
+#: ``_apply_control_to_asset`` — ``core/tests/test_optimizer.py`` checks
+#: every entry here applies cleanly and closes its gap.
+APPLICABLE_CONTROL_CATEGORIES: tuple[str, ...] = ("mfa_enforced", "edr_active")
+
 
 def _derive_comparison_seed(snapshot: dict[str, Any]) -> int:
     """Derive a Monte Carlo seed from the original (pre-control) snapshot.
@@ -304,4 +315,142 @@ def recommend_portfolio(
         post_investment_risk_figure=current_figure,
         risk_reduction_inr=baseline_figure.expected_annual_loss_inr
         - current_figure.expected_annual_loss_inr,
+    )
+
+
+@dataclass(frozen=True)
+class ControlGap:
+    """A control category not observed active on one asset.
+
+    Every gap is something :func:`apply_controls_to_snapshot` can close, so
+    each one is a candidate a caller can price and hand to
+    :func:`recommend_portfolio`. A gap carries no cost: nothing in the
+    snapshot or in ``core.assumptions`` says what closing it would cost,
+    and this module will not invent one.
+
+    Attributes:
+        control_id: ``"{control_category}::{asset_id}"``, stable for a
+            given asset and category.
+        control_category: A key of :data:`APPLICABLE_CONTROL_CATEGORIES`.
+        affected_asset_ids: The one asset the gap is on.
+    """
+
+    control_id: str
+    control_category: str
+    affected_asset_ids: list[str]
+
+
+def find_control_gaps(snapshot: dict[str, Any]) -> list[ControlGap]:
+    """List every applicable control category the engine does not credit on each asset.
+
+    A category counts as a gap exactly when the engine's own
+    parameterization would not apply its resistance to the asset — so an
+    MFA flag that is ``null`` (unknown) is a gap, just as ``false`` is: the
+    engine gives no credit for a control it cannot see.
+
+    Args:
+        snapshot: The current committed, schema-shaped aggregated snapshot.
+
+    Returns:
+        One :class:`ControlGap` per (asset, category) pair, in snapshot
+        asset order, for categories present in both
+        :data:`APPLICABLE_CONTROL_CATEGORIES` and
+        ``core.assumptions.CONTROL_RESISTANCE_STRENGTH``.
+
+    Must never:
+        Attach a cost or a benefit to a gap. Benefit only ever comes from
+        a joint re-simulation (principle 7); cost is a declared input.
+    """
+    categories = [c for c in APPLICABLE_CONTROL_CATEGORIES if c in CONTROL_RESISTANCE_STRENGTH]
+    gaps: list[ControlGap] = []
+    for asset in snapshot["assets"]:
+        active = _active_control_resistances(asset)
+        for category in categories:
+            if category not in active:
+                gaps.append(
+                    ControlGap(
+                        control_id=f"{category}::{asset['asset_id']}",
+                        control_category=category,
+                        affected_asset_ids=[asset["asset_id"]],
+                    )
+                )
+    return gaps
+
+
+@dataclass(frozen=True)
+class HypotheticalComparison:
+    """A what-if: the snapshot as it stands versus with some controls applied.
+
+    Attributes:
+        controls: The hypothetical controls, applied together.
+        baseline_risk_figure: ``evaluate_portfolio(snapshot, [])``.
+        hypothetical_risk_figure: ``evaluate_portfolio(snapshot, controls)``
+            — one joint re-simulation on the same random draws as the
+            baseline, so the difference comes from the controls, not noise.
+        expected_annual_loss_change_inr: hypothetical minus baseline
+            Expected Annual Loss; negative means the controls reduce it.
+        value_at_risk_change_inr: hypothetical minus baseline Value at
+            Risk, at the percentile both figures carry.
+    """
+
+    controls: list[Control]
+    baseline_risk_figure: RiskFigure
+    hypothetical_risk_figure: RiskFigure
+    expected_annual_loss_change_inr: float
+    value_at_risk_change_inr: float
+
+
+def compare_hypothetical(
+    snapshot: dict[str, Any], controls: list[Control]
+) -> HypotheticalComparison:
+    """Jointly re-simulate a "what if we did X" against the same baseline draws.
+
+    The baseline here is ``evaluate_portfolio(snapshot, [])``, which uses
+    the common-random-numbers seed (see :func:`_derive_comparison_seed`),
+    not ``compute_risk_figure(snapshot)``'s own content seed. The two
+    baselines describe the same snapshot with different random draws, so
+    they can differ slightly; a caller comparing against a what-if must use
+    this baseline, never the headline figure.
+
+    Args:
+        snapshot: The current committed, schema-shaped aggregated snapshot.
+        controls: One or more controls to apply together.
+
+    Returns:
+        A :class:`HypotheticalComparison`.
+
+    Raises:
+        ValueError: If ``controls`` is empty, a control affects no asset,
+            names an asset not in the snapshot, or has a category
+            :func:`apply_controls_to_snapshot` cannot apply — a what-if
+            that silently changes nothing would report a zero effect for a
+            question it never actually asked.
+
+    Must never:
+        Derive the effect by summing individually-simulated deltas; the
+        hypothetical figure is one joint simulation of every control.
+    """
+    if not controls:
+        raise ValueError("a what-if needs at least one hypothetical control")
+    known_asset_ids = {asset["asset_id"] for asset in snapshot["assets"]}
+    for control in controls:
+        if not control.affected_asset_ids:
+            raise ValueError(f"control {control.control_id!r} affects no asset")
+        unknown = sorted(set(control.affected_asset_ids) - known_asset_ids)
+        if unknown:
+            raise ValueError(
+                f"control {control.control_id!r} names asset(s) not in the current "
+                f"snapshot: {', '.join(unknown)}"
+            )
+
+    hypothetical_figure = evaluate_portfolio(snapshot, controls)
+    baseline_figure = evaluate_portfolio(snapshot, [])
+    return HypotheticalComparison(
+        controls=list(controls),
+        baseline_risk_figure=baseline_figure,
+        hypothetical_risk_figure=hypothetical_figure,
+        expected_annual_loss_change_inr=hypothetical_figure.expected_annual_loss_inr
+        - baseline_figure.expected_annual_loss_inr,
+        value_at_risk_change_inr=hypothetical_figure.value_at_risk_inr
+        - baseline_figure.value_at_risk_inr,
     )

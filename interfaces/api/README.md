@@ -63,8 +63,31 @@ or put a shared store behind `ai.sessions.InMemorySessionStore`'s interface.
 | `POST` | `/chat/stream` | The same turn as Server-Sent Events |
 | `GET` | `/chat/tools` | Every tool, with whether it can answer today |
 | `DELETE` | `/chat/sessions/{session_id}` | Discards that conversation |
-| `GET` | `/exposure?scope=` | `RiskFigure` — 501 until the engine exists |
-| `GET` | `/optimize?budget_inr=` | `PortfolioRecommendation` — 501 until the optimizer exists |
+| `GET` | `/exposure?scope=` | `RiskFigure` for the current snapshot (via `ai.tools.get_exposure`) |
+| `GET` | `/exposure/history` | `RiskFigure` for every committed snapshot, oldest first |
+| `GET` | `/exposure/exceedance` | Loss exceedance curve, read off the same simulation as `/exposure` |
+| `GET` | `/snapshot` | Current snapshot's provenance: ids, bitemporal fields, `scan_scope`, counts |
+| `GET` | `/snapshot/gates` | The five quality gates, re-run on the current snapshot and its predecessor |
+| `GET` | `/assets` | Every asset: posture, findings, and each open finding's FAIR parameters and EAL |
+| `GET` | `/frameworks` | Every control library in force, with its statutory penalty ceilings |
+| `GET` | `/frameworks/{framework}/status` | Control-by-control status and weighted score (via `ai.tools.get_framework_status`) |
+| `POST` | `/simulate` | What-if: joint re-simulation of hypothetical controls (via `ai.tools.simulate_scenario`) |
+| `GET` | `/optimize/candidates` | Control gaps the optimizer can close — no cost, no benefit |
+| `POST` | `/optimize` | `PortfolioRecommendation` over candidates whose costs the caller declares |
+| `GET` | `/optimize?budget_inr=` | `optimize_investment` tool — 501: no candidate-cost catalogue exists |
+| `GET` | `/assumptions` | Every constant in `core/assumptions.py`, live, with its documented rationale |
+
+`404` means no snapshot has been committed yet; `501` means the computation
+cannot run yet; both carry a `detail` saying why, and neither is ever a zero.
+`400` is a request the engine rejected (unknown asset, a control category the
+optimizer cannot apply). The routes behind the dashboard live in
+`dashboard_routes.py`; like every route here they only load the snapshot,
+call into `core/`/`governance/`/`ai.tools`, and reshape the result.
+
+**Baselines differ on purpose.** `/simulate` and `/optimize` compare against a
+baseline re-simulated on the *same random draws* as the hypothetical (common
+random numbers, `core.optimizer.evaluate_portfolio`), so their baseline EAL can
+differ slightly from `/exposure`'s. Compare a what-if against its own baseline.
 
 ### `POST /chat`
 
@@ -83,7 +106,7 @@ or put a shared store behind `ai.sessions.InMemorySessionStore`'s interface.
       "tool_name": "get_exposure",
       "arguments": {},
       "status": "unavailable",
-      "detail": "The FAIR + Monte Carlo engine in core/ is not implemented yet…",
+      "detail": "No snapshot has been committed yet, so the FAIR + Monte Carlo engine…",
       "result": null
     }
   ],
@@ -123,9 +146,8 @@ unverified numbers — the one failure mode this design exists to prevent.
 
 ### `GET /chat/tools`
 
-Lists each tool with its schema, `available`, and `unavailable_reason`. Most
-tools are currently unavailable because `core/` is unimplemented; this lets a
-client say what the assistant cannot yet do without having to ask it.
+Lists each tool with its schema, `available`, and `unavailable_reason`, so a
+client can say what the assistant cannot yet do without having to ask it.
 
 ## Adding a tool
 

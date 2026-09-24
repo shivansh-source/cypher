@@ -35,6 +35,7 @@ from infra.connectors.greenbone_connector import GreenboneConnectorError
 from infra.connectors.prowler_connector import ProwlerConnectorError
 from infra.connectors.scoutsuite_connector import ScoutSuiteConnectorError
 from infra.connectors.wazuh_connector import WazuhConnectorError
+from interfaces._dotenv import load_dotenv
 
 #: Default shape for ``assets[].edr`` when no connector contributed EDR data
 #: for an asset — matches the schema's "no agent seen" reading rather than
@@ -531,6 +532,9 @@ def build_cli() -> Any:
     Returns:
         A configured Typer app instance.
     """
+    # Fills os.environ from the repo-root .env without overriding variables
+    # the shell already set, so every command sees the same configuration.
+    load_dotenv()
     app = typer.Typer()
     app.command("validate-snapshot")(validate_snapshot_command)
     app.command("run-engine")(run_engine_command)

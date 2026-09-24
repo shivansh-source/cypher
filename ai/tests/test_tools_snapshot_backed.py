@@ -130,3 +130,83 @@ def test_explain_number_unknown_reference_unavailable(committed_store: Path) -> 
 
     with pytest.raises(NotImplementedError):
         explain_number("does-not-exist")
+
+
+def test_get_framework_status_names_each_control_and_reports_weighted_score(
+    committed_store: Path,
+) -> None:
+    from ai.tools.get_framework_status import get_framework_status
+
+    result = get_framework_status("sebi_cscrf_cci")
+
+    assert all(c["parameter_name"] and c["framework_ref"] for c in result["controls"])
+    score = result["weighted_score"]
+    assert score["framework"] == "sebi_cscrf_cci"
+    assert "coverage_fraction" in score
+    assert "low_confidence_fraction_of_determined" in score
+
+
+def test_simulate_scenario_unavailable_without_a_committed_snapshot(empty_store: Path) -> None:
+    from ai.tools.simulate_scenario import simulate_scenario
+
+    with pytest.raises(NotImplementedError):
+        simulate_scenario(
+            [
+                {
+                    "control_id": "mfa",
+                    "control_category": "mfa_enforced",
+                    "affected_asset_ids": ["asset-hr-db-01"],
+                }
+            ]
+        )
+
+
+def test_simulate_scenario_returns_joint_baseline_and_hypothetical(committed_store: Path) -> None:
+    from ai.tools.simulate_scenario import simulate_scenario
+
+    result = simulate_scenario(
+        [
+            {
+                "control_id": "mfa",
+                "control_category": "mfa_enforced",
+                "affected_asset_ids": ["asset-hr-db-01"],
+            }
+        ]
+    )
+
+    baseline = result["baseline"]["expected_annual_loss_inr"]
+    hypothetical = result["hypothetical"]["expected_annual_loss_inr"]
+    assert result["snapshot_id"]
+    assert result["expected_annual_loss_change_inr"] == pytest.approx(hypothetical - baseline)
+    assert hypothetical < baseline
+
+
+@pytest.mark.parametrize(
+    "control",
+    [
+        {"control_id": "mfa", "control_category": "mfa_enforced"},
+        {
+            "control_id": "x",
+            "control_category": "patch_current",
+            "affected_asset_ids": ["asset-hr-db-01"],
+        },
+        {"control_category": "mfa_enforced", "affected_asset_ids": ["asset-hr-db-01"]},
+    ],
+)
+def test_simulate_scenario_rejects_a_control_it_cannot_apply(
+    committed_store: Path, control: dict[str, Any]
+) -> None:
+    from ai.tools.simulate_scenario import simulate_scenario
+
+    with pytest.raises(ValueError):
+        simulate_scenario([control])
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_get_exposure_blank_scope_means_whole_estate(committed_store: Path, blank: str) -> None:
+    from ai.tools.get_exposure import get_exposure
+
+    result = get_exposure(scope=blank)
+
+    assert result == get_exposure()
+    assert result["top_contributors"]
