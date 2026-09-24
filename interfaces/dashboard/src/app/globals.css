@@ -1,7 +1,7 @@
 /*
- * Su₹aksha dashboard styles, ported from the design prototype in
- * interfaces/prototype/css/ (one section per prototype stylesheet, in the
- * same cascade order), plus the few states the prototype never needed: a
+ * Su₹aksha dashboard styles, ported from the design prototype's stylesheets
+ * (interfaces/prototype/css/ at commit 55ef517, since removed; one section
+ * per prototype stylesheet, in the same cascade order), plus the few states the prototype never needed: a
  * missing figure, sample data, and an unverified number from the assistant.
  *
  * Light and dark palettes follow the operating system. Semantic colours
