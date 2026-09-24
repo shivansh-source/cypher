@@ -31,7 +31,7 @@ from ai.llm_client import (
 #: be a model that supports tool calling — a model that does not will reject
 #: every chat request. This is an infrastructure choice, not a modelling
 #: constant, so it does not belong in ``core/assumptions.py``.
-DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
 
 #: Output token ceiling per request. Well under the context limits of
 #: Groq-hosted models.

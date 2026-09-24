@@ -108,7 +108,7 @@ There is no separate "intent" enum. The set of things the model can be routed to
 ### Where the LLM is invoked — model/provider, call site, prompt template
 
 - **Provider:** Groq (`ai/groq_transport.py`), OpenAI-shaped chat-completions API.
-- **Default model:** `DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"` (overridable via `GROQ_MODEL` env var; must support tool calling).
+- **Default model:** `DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"` (overridable via `GROQ_MODEL` env var; must support tool calling).
 - **Max output tokens:** `DEFAULT_GROQ_MAX_TOKENS = 8_192`.
 - **Client construction:** lazy, in `ai/llm_client.py::get_transport()` — `GroqTransport()` is only instantiated on first use, so a missing API key surfaces as `LLMConfigurationError` at call time, not import time.
 - **Call sites:**
