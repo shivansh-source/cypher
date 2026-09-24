@@ -110,7 +110,7 @@ differ slightly from `/exposure`'s. Compare a what-if against its own baseline.
       "result": null
     }
   ],
-  "model": "llama-3.3-70b-versatile",
+  "model": "openai/gpt-oss-120b",
   "stop_reason": "end_turn"
 }
 ```
