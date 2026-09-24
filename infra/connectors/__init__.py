@@ -10,12 +10,14 @@ principle 3.
 from __future__ import annotations
 
 from infra.connectors.greenbone_connector import GreenboneConnector as GreenboneConnector
+from infra.connectors.iam_connector import IAMConnector as IAMConnector
 from infra.connectors.prowler_connector import ProwlerConnector as ProwlerConnector
 from infra.connectors.scoutsuite_connector import ScoutSuiteConnector as ScoutSuiteConnector
 from infra.connectors.wazuh_connector import WazuhConnector as WazuhConnector
 
 __all__ = [
     "GreenboneConnector",
+    "IAMConnector",
     "ProwlerConnector",
     "ScoutSuiteConnector",
     "WazuhConnector",

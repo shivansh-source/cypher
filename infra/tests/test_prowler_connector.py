@@ -66,12 +66,19 @@ def test_run_skips_pass_and_produces_schema_valid_snapshot(mock_read_latest: Any
     assert all(f["asset_id"].startswith("cloud:") for f in fragments)
     assert all(not any(key.startswith("_") for key in f) for f in fragments)
 
-    s3_fragment = next(
-        f for f in fragments if f["asset_id"] == "cloud:arn:aws:s3:::example-public-bucket"
+    role_fragment = next(
+        f
+        for f in fragments
+        if f["asset_id"] == "cloud:arn:aws:iam::123456789012:role/example-admin-role"
     )
-    assert s3_fragment["findings"][0]["criticality"] == "critical"
-    assert s3_fragment["findings"][0]["type"] == "misconfiguration"
-    assert s3_fragment["findings"][0]["provenance"]["connector"] == "prowler_connector"
+    finding = role_fragment["findings"][0]
+    assert finding["criticality"] == "high"
+    assert finding["type"] == "misconfiguration"
+    assert finding["provenance"] == {
+        "connector": "prowler_connector",
+        "raw_source_id": "iam_role_administratoraccess_policy",
+    }
+    assert finding["first_seen_at"] == "2026-09-24T14:07:22Z"
 
     assets = merge_fragments(fragments)
     snapshot = build_snapshot(assets, reachable_scanners=["prowler_connector"])
@@ -79,3 +86,24 @@ def test_run_skips_pass_and_produces_schema_valid_snapshot(mock_read_latest: Any
     with open(_SCHEMA_PATH, encoding="utf-8") as handle:
         schema = json.load(handle)
     jsonschema.validate(instance=snapshot, schema=schema)
+
+
+def test_missing_compliance_status_or_bad_generator_id_raises() -> None:
+    import copy
+
+    fixture = _load_fixture()
+    broken = copy.deepcopy(fixture)
+    del broken[0]["Compliance"]
+    try:
+        ProwlerConnector().normalize(broken)
+        raise AssertionError("expected ProwlerConnectorError")
+    except ProwlerConnectorError as exc:
+        assert "Compliance.Status" in str(exc)
+
+    broken = copy.deepcopy(fixture)
+    broken[0]["GeneratorId"] = "not-prowler"
+    try:
+        ProwlerConnector().normalize(broken)
+        raise AssertionError("expected ProwlerConnectorError")
+    except ProwlerConnectorError as exc:
+        assert "GeneratorId" in str(exc)
