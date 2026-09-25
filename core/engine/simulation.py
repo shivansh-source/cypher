@@ -280,11 +280,11 @@ def run_monte_carlo(
                 lm["min"], lm["most_likely"], lm["max"], total_events, magnitude_rng
             )
             event_year = np.repeat(np.arange(resolved_iterations), event_counts)
-            annual_losses = np.bincount(
+            annual_losses: np.ndarray = np.bincount(
                 event_year, weights=magnitude_samples, minlength=resolved_iterations
             )
         else:
-            annual_losses = np.zeros(resolved_iterations)
+            annual_losses = np.zeros(resolved_iterations, dtype=np.float64)
 
         per_scenario_losses[scenario["scenario_id"]] = annual_losses
 
