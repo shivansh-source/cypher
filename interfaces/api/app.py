@@ -347,4 +347,10 @@ def create_app() -> Any:
     app.get("/chat/tools", response_model=list[ToolDescription])(chat_tools_route())
     app.delete("/chat/sessions/{session_id}")(delete_session_route())
     register_dashboard_routes(app)
+
+    # Signed S3 download links for published snapshots; refuses unless
+    # SNAPSHOT_LINKS_TOKEN is set (see interfaces/api/snapshot_links.py).
+    from interfaces.api.snapshot_links import register_snapshot_link_routes
+
+    register_snapshot_link_routes(app)
     return app
