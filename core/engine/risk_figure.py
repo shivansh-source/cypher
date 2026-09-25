@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 from core.assumptions import VALUE_AT_RISK_PERCENTILE
+from core.engine.attack_graph_inference import compute_graph_reachability
 from core.engine.models import (
     LossEventContribution,
     LossExceedanceCurve,
@@ -34,11 +35,19 @@ def _simulate(
     :func:`compute_loss_exceedance_curve` run, so that for the same
     snapshot and seed they read off the very same simulated years.
 
+    Attack-graph reachability is computed once per snapshot here, not per
+    scenario, and applied to every scenario on an asset with known network
+    topology (see ``core.engine.parameterization.parameterize_scenario``).
+
     Returns:
         The parameterized scenarios and ``run_monte_carlo``'s result.
     """
     scenarios = build_loss_event_scenarios(snapshot)
-    parameterized_scenarios = [parameterize_scenario(scenario, snapshot) for scenario in scenarios]
+    graph_reachability = compute_graph_reachability(snapshot, seed=seed)
+    parameterized_scenarios = [
+        parameterize_scenario(scenario, snapshot, graph_reachability=graph_reachability)
+        for scenario in scenarios
+    ]
     return parameterized_scenarios, run_monte_carlo(parameterized_scenarios, seed=seed)
 
 

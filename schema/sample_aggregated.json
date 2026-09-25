@@ -67,7 +67,8 @@
       },
       "network": {
         "internet_facing": true,
-        "open_ports": [443]
+        "open_ports": [443],
+        "segment_id": "dmz"
       }
     },
     {
@@ -99,10 +100,21 @@
       },
       "network": {
         "internet_facing": false,
-        "open_ports": null
+        "open_ports": null,
+        "segment_id": "internal-corp"
       }
     }
   ],
+
+  "network_topology": {
+    "segments": [
+      { "segment_id": "dmz", "name": "dmz" },
+      { "segment_id": "internal-corp", "name": "internal-corp" }
+    ],
+    "segment_reachability": [
+      { "from_segment_id": "dmz", "to_segment_id": "internal-corp" }
+    ]
+  },
 
   "endpoints": [
     {

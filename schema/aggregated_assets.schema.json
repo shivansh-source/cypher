@@ -175,7 +175,45 @@
             "additionalProperties": true,
             "properties": {
               "internet_facing": { "type": ["boolean", "null"] },
-              "open_ports": { "type": ["array", "null"], "items": { "type": "integer" } }
+              "open_ports": { "type": ["array", "null"], "items": { "type": "integer" } },
+              "segment_id": {
+                "type": ["string", "null"],
+                "description": "Which network_topology.segments entry this asset belongs to, for attack-graph edge derivation. Null means segment membership is unknown — core/ must treat this as maximum uncertainty (could be anywhere, potentially adjacent to anything), never as 'isolated' or 'no path in or out'. Optional and independent of scan_scope: a connector can resolve segment_id without running a full network scan."
+              }
+            }
+          }
+        }
+      }
+    },
+    "network_topology": {
+      "type": "object",
+      "description": "Network segmentation used to derive attack-graph edges between assets (see core/engine/attack_graph.py). Optional at the top level — a snapshot with no network_topology has no known segmentation, and every asset's reachability must be treated as unknown rather than as 'unreachable'. Assets sharing the same non-null segment_id are considered mutually reachable; reachability *between* different segments exists only where segment_reachability explicitly lists it — nothing is inferred.",
+      "required": ["segments", "segment_reachability"],
+      "additionalProperties": false,
+      "properties": {
+        "segments": {
+          "type": "array",
+          "description": "Every known network segment/zone, referenced by assets[].network.segment_id.",
+          "items": {
+            "type": "object",
+            "required": ["segment_id", "name"],
+            "additionalProperties": false,
+            "properties": {
+              "segment_id": { "type": "string" },
+              "name": { "type": "string", "description": "Human-readable label, e.g. 'dmz', 'internal-corp', 'pci-cde'." }
+            }
+          }
+        },
+        "segment_reachability": {
+          "type": "array",
+          "description": "Directed edges between segments. A listed {from_segment_id, to_segment_id} pair means an attacker already inside from_segment_id can reach to_segment_id (e.g. a firewall rule permits it) — this is directional and not automatically symmetric. Absence of a pair means no assumed reachability; this must be populated explicitly by a connector with real topology visibility, never guessed at by core/.",
+          "items": {
+            "type": "object",
+            "required": ["from_segment_id", "to_segment_id"],
+            "additionalProperties": false,
+            "properties": {
+              "from_segment_id": { "type": "string" },
+              "to_segment_id": { "type": "string" }
             }
           }
         }

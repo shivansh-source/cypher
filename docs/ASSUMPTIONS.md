@@ -109,6 +109,15 @@ Each assumption entry has four parts:
   sensitive input to the whole model and the hardest to calibrate without
   either real telemetry or a credible external benchmark specific to
   India's threat landscape and the organization's sector.
+- **Interaction with the attack graph:** the `internal_asset` rate is a
+  rough stand-in for "hard to reach from outside." When the attack graph
+  knows the real path to an internal asset (see the attack-graph entry
+  below), that difficulty is carried by each route's reach probability
+  instead, so the asset's rate is the sum, over the entry points that lead
+  to it, of **each entry point's own** rate times its route's reach, not
+  `internal_asset`. Using both would count the same difficulty twice.
+  `internal_asset` still applies to any internal asset whose network
+  segment is unknown.
 
 ### Vulnerability inputs (`core.assumptions.BASELINE_EXPLOIT_PROBABILITY_FOR_UNSCORED_FINDING`, `core.assumptions.KEV_LISTED_MINIMUM_EXPLOIT_PROBABILITY`)
 
@@ -207,7 +216,101 @@ Each assumption entry has four parts:
   <1% at 1,000,000 iterations too — see the test's docstring). A proper
   convergence study (does VaR stop moving materially beyond N iterations,
   for this organization's real scenario count) is still TODO.
-- **Known limitations:** None yet identified.
+- **Known limitations:** The random seed is derived from the scenarios'
+  own content, so any change to any scenario reshuffles every simulated
+  year. Two snapshots' figures therefore differ by sampling noise even for
+  assets that did not change (seen at ~0.5% of an asset's contribution at
+  10,000 iterations on `schema/sample_aggregated.json`). Compare snapshots
+  with that in mind; the optimizer avoids it for its own comparisons with
+  a shared seed (see `core.optimizer._derive_comparison_seed`).
+
+### Bayesian attack graph (`core/engine/attack_graph.py`, `core/engine/attack_graph_inference.py`)
+
+Not a single constant, but a modelling structure with its own
+judgement calls, so it gets an entry.
+
+- **Assumption:** Assets in the same network segment
+  (`assets[].network.segment_id`) can reach each other; reachability
+  between segments exists only where `network_topology.segment_reachability`
+  lists it, one direction at a time. Internet-facing assets are the
+  attacker's entry points. An asset's chance of falling once tried reuses
+  the existing per-finding vulnerability (EPSS/KEV, less observed
+  controls); it falls if at least one of its open findings works.
+  Attack spread is **simulated**: in each sample, every open finding's
+  exploit either works or not, and compromise spreads forward from the
+  entry point along the graph's edges. **Findings that share a CVE share one
+  draw** (a finding works when the shared uniform falls below its own
+  vulnerability). Each finding keeps exactly its own probability, but an
+  attacker whose exploit works on one host is correspondingly likely to
+  have it work on the next.
+  Each entry point with a path to an asset is simulated as its own
+  **route**, over the same draws. A finding's attack rate is then
+  `Σ over routes (entry point's own rate × P(route reaches the asset | this
+  finding's exploit works))`; its vulnerability stays its own. Every
+  route's **share** (`entry rate × reach`, normalized) is reported, and the
+  description lists them ("reached via attack graph: asset-web-01 80%
+  (p=0.263), …").
+- **Justification:** Follows the SIH105 project doc's Conflict Register
+  item **C5**: exact inference on a Bayesian attack graph is #P-complete, so
+  every computation is scoped to one asset's bounded subgraph (nodes on
+  some path from an entry point to it). Within it, simulation rather than
+  an analytic propagation formula follows Homer et al. (2013), who show
+  that formula-based propagation goes wrong in two ways that simulation
+  avoids by construction. First, loops feed a node's own probability back
+  into itself; a boolean forward spread can't. Second, shared weaknesses
+  (the same CVE on several hops) are hidden correlations that independent
+  per-hop factors miss; one shared draw per CVE captures them. Rates add
+  across routes because separate entry points are separate streams of
+  attack campaigns. This replaced the earlier "busiest entry point's rate
+  for every route" rule, which overstated rate for a quiet second route.
+- **Sensitivity:** On `schema/sample_aggregated.json` the headline EAL moves
+  by about +0.4% (within sampling noise), while the internal HR database's
+  own contribution rises from ~₹1.18 lakh to ~₹1.68 lakh: its only route in
+  runs through a critical internet-facing server attacked 12 times a year
+  (12 × 0.261 ≈ 3.1 attacks/year reach it), not the 2/year its "internal"
+  label assumed. Direction depends on real topology; no formal sweep yet.
+- **Known limitations:**
+  - No per-hop measurement exists yet. The SIH105 lab (page 11) is
+    designed to measure exactly this; until it runs, per-hop probabilities
+    are the engine's own finding-based vulnerability, not observation.
+  - Only *same-CVE* correlation is modelled. Other reasons an attacker who
+    clears one hop is likelier to clear the next (skill, harvested
+    credentials, a shared misconfiguration without a CVE) are not, so real
+    end-to-end reach may still be *higher* than computed.
+  - Routes are simulated one entry point at a time and their rates
+    summed. A campaign that enters through two points at once isn't
+    modelled as one event, so heavily overlapping routes can double-count
+    slightly; routes through different perimeters are unaffected.
+  - Reach is a simulation estimate, so it carries sampling noise (see the
+    samples entry below). It is seeded from the snapshot (or the caller's
+    seed), so the same input always gives the same figure.
+  - Same-CVE correlation only changes the rate for a finding whose CVE
+    also appears upstream. That conditional is estimated from the samples
+    where the finding's exploit works, so it is noisier for low-probability
+    findings. A finding whose CVE appears nowhere upstream uses the route's
+    plain reach, which is exact by independence and adds no noise.
+  - An asset with no open findings can't be compromised in the model, so it
+    also can't act as a stepping stone, even if a real attacker could get
+    through it by other means (e.g. stolen credentials).
+  - Anything not covered by `network_topology` (paths through IAM, shared
+    credentials, SaaS) is invisible to the graph.
+  - Connectors don't populate `segment_id` or `network_topology` yet, so
+    until one does, real snapshots behave exactly as before the graph
+    existed.
+
+### Attack graph samples (`core.assumptions.ATTACK_GRAPH_SAMPLES`)
+
+- **Assumption:** `50_000` simulated attack campaigns per target asset.
+- **Justification:** PLACEHOLDER. Gives a standard error of about ±0.002
+  on a reach probability near 0.26, well inside the uncertainty of the
+  per-hop probabilities themselves. On the sample fixture, all inference
+  for a snapshot runs in well under a second.
+- **Sensitivity:** On `schema/sample_aggregated.json`, reach for the HR
+  database lands at 0.261–0.263 against a hand-calculated 0.261.
+- **Known limitations:** Needs a convergence study on realistically sized
+  bounded subgraphs, analogous to the one `MONTE_CARLO_ITERATIONS` needs.
+  Rare events deep in a large graph would need more samples, or
+  importance sampling, to estimate well.
 
 ### Identity-merge confidence threshold (`infra.connectors._identity_resolution.MERGE_CONFIDENCE_THRESHOLD`)
 
@@ -265,6 +368,10 @@ indirectly).
   assumptions still treat each control's effect somewhat independently
   before combination — a truly joint control-interaction model is a
   further refinement not yet attempted.
+- Multi-step (stepping-stone) attacks are modelled by the Bayesian attack
+  graph only where a snapshot carries network segmentation; see that
+  entry's known limitations. Without it, every asset is scored as if
+  attacked directly, as before the graph existed.
 - `core/engine/`'s `build_loss_event_scenarios` only produces a scenario
   for a discrete, evidenced finding — risk implied purely by posture (e.g.
   weak IAM with no associated finding, ransomware exposure from backup

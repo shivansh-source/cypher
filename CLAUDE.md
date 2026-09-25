@@ -58,7 +58,7 @@ should be rejected in review regardless of how convenient it is.
 |---|---|---|---|
 | `schema/` | The shared data contract (JSON Schema, sample fixture) | nothing | — |
 | `infra/connectors/` | Fetching raw tool output and normalizing it into `schema/aggregated_assets.schema.json` | `schema/` | `core/`, `governance/`, `ai/` |
-| `core/` | Snapshot lifecycle, quality gates, the FAIR + Monte Carlo engine, the joint-simulation optimizer, all named assumptions | `schema/` | `infra/`, `governance/`, `ai/`, `interfaces/` |
+| `core/` | Snapshot lifecycle, quality gates, the FAIR + Monte Carlo engine (including the bounded Bayesian attack graph that feeds its vulnerability factor), the joint-simulation optimizer, all named assumptions | `schema/` | `infra/`, `governance/`, `ai/`, `interfaces/` |
 | `governance/` | Mapping findings/controls to regulatory frameworks, evidence generation | `schema/`, `core/` (read-only: findings/controls, never optimizer output) | `infra/`, `ai/`, `interfaces/` |
 | `ai/` | Intent classification, LLM client, numeric verification, tool wrappers | `core/`, `governance/` | `infra/` |
 | `interfaces/` |Dashboard, API and CLI entry points | `core/`, `governance/`, `ai/` | — |

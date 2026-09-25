@@ -14,6 +14,10 @@ Split across submodules by pipeline stage, each independently testable:
 
 - ``models`` — ``LossEventContribution``, ``RiskFigure``, ``LossExceedanceCurve``.
 - ``scenarios`` — ``build_loss_event_scenarios``: snapshot -> candidate scenarios.
+- ``attack_graph`` — ``build_attack_graph``: snapshot network topology -> nodes/edges (structure only).
+- ``attack_graph_inference`` — ``compute_graph_reachability``: bounded, simulated Bayesian
+  inference -> per-asset attack routes (entry point, reach, share), consumed by
+  ``parameterization``.
 - ``parameterization`` — ``parameterize_scenario``: scenario -> FAIR distribution parameters.
 - ``simulation`` — ``run_monte_carlo``: parameterized scenarios -> joint loss distribution.
 - ``risk_figure`` — ``compute_risk_figure``: wires the above into one ``RiskFigure``;
