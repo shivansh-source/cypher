@@ -124,11 +124,9 @@ def test_wazuh_reads_bundle_and_reports_real_agent_status(
         "host:example-manager",  # manager: no usable IP, so identified by name
         "host:192.0.2.10",
         "host:192.0.2.11",
-        "host:roaming",
-    }
+    }  # the never-connected "roaming" registration is not an installed agent
     assert edr["host:192.0.2.10"]["agent_healthy"] is True
     assert edr["host:192.0.2.11"]["agent_healthy"] is False  # disconnected, not inferred healthy
-    assert edr["host:roaming"]["agent_healthy"] is False
     assert [a["rule_id"] for a in edr["host:192.0.2.10"]["recent_alerts"]] == ["2904"]
     assert [a["rule_id"] for a in edr["host:example-manager"]["recent_alerts"]] == ["5501"]
 
@@ -216,3 +214,39 @@ def test_greenbone_csv_errors_are_named(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.setenv("GREENBONE_EXPORT_PATH", str(header_only))
     with pytest.raises(GreenboneConnectorError, match="no result rows"):
         GreenboneConnector().fetch()
+
+
+_AGENTS_WITH_ANY_IP = (
+    "ID: 001, Name: example-web, IP: any, Active\nID: 002, Name: example-db, IP: any, Active\n"
+)
+
+
+def test_agent_ip_any_is_filled_from_the_ip_wazuh_reported_in_alerts() -> None:
+    alerts = "\n".join(
+        json.dumps({"agent": {"id": i, "name": n, "ip": ip}, "rule": {"id": "1"}})
+        for i, n, ip in (
+            ("001", "example-web", "192.0.2.10"),
+            ("001", "example-web", "192.0.2.10"),
+            ("002", "example-db", "192.0.2.11"),
+            ("002", "example-db", "192.0.2.99"),  # conflicting reports for 002
+        )
+    )
+
+    bundle = build_bundle(alerts, _AGENTS_WITH_ANY_IP)
+
+    ips = {a["agent"]["id"]: a["agent"]["ip"] for a in bundle["agents"]}
+    assert ips == {"001": "192.0.2.10", "002": None}  # conflicting reports are not guessed
+
+
+def test_never_connected_agent_is_not_reported_as_edr_coverage(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    agents = (
+        "ID: 001, Name: example-web, IP: 192.0.2.10, Active\n"
+        "ID: 004, Name: probe.local, IP: any, Never connected\n"
+    )
+    bundle = tmp_path / "bundle.json"
+    bundle.write_text(json.dumps(build_bundle("", agents)))
+    monkeypatch.setenv("WAZUH_EXPORT_PATH", str(bundle))
+
+    assert [f["asset_id"] for f in WazuhConnector().run()] == ["host:192.0.2.10"]

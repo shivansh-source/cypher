@@ -49,6 +49,9 @@ module "pipeline" {
   bucket_name   = var.raw_findings_bucket
   github_repo   = var.github_repo
   github_branch = var.github_branch
+
+  github_owner_id = var.github_owner_id
+  github_repo_id  = var.github_repo_id
 }
 
 module "compute" {

@@ -103,11 +103,30 @@ def build_bundle(alerts_ndjson: str, agent_list_text: str) -> dict[str, Any]:
         except json.JSONDecodeError as exc:
             raise ValueError(f"alerts line {number} is not valid JSON: {exc}") from exc
 
-    agents = [
-        {"agent": agent, "packages": [], "ports": []}
-        for agent in parse_agent_control_list(agent_list_text)
-    ]
+    observed_ips = _observed_agent_ips(alerts)
+    agents = []
+    for agent in parse_agent_control_list(agent_list_text):
+        if agent["ip"] is None:
+            agent["ip"] = observed_ips.get(agent["id"])
+        agents.append({"agent": agent, "packages": [], "ports": []})
     return {"agents": agents, "alerts": alerts}
+
+
+def _observed_agent_ips(alerts: list[dict[str, Any]]) -> dict[str, str]:
+    """Each agent id's IP as Wazuh itself reported it in that agent's alerts.
+
+    ``agent_control -l`` prints ``any`` for agents that enrolled without a fixed address, yet
+    their alerts carry the address the manager saw. Used only to fill an otherwise unusable IP,
+    and only when every alert for that agent agrees on exactly one address; an agent whose
+    alerts name several addresses (or none) gets no IP rather than a guess.
+    """
+    seen: dict[str, set[str]] = {}
+    for alert in alerts:
+        agent = alert["_source"].get("agent") or {}
+        agent_id, ip = agent.get("id"), agent.get("ip")
+        if agent_id and ip:
+            seen.setdefault(str(agent_id), set()).add(str(ip))
+    return {agent_id: next(iter(ips)) for agent_id, ips in seen.items() if len(ips) == 1}
 
 
 def main(argv: list[str] | None = None) -> None:
