@@ -11,10 +11,10 @@ workflow to follow when adding a new one.
 | Connector | Source tool | Schema sections populated |
 |---|---|---|
 | `nessus_connector.py` | Tenable Nessus | `assets[].findings` (CVEs) |
-| `greenbone_connector.py` | Greenbone (OpenVAS/GVM) | `assets[].findings` (CVEs) |
+| `greenbone_connector.py` | Greenbone (OpenVAS/GVM) via GMP, or a GSA XML report export (`GREENBONE_EXPORT_PATH`) | `assets[].findings` (CVEs) |
 | `prowler_connector.py` | Prowler (CSPM) | `assets[].findings` (misconfigurations) |
 | `scoutsuite_connector.py` | ScoutSuite (CSPM) | `assets[].findings` (misconfigurations) |
-| `wazuh_connector.py` | Wazuh (EDR/SIEM) | `assets[].edr`, optionally `assets[].findings` |
+| `wazuh_connector.py` | Wazuh (EDR/SIEM) via manager API + indexer, or a bundle file (`WAZUH_EXPORT_PATH`, built by `infra/inventory/build_wazuh_bundle.py`) | `assets[].edr`, optionally `assets[].findings` |
 | `iam_connector.py` | AWS IAM via PMapper (`IAM_PMAPPER_OUTPUT_PATH`, a `pmapper analysis --output-type json` file) | `assets[].findings`, attached to the account-level asset |
 | `cmdb_connector.py` | CMDB REST API, or a JSON inventory file (`CMDB_EXPORT_PATH`, e.g. from `infra/inventory/export_ec2_inventory.py`) | `endpoints[]`, canonical asset identity |
 | `nmap_connector.py` | nmap | `assets[].network`, `endpoints[]` |
@@ -152,3 +152,23 @@ persistence/scheduling (`db`, `connector-scheduler`). `dashboard` talks to
   (currently `export_ec2_inventory.py`, the AWS stand-in for a CMDB).
 - `infra/terraform/` — the LoanEase sandbox that generates the telemetry; see
   its own `README.md` and `manifest.yaml`.
+- `infra/bastion/` — the daily Wazuh export cron that runs on the bastion.
+- `infra/Dockerfile.api` — container image for the hosted API.
+- `.github/workflows/scheduled-ingest.yml` — the daily / on-demand pipeline: Prowler + PMapper,
+  then `riskctl ingest`, then publishes the snapshot store to S3.
+
+## Daily pipeline at a glance
+
+```
+bastion cron (20:00 UTC)  -> S3 inputs/wazuh_bundle.json
+you, by hand              -> S3 inputs/greenbone_report.csv   (after a scan; not automated)
+workflow (21:00 UTC / manual "Run workflow"):
+    Prowler + PMapper     -> S3 latest/prowler_connector.json, inputs/pmapper.json
+    EC2 inventory         -> built inside the ingest job
+    riskctl ingest        -> S3 snapshots/  (current.json + history/)
+hosted API                -> syncs snapshots/ from S3 -> Vercel dashboard
+```
+
+A missing or stale input is never faked: its connector is left unconfigured, so that scanner is
+recorded as unreachable. A quality-gate rejection leaves the previous snapshot current and
+fails the workflow run.

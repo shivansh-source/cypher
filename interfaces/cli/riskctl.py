@@ -574,3 +574,12 @@ def build_cli() -> Any:
     app.command("framework-status")(framework_status_command)
     app.command("ingest")(ingest_command)
     return app
+
+
+def main() -> None:
+    """Console entry point: ``riskctl <command>`` (see ``[project.scripts]``)."""
+    build_cli()()
+
+
+if __name__ == "__main__":
+    main()

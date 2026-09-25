@@ -148,3 +148,22 @@ export function scenarioLabel(contribution: { description: string }): string {
   const cut = contribution.description.indexOf(" (");
   return cut > 0 ? contribution.description.slice(0, cut) : contribution.description;
 }
+
+/**
+ * Hours since an ISO timestamp, or null if it is unreadable. Reads the clock, so call it
+ * only from code that runs per request (pages here fetch with `cache: "no-store"`).
+ */
+export function hoursSince(iso: string): number | null {
+  const then = parseIso(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  return Math.max(0, (Date.now() - then) / (60 * 60 * 1000));
+}
+
+/** A coarse age such as `40 min ago`, `3 h ago` or `2 d ago`, or null if unreadable. */
+export function formatAge(iso: string): string | null {
+  const hours = hoursSince(iso);
+  if (hours === null) return null;
+  if (hours < 1) return `${Math.max(1, Math.round(hours * 60))} min ago`;
+  if (hours < 48) return `${Math.round(hours)} h ago`;
+  return `${Math.round(hours / 24)} d ago`;
+}

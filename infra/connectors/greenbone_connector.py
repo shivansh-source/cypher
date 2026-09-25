@@ -16,11 +16,14 @@ now (see ``infra/README.md``).
 
 from __future__ import annotations
 
+import csv
+from pathlib import Path
 from typing import Any
 
 from gvm.connections import TLSConnection
 from gvm.protocols.gmp import Gmp
 from gvm.transforms import EtreeCheckCommandTransform
+from gvm.xml import parse_xml
 
 from infra.connectors import _env, _object_store
 from infra.connectors.base import Connector
@@ -37,6 +40,20 @@ _GREENBONE_HOST_ENV = "GREENBONE_HOST"
 _GREENBONE_PORT_ENV = "GREENBONE_PORT"
 _GREENBONE_USERNAME_ENV = "GREENBONE_USERNAME"
 _GREENBONE_PASSWORD_ENV = "GREENBONE_PASSWORD"
+_GREENBONE_EXPORT_PATH_ENV = "GREENBONE_EXPORT_PATH"
+
+#: Columns of a GSA "CSV Results" export this connector reads; a file lacking
+#: any of them is not that export.
+_CSV_REQUIRED_COLUMNS: tuple[str, ...] = (
+    "IP",
+    "NVT Name",
+    "Severity",
+    "CVSS",
+    "NVT OID",
+    "CVEs",
+    "Timestamp",
+    "Result ID",
+)
 
 #: Direct rename of GVM's own ``threat`` vocabulary into the schema's
 #: criticality vocabulary. This is *not* a FAIR judgement call — it is a
@@ -74,7 +91,11 @@ def _element_text(element: Any) -> str | None:
 
 
 def _results_to_dicts(results_root: Any) -> list[dict[str, Any]]:
-    """Convert a ``get_results`` XML response into plain dicts.
+    """Convert a ``get_results`` response, or a full report export, into plain dicts.
+
+    Every ``result`` element under ``results_root`` is read, however deeply
+    nested — a ``get_results`` response holds them directly, while a GSA
+    report export nests them under ``report/report/results``.
 
     Preserves GVM's own field names (``host``, NVT ``oid``, ``name``,
     ``cvss`` via ``severity``, ``threat``, ``cve``, result ``id``) without
@@ -82,7 +103,7 @@ def _results_to_dicts(results_root: Any) -> list[dict[str, Any]]:
     :meth:`GreenboneConnector.normalize`, not here.
     """
     records: list[dict[str, Any]] = []
-    for result in results_root.findall("result"):
+    for result in results_root.iter("result"):
         nvt = result.find("nvt")
         records.append(
             {
@@ -109,9 +130,22 @@ class GreenboneConnector(Connector):
     name: str = "greenbone_connector"
 
     def fetch(self) -> Any:
-        """Connect to the Greenbone GVM manager and retrieve scan results.
+        """Retrieve scan results from an XML export file, or from the GVM manager.
 
-        Connects via GMP-over-TLS to ``GREENBONE_HOST``/``GREENBONE_PORT``
+        If ``GREENBONE_EXPORT_PATH`` is set, reads that file instead of
+        connecting: an operator-produced GSA report download, either the
+        "CSV Results" export (``.csv``) or the XML report (anything else),
+        chosen by file extension (the same "operator provides the file"
+        pattern as
+        ``iam_connector.py``). This exists because the Community Containers
+        deployment publishes no gvmd port, so GMP is unreachable from
+        outside the container network. The export must be taken with
+        ``levels=chmlg`` in GSA's filter, since the default filter hides
+        Log-severity results (where version-banner detections live). The
+        export is not written back to the object store: the input file is
+        itself the audit artifact.
+
+        Otherwise connects via GMP-over-TLS to ``GREENBONE_HOST``/``GREENBONE_PORT``
         (defaulting to :data:`DEFAULT_GVM_PORT`), authenticates with
         ``GREENBONE_USERNAME``/``GREENBONE_PASSWORD``, and calls
         ``gmp.get_results()``.
@@ -127,6 +161,10 @@ class GreenboneConnector(Connector):
                 fails, or the ``get_results`` request fails. Must not
                 return an empty result to mean "could not fetch".
         """
+        export_path = _env.get_optional(_GREENBONE_EXPORT_PATH_ENV)
+        if export_path:
+            return self._read_export(Path(export_path))
+
         host = _env.require(_GREENBONE_HOST_ENV, self.name, GreenboneConnectorError)
         username = _env.require(_GREENBONE_USERNAME_ENV, self.name, GreenboneConnectorError)
         password = _env.require(_GREENBONE_PASSWORD_ENV, self.name, GreenboneConnectorError)
@@ -158,6 +196,89 @@ class GreenboneConnector(Connector):
 
         results = _results_to_dicts(results_root)
         _object_store.write_raw(self.name, results)
+        return results
+
+    def _read_csv_export(self, path: Path) -> list[dict[str, Any]]:
+        """Parse a GSA "CSV Results" export into result dicts (see :meth:`fetch`).
+
+        Column names are those of a real GSA export (checked against one
+        downloaded from a live scan): ``IP``, ``NVT Name``, ``Severity``
+        (textual: High/Medium/Low/Log), ``CVSS``, ``NVT OID``, ``CVEs``,
+        ``Timestamp``, ``Result ID``. Only those are read; the remaining
+        columns (free-text descriptions) are ignored.
+
+        A ``CVEs`` cell holding several comma-separated ids yields the first
+        one: the schema's ``cve_id`` holds one id, and the first listed is a
+        real id from the report, not a substitute.
+
+        Raises:
+            GreenboneConnectorError: If the file cannot be read or parsed, a
+                required column is missing, or it has no data rows.
+        """
+        try:
+            with path.open(encoding="utf-8-sig", newline="") as handle:
+                reader = csv.DictReader(handle)
+                missing = [c for c in _CSV_REQUIRED_COLUMNS if c not in (reader.fieldnames or [])]
+                if missing:
+                    raise GreenboneConnectorError(
+                        f"{self.name}: {path} is missing expected CSV column(s) {missing}; "
+                        "expected a GSA 'CSV Results' export"
+                    )
+                rows = list(reader)
+        except OSError as exc:
+            raise GreenboneConnectorError(f"{self.name}: could not read {path}: {exc}") from exc
+        except csv.Error as exc:
+            raise GreenboneConnectorError(
+                f"{self.name}: {path} is not parseable CSV: {exc}"
+            ) from exc
+
+        if not rows:
+            raise GreenboneConnectorError(
+                f"{self.name}: {path} has a CSV header but no result rows; refusing to read "
+                "that as 'scanned and found nothing'"
+            )
+        return [
+            {
+                "result_id": row["Result ID"] or None,
+                "host": row["IP"] or None,
+                "name": row["NVT Name"] or None,
+                "threat": row["Severity"] or None,
+                "severity": row["CVSS"] or None,
+                "creation_time": row["Timestamp"] or None,
+                "nvt_oid": row["NVT OID"] or None,
+                "cve": (row["CVEs"].split(",")[0].strip() or None),
+            }
+            for row in rows
+        ]
+
+    def _read_export(self, path: Path) -> list[dict[str, Any]]:
+        """Parse a GSA export (CSV or XML, chosen by file extension) into result dicts.
+
+        See :meth:`fetch`.
+
+        Raises:
+            GreenboneConnectorError: If the file cannot be read or parsed,
+                or contains no results at all (an export with none is far
+                likelier a wrong download than a clean scan, and must not be
+                read as "scanned and found nothing").
+        """
+        if path.suffix.lower() == ".csv":
+            return self._read_csv_export(path)
+        try:
+            root = parse_xml(path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            raise GreenboneConnectorError(f"{self.name}: could not read {path}: {exc}") from exc
+        except Exception as exc:
+            raise GreenboneConnectorError(
+                f"{self.name}: {path} is not a parseable XML export: {exc}"
+            ) from exc
+
+        results = _results_to_dicts(root)
+        if not results:
+            raise GreenboneConnectorError(
+                f"{self.name}: {path} contains no <result> elements; expected a GSA report "
+                "downloaded in XML format with levels=chmlg"
+            )
         return results
 
     def normalize(self, raw: Any) -> list[dict[str, Any]]:

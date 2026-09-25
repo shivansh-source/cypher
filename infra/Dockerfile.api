@@ -1,0 +1,38 @@
+# Su₹aksha API (interfaces/api). Build from the repo root:
+#   docker build -f infra/Dockerfile.api -t suraksha-api .
+#
+# Runtime configuration is environment-only; nothing secret is baked in. On a hosted API
+# set (see .env.example):
+#   SNAPSHOT_S3_BUCKET         bucket the scheduled-ingest workflow publishes snapshots to
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_DEFAULT_REGION   the read-only
+#                              suraksha-api-reader user (snapshots/* only)
+#   CORS_ALLOWED_ORIGINS       the dashboard's public origin (e.g. https://<project>.vercel.app)
+#   GROQ_API_KEY               only if the chat assistant should work
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    SNAPSHOT_STORE_PATH=/data/snapshots \
+    PORT=8000
+
+WORKDIR /app
+
+# Install dependencies from pyproject first so this layer caches across code edits.
+COPY pyproject.toml README.md ./
+COPY ai ./ai
+COPY core ./core
+COPY governance ./governance
+COPY infra/__init__.py ./infra/__init__.py
+COPY infra/connectors ./infra/connectors
+COPY interfaces/__init__.py interfaces/_dotenv.py ./interfaces/
+COPY interfaces/api ./interfaces/api
+COPY interfaces/cli ./interfaces/cli
+COPY schema ./schema
+RUN pip install --no-cache-dir .
+
+# Snapshots live outside the code tree and are owned by the unprivileged runtime user.
+RUN useradd --create-home --uid 10001 suraksha && mkdir -p /data/snapshots && chown -R suraksha /data
+USER suraksha
+
+EXPOSE 8000
+CMD ["sh", "-c", "uvicorn --factory interfaces.api.app:create_app --host 0.0.0.0 --port ${PORT}"]

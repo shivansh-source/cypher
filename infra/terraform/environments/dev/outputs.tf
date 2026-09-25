@@ -33,3 +33,13 @@ output "iam_v05_key_create_date" {
 output "dlm_policy_id" {
   value = module.backup.dlm_policy_id
 }
+
+output "pipeline_gha_role_arn" {
+  description = "Set as the AWS_ROLE_ARN repository variable for the scheduled-ingest workflow."
+  value       = module.pipeline.gha_role_arn
+}
+
+output "pipeline_api_reader_user" {
+  description = "Create its access key by hand (aws iam create-access-key) for the API host."
+  value       = module.pipeline.api_reader_user
+}

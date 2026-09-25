@@ -1,0 +1,172 @@
+name: Scheduled ingest
+
+# Daily (and on-demand) refresh of the Su₹aksha snapshot.
+#
+#   scan   : Prowler + PMapper against the AWS account (read-only role), uploaded to S3.
+#   ingest : pulls every input from S3, runs `riskctl ingest`, and syncs the snapshot store
+#            back to S3 so the API host serves the new snapshot.
+#
+# Host-side inputs (Wazuh bundle, Greenbone report) are produced on the bastion by
+# infra/bastion/export_host_data.sh at 20:00 UTC, an hour before this runs. A missing or
+# stale input is NOT faked: its connector is left unconfigured, so `ingest` records that
+# scanner as unreachable. If the quality gates reject the candidate, the previous snapshot
+# stays current and this job fails, so a stale day is visible in Actions.
+#
+# Manual trigger ("the button"): Actions -> Scheduled ingest -> Run workflow. Tick
+# "skip_scanners" for a fast run that reuses the last Prowler/PMapper exports
+# (a full scan is expected to take on the order of 10-20 minutes; measure it).
+#
+# One-time setup: repository variables AWS_ROLE_ARN (terraform output pipeline_gha_role_arn)
+# and RAW_FINDINGS_BUCKET. Scheduled runs only fire from the default branch.
+
+on:
+  schedule:
+    - cron: "0 21 * * *" # 21:00 UTC = 02:30 IST
+  workflow_dispatch:
+    inputs:
+      skip_scanners:
+        description: "Skip Prowler/PMapper and reuse their last exports"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: suraksha-ingest
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+  RAW_FINDINGS_BUCKET: ${{ vars.RAW_FINDINGS_BUCKET }}
+
+jobs:
+  scan:
+    name: Prowler + PMapper
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_scanners) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Assume AWS role (OIDC)
+        run: bash .github/scripts/aws-oidc-login.sh
+
+      - name: Install scanners
+        run: |
+          pip install --upgrade pip
+          pip install "prowler==5.43.0" "principalmapper==1.1.5"
+          # PMapper 1.1.5 imports Mapping/MutableMapping from `collections`, removed in
+          # Python 3.10. No fixed release exists, so patch the installed package.
+          pm_dir=$(python -c "import importlib.util as u; print(u.find_spec('principalmapper').submodule_search_locations[0])")
+          sed -i \
+            -e 's/from collections import Mapping, MutableMapping, OrderedDict/from collections import OrderedDict\nfrom collections.abc import Mapping, MutableMapping/' \
+            -e 's/from collections import Mapping, MutableMapping/from collections.abc import Mapping, MutableMapping/' \
+            -e 's/from collections import MutableMapping, Mapping/from collections.abc import MutableMapping, Mapping/' \
+            "${pm_dir}/util/case_insensitive_dict.py"
+
+      - name: Prowler (ASFF) -> S3 latest/prowler_connector.json
+        run: |
+          prowler aws --region "${AWS_REGION}" --output-formats json-asff \
+            --output-directory prowler-out --output-filename prowler \
+            --ignore-exit-code-3 --no-banner
+          file=$(ls prowler-out/*.asff.json | head -n1)
+          # Never upload an empty/invalid file: the connector would read it as "no findings".
+          python -c "import json,sys; d=json.load(open(sys.argv[1])); assert isinstance(d,list) and d, 'empty ASFF output'" "${file}"
+          aws s3 cp "${file}" "s3://${RAW_FINDINGS_BUCKET}/latest/prowler_connector.json" --only-show-errors
+
+      - name: PMapper -> S3 inputs/pmapper.json
+        run: |
+          # Opt-in regions that are disabled in this account time out instead of failing fast.
+          pmapper graph create --exclude-regions me-south-1 af-south-1 ap-east-1 \
+            ap-east-2 ap-southeast-3 ap-southeast-4 ap-southeast-5 ap-southeast-6 \
+            ap-southeast-7 ca-west-1 eu-central-2 eu-south-1 eu-south-2 \
+            il-central-1 me-central-1 mx-central-1
+          pmapper analysis --output-type json > pmapper.json
+          python -c "import json,sys; d=json.load(open(sys.argv[1])); assert 'findings' in d and 'account' in d" pmapper.json
+          aws s3 cp pmapper.json "s3://${RAW_FINDINGS_BUCKET}/inputs/pmapper.json" --only-show-errors
+
+  ingest:
+    name: Ingest + publish snapshot
+    needs: scan
+    # Run after a successful scan, or when the scan was deliberately skipped; never after a failed scan.
+    if: ${{ !cancelled() && (needs.scan.result == 'success' || needs.scan.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install --upgrade pip setuptools
+      - run: pip install -e .
+
+      - name: Assume AWS role (OIDC)
+        run: bash .github/scripts/aws-oidc-login.sh
+
+      - name: Fetch inputs (missing or stale ones are left unconfigured, not faked)
+        run: |
+          mkdir -p inputs data/snapshots
+          # Snapshot store first: ingest compares the candidate against the previous snapshot.
+          aws s3 sync "s3://${RAW_FINDINGS_BUCKET}/snapshots/" data/snapshots/ --only-show-errors
+
+          # EC2 inventory is produced here, straight from AWS.
+          python -m infra.inventory.export_ec2_inventory --region "${AWS_REGION}" > inputs/ec2_inventory.json
+          echo "CMDB_EXPORT_PATH=inputs/ec2_inventory.json" >> "${GITHUB_ENV}"
+
+          if bash .github/scripts/fetch-input.sh inputs/pmapper.json inputs/pmapper.json 48; then
+            echo "IAM_PMAPPER_OUTPUT_PATH=inputs/pmapper.json" >> "${GITHUB_ENV}"
+          fi
+          if bash .github/scripts/fetch-input.sh inputs/wazuh_bundle.json inputs/wazuh_bundle.json 30; then
+            echo "WAZUH_EXPORT_PATH=inputs/wazuh_bundle.json" >> "${GITHUB_ENV}"
+          fi
+          # Greenbone is a scan export; any age is accepted (findings carry their own scan
+          # timestamp), but the age is printed above. CSV preferred, XML accepted.
+          if bash .github/scripts/fetch-input.sh inputs/greenbone_report.csv inputs/greenbone_report.csv 0; then
+            echo "GREENBONE_EXPORT_PATH=inputs/greenbone_report.csv" >> "${GITHUB_ENV}"
+          elif bash .github/scripts/fetch-input.sh inputs/greenbone_report.xml inputs/greenbone_report.xml 0; then
+            echo "GREENBONE_EXPORT_PATH=inputs/greenbone_report.xml" >> "${GITHUB_ENV}"
+          fi
+          echo "DECLARED_SERVICES_PATH=core/declared/loanease_sandbox_services.json" >> "${GITHUB_ENV}"
+          echo "SNAPSHOT_STORE_PATH=data/snapshots" >> "${GITHUB_ENV}"
+
+      - name: Ingest
+        run: |
+          riskctl ingest 2>&1 | tee ingest.log
+          # ingest exits 0 even when a quality gate rejects the candidate; surface that as a failure.
+          if grep -q "candidate snapshot not committed" ingest.log; then
+            echo "::error::A quality gate rejected the candidate; the previous snapshot stays current."
+            exit 1
+          fi
+
+      - name: Publish snapshot store to S3
+        run: |
+          # No --delete: history is append-only and immutable.
+          aws s3 sync data/snapshots/ "s3://${RAW_FINDINGS_BUCKET}/snapshots/" --only-show-errors
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          python - <<'PY' >> "${GITHUB_STEP_SUMMARY}"
+          import json, pathlib
+          p = pathlib.Path("data/snapshots/current.json")
+          print("## Scheduled ingest")
+          if not p.exists():
+              print("No snapshot has been committed yet.")
+          else:
+              s = json.loads(p.read_text())
+              scope = s["scan_scope"]
+              print(f"- snapshot: `{s['snapshot_id'][:23]}`  observed_at: `{s['observed_at']}`")
+              print(f"- assets: {len(s['assets'])}, services: {len(s['services'])}, endpoints: {len(s['endpoints'])}")
+              print(f"- reachable: {', '.join(scope['reachable_scanners']) or 'none'}")
+              print(f"- unreachable: {', '.join(scope['unreachable_scanners']) or 'none'}")
+          PY

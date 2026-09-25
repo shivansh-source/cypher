@@ -29,6 +29,23 @@ variable "werkzeug_version" {
   default = "2.2.2"
 }
 
+variable "raw_findings_bucket" {
+  type        = string
+  default     = "loanease-raw-findings-f00321"
+  description = "Existing S3 bucket holding pipeline inputs and the snapshot store (created outside Terraform)."
+}
+
+variable "github_repo" {
+  type        = string
+  default     = "shivansh-source/ps105"
+  description = "Repo whose workflows may assume the ingest role."
+}
+
+variable "github_branch" {
+  type    = string
+  default = "main"
+}
+
 variable "bastion_instance_type" {
   type    = string
   default = "m7i-flex.large"

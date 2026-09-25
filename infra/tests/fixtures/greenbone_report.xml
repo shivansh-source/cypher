@@ -1,0 +1,34 @@
+<!-- SYNTHETIC test fixture: hand-written to have the structure of a GSA XML report
+     export (results nest under report/report/results). Hosts use the reserved
+     documentation range 192.0.2.0/24. Not captured scan output, and unrelated to
+     any real environment. -->
+<report id="00000000-0000-0000-0000-000000000000" format_id="a994b278-1f62-11e1-96ac-406186ea4fc5">
+  <report id="00000000-0000-0000-0000-000000000000">
+    <results start="1" max="-1">
+      <result id="aaaaaaaa-0000-0000-0000-000000000001">
+        <name>HTTP Server type and version</name>
+        <host>192.0.2.10<asset asset_id="11111111-1111-1111-1111-111111111111"/><hostname>example-web</hostname></host>
+        <port>80/tcp</port>
+        <nvt oid="1.3.6.1.4.1.25623.1.0.10107">
+          <name>HTTP Server type and version</name>
+          <cve>NOCVE</cve>
+        </nvt>
+        <threat>Log</threat>
+        <severity>0.0</severity>
+        <creation_time>2026-09-24T12:50:00Z</creation_time>
+      </result>
+      <result id="aaaaaaaa-0000-0000-0000-000000000002">
+        <name>Example service finding</name>
+        <host>192.0.2.20<asset asset_id="22222222-2222-2222-2222-222222222222"/></host>
+        <port>1515/tcp</port>
+        <nvt oid="1.3.6.1.4.1.25623.1.0.999001">
+          <name>Example service finding</name>
+          <cve>NOCVE</cve>
+        </nvt>
+        <threat>High</threat>
+        <severity>7.5</severity>
+        <creation_time>2026-09-24T12:51:00Z</creation_time>
+      </result>
+    </results>
+  </report>
+</report>

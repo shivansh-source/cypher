@@ -1,7 +1,7 @@
 {
   "declared_by": "Su₹aksha team (manual declaration — NOT connector-observed)",
   "declared_at": "2026-09-24T00:00:00Z",
-  "basis": "Business criticality tiers are human judgements for the LoanEase sandbox, not scan output. Backup facts come from loanease-sim's Terraform (modules/backup): a daily DLM policy (03:00 UTC, retain 3) targets volumes tagged Backup=true; only the DB volume carries the tag. No restore test has been run, so last_tested_at is null. Fields nothing establishes (rto_hours, immutable_copy) are null, not guessed. Asset links use the EC2 instance and root-volume ARNs Prowler observed (instance-to-name mapping read from `aws ec2 describe-instances`, 2026-09-25), because the host:<ip> assets need Wazuh/Greenbone, which are unreachable in this sandbox.",
+  "basis": "Business criticality tiers are human judgements for the LoanEase sandbox, not scan output. Backup facts come from loanease-sim's Terraform (modules/backup): a daily DLM policy (03:00 UTC, retain 3) targets volumes tagged Backup=true; only the DB volume carries the tag. No restore test has been run, so last_tested_at is null. Fields nothing establishes (rto_hours, immutable_copy) are null, not guessed. Asset links use the EC2 instance and root-volume ARNs Prowler observed (instance-to-name mapping read from `aws ec2 describe-instances`, 2026-09-25), because the host:<ip> assets need Wazuh/Greenbone, which are unreachable in this sandbox. host:<ip> links attach once the Wazuh and Greenbone exports are supplied (their connectors identify hosts by private IP; the Wazuh manager host, which has no usable IP in agent_control, is identified by its name). The same machine then appears twice, as a host: asset and a cloud: ARN asset, until identity resolution merges them.",
   "services": [
     {
       "service_id": "svc-loan-portal",
@@ -55,19 +55,24 @@
   "asset_links": {
     "svc-loan-portal": [
       "cloud:arn:aws:ec2:ap-south-1:627984120842:instance/i-018baad978b8d5eb3",
-      "cloud:arn:aws:ec2:ap-south-1:627984120842:volume/vol-014f68af9f59bbaa2"
+      "cloud:arn:aws:ec2:ap-south-1:627984120842:volume/vol-014f68af9f59bbaa2",
+      "host:10.20.1.97"
     ],
     "svc-loan-db": [
       "cloud:arn:aws:ec2:ap-south-1:627984120842:instance/i-06d59432543fb1af9",
-      "cloud:arn:aws:ec2:ap-south-1:627984120842:volume/vol-050e7c1b5d5fd25b1"
+      "cloud:arn:aws:ec2:ap-south-1:627984120842:volume/vol-050e7c1b5d5fd25b1",
+      "host:10.20.1.129"
     ],
     "svc-endpoint-sim": [
       "cloud:arn:aws:ec2:ap-south-1:627984120842:instance/i-021c0d2f51f818864",
-      "cloud:arn:aws:ec2:ap-south-1:627984120842:volume/vol-0e2b3235f401a684e"
+      "cloud:arn:aws:ec2:ap-south-1:627984120842:volume/vol-0e2b3235f401a684e",
+      "host:10.20.1.53"
     ],
     "svc-scanner-ops": [
       "cloud:arn:aws:ec2:ap-south-1:627984120842:instance/i-056ceaa14f5f5f5e9",
-      "cloud:arn:aws:ec2:ap-south-1:627984120842:volume/vol-02a7fe30141e6abf0"
+      "cloud:arn:aws:ec2:ap-south-1:627984120842:volume/vol-02a7fe30141e6abf0",
+      "host:10.20.1.56",
+      "host:ip-10-20-1-56"
     ]
   }
 }

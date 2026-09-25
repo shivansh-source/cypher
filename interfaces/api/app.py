@@ -310,6 +310,12 @@ def create_app() -> Any:
     # repo-root .env without overriding variables the shell already set.
     load_dotenv()
 
+    # No-op unless SNAPSHOT_S3_BUCKET is set: on a hosted API, pulls the snapshot store the
+    # scheduled-ingest workflow publishes to S3 into SNAPSHOT_STORE_PATH.
+    from interfaces.api.snapshot_sync import configure_from_env, sync_status
+
+    configure_from_env()
+
     app = FastAPI(
         title="Su₹aksha API",
         description=(
@@ -333,6 +339,7 @@ def create_app() -> Any:
     )
 
     app.get("/health")(lambda: {"status": "ok"})
+    app.get("/health/snapshot-sync")(sync_status)
     app.get("/exposure")(get_exposure_route())
     app.get("/optimize")(optimize_investment_route())
     app.post("/chat", response_model=ChatResponse)(chat_route())

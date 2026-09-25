@@ -59,6 +59,7 @@ or put a shared store behind `ai.sessions.InMemorySessionStore`'s interface.
 | Method | Path | Returns |
 |---|---|---|
 | `GET` | `/health` | `{"status": "ok"}` |
+| `GET` | `/health/snapshot-sync` | Last S3 snapshot-sync outcome (`enabled`, `last_success_at`, `last_error`); only active when `SNAPSHOT_S3_BUCKET` is set |
 | `POST` | `/chat` | A complete, guarded turn (below) |
 | `POST` | `/chat/stream` | The same turn as Server-Sent Events |
 | `GET` | `/chat/tools` | Every tool, with whether it can answer today |
@@ -155,3 +156,13 @@ Add a `ToolSpec` to `ai/tool_registry.py` pointing at a wrapper in
 `ai/tools/`. The chat loop, the classifier and `/chat/tools` all read that
 registry — nothing in `ai/chat.py` or this module knows about any individual
 tool, and nothing should be taught to.
+
+
+## Hosting
+
+`infra/Dockerfile.api` builds the API (`docker build -f infra/Dockerfile.api -t suraksha-api .`).
+On a hosted deployment the API has no shared disk with the ingest job, so it pulls the snapshot
+store the `scheduled-ingest` workflow publishes to S3 (`interfaces/api/snapshot_sync.py`): set
+`SNAPSHOT_S3_BUCKET` and the read-only `suraksha-api-reader` credentials, plus
+`CORS_ALLOWED_ORIGINS` (the dashboard's public origin). See `.env.example`. The dashboard, on
+Vercel, points `NEXT_PUBLIC_API_BASE_URL` at this service.
