@@ -7,7 +7,8 @@ name: Scheduled ingest
 #            back to S3 so the API host serves the new snapshot.
 #
 # Host-side inputs (Wazuh bundle, Greenbone report) are produced on the bastion by
-# infra/bastion/export_host_data.sh at 20:00 UTC, an hour before this runs. A missing or
+# infra/bastion/refresh_host_data.sh, which this workflow triggers through SSM (no SSH, no bastion
+# cron): on every scheduled run, and on a manual run when "refresh_host_data" is ticked. A missing or
 # stale input is NOT faked: its connector is left unconfigured, so `ingest` records that
 # scanner as unreachable. If the quality gates reject the candidate, the previous snapshot
 # stays current and this job fails, so a stale day is visible in Actions.
@@ -26,6 +27,10 @@ on:
     inputs:
       skip_scanners:
         description: "Skip Prowler/PMapper and reuse their last exports"
+        type: boolean
+        default: false
+      refresh_host_data:
+        description: "First have the bastion re-export Wazuh and Greenbone data (via SSM, no SSH)"
         type: boolean
         default: false
 
@@ -113,6 +118,16 @@ jobs:
       - name: Assume AWS role (OIDC)
         run: bash .github/scripts/aws-oidc-login.sh
 
+      # Runs on every scheduled run, and on manual runs when "refresh_host_data" is ticked.
+      # On a schedule a bastion failure must not block the daily snapshot: the step is allowed to
+      # fail, and the stale/missing input is then handled honestly by the fetch step below (Wazuh
+      # older than 30h is dropped, so that scanner shows as not reporting). A manual run still
+      # fails loudly, since someone is watching and asked for a refresh.
+      - name: Refresh host-side inputs on the bastion (Wazuh + Greenbone)
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.refresh_host_data) }}
+        continue-on-error: ${{ github.event_name == 'schedule' }}
+        run: bash .github/scripts/refresh-bastion.sh
+
       - name: Fetch inputs (missing or stale ones are left unconfigured, not faked)
         run: |
           mkdir -p inputs data/snapshots
@@ -130,11 +145,12 @@ jobs:
             echo "WAZUH_EXPORT_PATH=inputs/wazuh_bundle.json" >> "${GITHUB_ENV}"
           fi
           # Greenbone is a scan export; any age is accepted (findings carry their own scan
-          # timestamp), but the age is printed above. CSV preferred, XML accepted.
-          if bash .github/scripts/fetch-input.sh inputs/greenbone_report.csv inputs/greenbone_report.csv 0; then
-            echo "GREENBONE_EXPORT_PATH=inputs/greenbone_report.csv" >> "${GITHUB_ENV}"
-          elif bash .github/scripts/fetch-input.sh inputs/greenbone_report.xml inputs/greenbone_report.xml 0; then
+          # timestamp), but the age is printed above. The bastion's automated XML export is
+          # preferred; a hand-uploaded CSV is the fallback.
+          if bash .github/scripts/fetch-input.sh inputs/greenbone_report.xml inputs/greenbone_report.xml 0; then
             echo "GREENBONE_EXPORT_PATH=inputs/greenbone_report.xml" >> "${GITHUB_ENV}"
+          elif bash .github/scripts/fetch-input.sh inputs/greenbone_report.csv inputs/greenbone_report.csv 0; then
+            echo "GREENBONE_EXPORT_PATH=inputs/greenbone_report.csv" >> "${GITHUB_ENV}"
           fi
           echo "DECLARED_SERVICES_PATH=core/declared/loanease_sandbox_services.json" >> "${GITHUB_ENV}"
           echo "SNAPSHOT_STORE_PATH=data/snapshots" >> "${GITHUB_ENV}"

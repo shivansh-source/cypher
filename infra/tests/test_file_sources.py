@@ -62,6 +62,8 @@ def test_greenbone_reads_report_export_including_log_results(
 
     fragments = GreenboneConnector().run()
 
+    # The fixture also nests a <detection><result> inside a finding; that is not a finding.
+    assert len(fragments) == 2
     by_asset = {f["asset_id"]: f["findings"][0] for f in fragments}
     assert set(by_asset) == {"host:192.0.2.10", "host:192.0.2.20"}
     banner = by_asset["host:192.0.2.10"]

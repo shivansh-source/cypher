@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Daily export of Wazuh host data from the bastion to S3 (inputs/wazuh_bundle.json).
+# Export of Wazuh host data from the bastion to S3 (inputs/wazuh_bundle.json).
 #
-# Runs as root from cron on the Wazuh manager host (see suraksha-export.cron). Needs the AWS
+# Runs as root on the Wazuh manager host, normally via refresh_host_data.sh. Needs the AWS
 # CLI and an instance profile allowing s3:PutObject on inputs/* (terraform module "pipeline").
 # The bundle builder must sit next to this script: build_wazuh_bundle.py (stdlib only).
 #

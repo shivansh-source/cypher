@@ -1,3 +1,0 @@
-# Install as /etc/cron.d/suraksha-export on the bastion (see README.md).
-# 20:00 UTC daily, one hour before the scheduled-ingest workflow (21:00 UTC).
-0 20 * * * root . /etc/default/suraksha-export && /opt/suraksha/export_host_data.sh >>/var/log/suraksha-export.log 2>&1
