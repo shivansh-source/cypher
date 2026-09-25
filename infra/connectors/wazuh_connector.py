@@ -42,6 +42,11 @@ _WAZUH_INDEXER_USERNAME_ENV = "WAZUH_INDEXER_USERNAME"
 _WAZUH_INDEXER_PASSWORD_ENV = "WAZUH_INDEXER_PASSWORD"
 _WAZUH_EXPORT_PATH_ENV = "WAZUH_EXPORT_PATH"
 
+#: Agent statuses meaning "enrolled but never actually connected" (the manager API spells it
+#: with an underscore, ``agent_control -l`` with a space). Such a registration is not an
+#: installed agent, so it must not be reported as EDR coverage.
+_NEVER_CONNECTED_STATUSES = ("never_connected", "never connected")
+
 
 class WazuhConnectorError(RuntimeError):
     """Raised when a call to the Wazuh manager or indexer API fails.
@@ -312,6 +317,10 @@ class WazuhConnector(Connector):
             out of scope here (``greenbone_connector.py`` already covers
             CVE findings for this deployment).
 
+        An agent that enrolled but never connected produces no fragment: a
+        bare registration (for example one left by a scanner probing an
+        unauthenticated enrolment service) is not an installed agent.
+
         Must never:
             Report ``agent_installed: true`` for a host with no
             corresponding Wazuh agent record, or infer ``agent_healthy``
@@ -325,6 +334,8 @@ class WazuhConnector(Connector):
             agent = entry.get("agent", {}) if isinstance(entry, dict) else {}
             agent_id = agent.get("id")
             status = agent.get("status")
+            if status in _NEVER_CONNECTED_STATUSES:
+                continue
             identity_source = agent.get("ip") or agent.get("name")
             if not identity_source:
                 raise WazuhConnectorError(

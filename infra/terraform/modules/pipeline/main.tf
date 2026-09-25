@@ -12,6 +12,18 @@ data "aws_iam_openid_connect_provider" "github" {
 
 locals {
   bucket_arn = "arn:aws:s3:::${var.bucket_name}"
+  repo_owner = split("/", var.github_repo)[0]
+  repo_name  = split("/", var.github_repo)[1]
+
+  # GitHub's OIDC `sub` claim now embeds the numeric owner and repo ids
+  # (repo:<owner>@<owner_id>/<repo>@<repo_id>:ref:...). Accept that form, which stays tied to
+  # this exact repo even if the name were reused, plus the plain-name form for older tokens.
+  github_subjects = concat(
+    ["repo:${var.github_repo}:ref:refs/heads/${var.github_branch}"],
+    var.github_owner_id != "" && var.github_repo_id != "" ? [
+      "repo:${local.repo_owner}@${var.github_owner_id}/${local.repo_name}@${var.github_repo_id}:ref:refs/heads/${var.github_branch}"
+    ] : []
+  )
 }
 
 # ---- GitHub Actions: scan (read-only AWS) + ingest (S3 read/write) ------------------------
@@ -28,7 +40,7 @@ resource "aws_iam_role" "gha_ingest" {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           # Only this repo's default branch, so a fork or PR branch can never assume it.
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:ref:refs/heads/${var.github_branch}"
+          "token.actions.githubusercontent.com:sub" = local.github_subjects
         }
       }
     }]

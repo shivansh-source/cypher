@@ -46,6 +46,17 @@ variable "github_branch" {
   default = "main"
 }
 
+# Read from the `sub` claim GitHub actually sends: repo:<owner>@<owner_id>/<repo>@<repo_id>:...
+variable "github_owner_id" {
+  type    = string
+  default = "174698756"
+}
+
+variable "github_repo_id" {
+  type    = string
+  default = "1376466134"
+}
+
 variable "bastion_instance_type" {
   type    = string
   default = "m7i-flex.large"
