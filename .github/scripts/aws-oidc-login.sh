@@ -14,6 +14,18 @@ token=$(curl -sS --fail \
   "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r '.value')
 echo "::add-mask::${token}"
 
+# Print the claims AWS will check against the role's trust policy (issuer, audience, subject,
+# ref). They identify the run, not authenticate it, so they are safe to log; the token itself
+# stays masked. An AccessDenied below almost always means `sub` differs from the trust rule.
+claims=$(printf '%s' "${token}" | python3 -c '
+import base64, json, sys
+payload = sys.stdin.read().split(".")[1]
+payload += "=" * (-len(payload) % 4)
+c = json.loads(base64.urlsafe_b64decode(payload))
+print({k: c.get(k) for k in ("iss", "aud", "sub", "ref", "event_name")})
+')
+echo "OIDC token claims: ${claims}"
+
 creds=$(aws sts assume-role-with-web-identity \
   --role-arn "${AWS_ROLE_ARN}" \
   --role-session-name "suraksha-ingest-${GITHUB_RUN_ID}" \
