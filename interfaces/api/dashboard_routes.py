@@ -390,9 +390,7 @@ def optimize_plan_route() -> Any:
         cached = _PLAN_CACHE.get(snapshot_id)
         if cached is not None:
             return cached
-        plan = prioritize_controls(
-            snapshot, find_control_gaps(snapshot), max_steps=_MAX_PLAN_STEPS
-        )
+        plan = prioritize_controls(snapshot, find_control_gaps(snapshot), max_steps=_MAX_PLAN_STEPS)
         response = {"snapshot_id": snapshot_id, **asdict(plan)}
         if len(_PLAN_CACHE) >= _PLAN_CACHE_SIZE:
             _PLAN_CACHE.pop(next(iter(_PLAN_CACHE)))

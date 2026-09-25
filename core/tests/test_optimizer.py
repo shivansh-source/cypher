@@ -347,6 +347,7 @@ def test_remediating_a_finding_removes_its_loss_and_leaves_the_input_untouched()
 def test_fixing_one_finding_leaves_other_scenarios_draws_unchanged() -> None:
     """Common random numbers survive removing a scenario: the other scenario's loss is identical."""
     snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    snapshot["assets"][1]["network"]["internet_facing"] = True
     fix_web = _gap(snapshot, "remediate_finding::asset-web-01::finding-0001", 0.0)
     fix_hr = _gap(snapshot, "remediate_finding::asset-hr-db-01::finding-0002", 0.0)
 
@@ -499,6 +500,7 @@ def test_priority_plan_orders_by_marginal_reduction_and_is_joint() -> None:
 
 def test_priority_plan_respects_max_steps_and_flags_truncation() -> None:
     snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    snapshot["assets"][1]["network"]["internet_facing"] = True
 
     plan = prioritize_controls(snapshot, find_control_gaps(snapshot), max_steps=1)
 

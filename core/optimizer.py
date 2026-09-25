@@ -35,6 +35,7 @@ from core.engine import (
     compute_risk_figure,
     parameterize_scenario,
 )
+from core.engine.attack_graph_inference import compute_graph_reachability
 
 # The engine's own rules for "is this control observed active on this
 # asset" and "what backup posture does this service have" — imported rather
@@ -450,8 +451,11 @@ class _ExpectedLossEstimator:
         key = frozenset(control.control_id for control in controls)
         if key not in self._estimates:
             hypothetical = apply_controls_to_snapshot(self._snapshot, list(controls))
+            reachability = compute_graph_reachability(hypothetical)
             self._estimates[key] = sum(
-                _scenario_expected_loss(parameterize_scenario(scenario, hypothetical))
+                _scenario_expected_loss(
+                    parameterize_scenario(scenario, hypothetical, graph_reachability=reachability)
+                )
                 for scenario in build_loss_event_scenarios(hypothetical)
             )
         return self._estimates[key]
