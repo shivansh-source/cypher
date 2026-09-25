@@ -5,6 +5,7 @@ import { AskSurakshaTrigger } from "./AskSuraksha";
 
 const VIEWS: { prefix: string; eyebrow: string; title: string }[] = [
   { prefix: "/assets", eyebrow: "Technical view", title: "Assets & findings" },
+  { prefix: "/attack-paths", eyebrow: "Threat view", title: "Attack paths" },
   { prefix: "/investment", eyebrow: "Budget decision", title: "Investment optimization" },
   { prefix: "/compliance", eyebrow: "Governance view", title: "Compliance & frameworks" },
   { prefix: "/data-quality", eyebrow: "Provenance view", title: "Data quality & coverage" },

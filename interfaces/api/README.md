@@ -72,6 +72,8 @@ or put a shared store behind `ai.sessions.InMemorySessionStore`'s interface.
 | `GET` | `/snapshot` | Current snapshot's provenance: ids, bitemporal fields, `scan_scope`, counts |
 | `GET` | `/snapshot/gates` | The five quality gates, re-run on the current snapshot and its predecessor |
 | `GET` | `/assets` | Every asset: posture, findings, and each open finding's FAIR parameters and EAL |
+| `GET` | `/attack-graph` | Segments, directed segment links, and every asset's role and attack routes in (`core.engine.attack_graph*`, same seed as `/exposure`) |
+| `GET` | `/attack-graph/targets/{asset_id}` | One asset's bounded subgraph, simulated with every entry point attacked at once; `409` when its segment is unknown |
 | `GET` | `/frameworks` | Every control library in force, with its statutory penalty ceilings |
 | `GET` | `/frameworks/{framework}/status` | Control-by-control status and weighted score (via `ai.tools.get_framework_status`) |
 | `POST` | `/simulate` | What-if: joint re-simulation of hypothetical controls (via `ai.tools.simulate_scenario`) |

@@ -22,6 +22,8 @@ import { demoResult, demoUnavailable } from "./demo-data";
 import { parseSseFrames } from "./sse";
 import type {
   AssetsResponse,
+  AttackGraphResponse,
+  AttackGraphTarget,
   AssumptionEntry,
   ChatResponse,
   ChatStreamFinal,
@@ -225,6 +227,20 @@ export async function fetchControlGaps(): Promise<ApiResult<ControlCandidates>> 
 export async function fetchPriorityPlan(): Promise<ApiResult<PriorityPlan>> {
   if (DEMO_MODE) return demoUnavailable("the priority plan");
   return request<PriorityPlan>("/optimize/plan");
+}
+
+/** The attack graph's segments, directed segment links, and every asset's routes in. */
+export async function fetchAttackGraph(): Promise<ApiResult<AttackGraphResponse>> {
+  if (DEMO_MODE) return demoUnavailable("the attack graph");
+  return request<AttackGraphResponse>("/attack-graph");
+}
+
+/** One asset's bounded subgraph, simulated with every entry point attacked at once. */
+export async function fetchAttackGraphTarget(
+  assetId: string,
+): Promise<ApiResult<AttackGraphTarget>> {
+  if (DEMO_MODE) return demoUnavailable("attack graph inference");
+  return request<AttackGraphTarget>(`/attack-graph/targets/${encodeURIComponent(assetId)}`);
 }
 
 /** Every constant in core/assumptions.py with its documented rationale. */

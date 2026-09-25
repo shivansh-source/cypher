@@ -27,6 +27,18 @@ const LINKS: { href: string; label: string; icon: ReactNode }[] = [
     ),
   },
   {
+    href: "/attack-paths",
+    label: "Attack paths",
+    icon: (
+      <>
+        <circle cx="5" cy="6" r="2" />
+        <circle cx="12" cy="18" r="2" />
+        <circle cx="19" cy="8" r="2" />
+        <path d="M6.2 7.8l4.6 8.4M13.6 16.8l4.2-7" />
+      </>
+    ),
+  },
+  {
     href: "/investment",
     label: "Investment",
     icon: (

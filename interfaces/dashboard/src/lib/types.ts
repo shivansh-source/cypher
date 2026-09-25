@@ -105,6 +105,10 @@ export interface ScenarioParameters {
   exploit_probability: number;
   active_control_resistances: Record<string, number>;
   vulnerability: number;
+  /** True when the attack graph replaced this asset's own threat event frequency. */
+  graph_reachability_applied?: boolean;
+  /** The routes that frequency was summed over; empty unless the graph applied. */
+  attack_routes?: { entry_asset_id: string; share: number; reach_probability: number }[];
   loss_event_frequency: PertEstimate;
   criticality_tier: string;
   backup_posture: string;
@@ -149,7 +153,7 @@ export interface AssetView {
   service_ids: string[];
   services: Service[];
   unresolved_service_ids: string[];
-  network: { internet_facing: boolean | null; open_ports: number[] | null } | null;
+  network: { internet_facing: boolean | null; open_ports: number[] | null; segment_id?: string | null } | null;
   edr: {
     agent_installed: boolean;
     agent_healthy: boolean | null;
@@ -386,4 +390,75 @@ export interface ChatToolResultEvent {
   tool_name: string;
   status: ChatToolCall["status"];
   detail: string | null;
+}
+
+/** One way into an asset, from `core.engine.attack_graph.AttackRoute`. */
+export interface AttackRoute {
+  entry_asset_id: string;
+  entry_exposure_profile: string;
+  /** P(a campaign starting at this entry point reaches the asset). */
+  reach_probability: number;
+  /** Per open finding: P(reached | that finding's exploit works). */
+  reach_given_finding: Record<string, number>;
+  /** This route's fraction of all campaigns that reach the asset. */
+  share: number;
+}
+
+/**
+ * - `entry` — internet-facing; attacked directly.
+ * - `reachable` — at least one route in from an entry point.
+ * - `unreachable` — topology known, and no entry point has a path to it.
+ * - `unknown` — no segment reported; the graph cannot say (never "unreachable").
+ */
+export type AttackGraphRole = "entry" | "reachable" | "unreachable" | "unknown";
+
+export interface AttackGraphNode {
+  asset_id: string;
+  segment_id: string | null;
+  internet_facing: boolean;
+  role: AttackGraphRole;
+  open_finding_count: number;
+  kev_finding_count: number;
+  routes: AttackRoute[];
+}
+
+export interface AttackGraphSegment {
+  segment_id: string;
+  name: string;
+  /** False when assets report this segment but `network_topology` does not declare it. */
+  declared: boolean;
+  asset_ids: string[];
+}
+
+export interface AttackGraphEdge {
+  source_asset_id: string;
+  target_asset_id: string;
+  /** e.g. `same_segment:dmz` or `segment_reachability:dmz->app`. */
+  reason: string;
+}
+
+/** `GET /attack-graph`. */
+export interface AttackGraphResponse {
+  snapshot_id: string;
+  observed_at: string;
+  samples: number;
+  topology_declared: boolean;
+  segments: AttackGraphSegment[];
+  segment_links: { from_segment_id: string; to_segment_id: string }[];
+  edge_count: number;
+  /** Directed asset-to-asset edges, from `core.engine.attack_graph.build_attack_graph`. */
+  edges: AttackGraphEdge[];
+  nodes: AttackGraphNode[];
+}
+
+/** `GET /attack-graph/targets/{asset_id}` — worst case: every entry point attacked at once. */
+export interface AttackGraphTarget {
+  snapshot_id: string;
+  asset_id: string;
+  samples: number;
+  included_asset_ids: string[];
+  compromise_probability: number;
+  node_probabilities: Record<string, number>;
+  reached_probabilities: Record<string, number>;
+  edges: AttackGraphEdge[];
 }

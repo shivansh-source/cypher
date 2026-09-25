@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
+import { useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useAgentPanelOpen, useAgentPanelWidth } from "@/lib/agent-panel-state";
 import { AskSurakshaPanel } from "./AskSuraksha";
 import { Nav } from "./Nav";
@@ -51,16 +52,34 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
+/**
+ * Routes whose page is a full-bleed canvas: the sidebar starts collapsed there
+ * on every visit, and toggling it only lasts for that visit — the viewer's
+ * saved preference for every other page is left alone.
+ */
+const CANVAS_ROUTES = ["/attack-paths"];
+
 /** The app frame: collapsible sidebar (brand, nav, current snapshot) beside the page. */
 export function AppShell({ children }: { children: ReactNode }) {
-  const collapsed = useSyncExternalStore(subscribe, readCollapsed, () => false);
+  const pathname = usePathname();
+  const canvas = CANVAS_ROUTES.some((route) => pathname.startsWith(route));
+  const stored = useSyncExternalStore(subscribe, readCollapsed, () => false);
+  const [expandedOnCanvas, setExpandedOnCanvas] = useState(false);
+  // Leaving a canvas route forgets the temporary expansion, so the next visit
+  // starts collapsed again (state adjusted during render, not in an effect).
+  const [lastPath, setLastPath] = useState(pathname);
+  if (lastPath !== pathname) {
+    setLastPath(pathname);
+    if (expandedOnCanvas) setExpandedOnCanvas(false);
+  }
+  const collapsed = canvas ? !expandedOnCanvas : stored;
   const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
   const agentOpen = useAgentPanelOpen();
   const agentWidth = useAgentPanelWidth();
 
   return (
     <div
-      className={`app${collapsed ? " collapsed" : ""}${agentOpen ? " agent-open" : ""}`}
+      className={`app${collapsed ? " collapsed" : ""}${agentOpen ? " agent-open" : ""}${canvas ? " canvas-route" : ""}`}
       style={{ "--panel-w": `${agentOpen ? agentWidth : 0}px` } as CSSProperties}
     >
       <aside className="side">
@@ -82,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             aria-expanded={!collapsed}
             aria-controls="sideNav"
             title={label}
-            onClick={() => writeCollapsed(!collapsed)}
+            onClick={() => (canvas ? setExpandedOnCanvas(collapsed) : writeCollapsed(!collapsed))}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M14.5 6.5L9 12l5.5 5.5" />
