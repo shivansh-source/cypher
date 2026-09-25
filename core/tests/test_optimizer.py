@@ -17,12 +17,16 @@ import pytest
 from core.engine import compute_risk_figure
 from core.optimizer import (
     APPLICABLE_CONTROL_CATEGORIES,
+    RESISTANCE_CONTROL_CATEGORIES,
     Control,
     _derive_comparison_seed,
+    _reduction_per_rupee,
+    _Search,
     apply_controls_to_snapshot,
     compare_hypothetical,
     evaluate_portfolio,
     find_control_gaps,
+    prioritize_controls,
     recommend_portfolio,
 )
 
@@ -224,13 +228,43 @@ def test_empty_candidate_controls_yields_zero_risk_reduction() -> None:
 
 def test_find_control_gaps_lists_only_controls_the_engine_does_not_credit() -> None:
     """asset-web-01 has MFA and a healthy EDR agent; asset-hr-db-01 has neither."""
-    gaps = find_control_gaps(copy.deepcopy(SAMPLE_SNAPSHOT))
+    gaps = [
+        g
+        for g in find_control_gaps(copy.deepcopy(SAMPLE_SNAPSHOT))
+        if g.control_category in RESISTANCE_CONTROL_CATEGORIES
+    ]
 
     assert {(g.control_category, tuple(g.affected_asset_ids)) for g in gaps} == {
         ("mfa_enforced", ("asset-hr-db-01",)),
         ("edr_active", ("asset-hr-db-01",)),
     }
     assert all(g.control_id == f"{g.control_category}::{g.affected_asset_ids[0]}" for g in gaps)
+
+
+def test_find_control_gaps_lists_every_open_finding_and_weak_backup() -> None:
+    """Each open finding is one fix; a service with no backup is one hardening."""
+    gaps = find_control_gaps(copy.deepcopy(SAMPLE_SNAPSHOT))
+
+    fixes = {
+        (g.affected_asset_ids[0], g.finding_id)
+        for g in gaps
+        if g.control_category == "remediate_finding"
+    }
+    backups = {
+        g.service_id: g.affected_asset_ids for g in gaps if g.control_category == "harden_backup"
+    }
+    assert fixes == {("asset-web-01", "finding-0001"), ("asset-hr-db-01", "finding-0002")}
+    # svc-core-banking already has a tested, immutable backup; svc-internal-hr has none.
+    assert backups == {"svc-internal-hr": ["asset-hr-db-01"]}
+
+
+def test_remediated_finding_is_not_a_candidate() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    snapshot["assets"][0]["findings"][0]["remediated_at"] = "2026-09-19T00:00:00Z"
+
+    ids = {g.finding_id for g in find_control_gaps(snapshot)}
+
+    assert "finding-0001" not in ids
 
 
 def test_unknown_mfa_posture_is_a_gap_not_a_pass() -> None:
@@ -249,10 +283,7 @@ def test_every_applicable_category_applies_and_closes_its_gap() -> None:
     gaps = find_control_gaps(snapshot)
     assert {g.control_category for g in gaps} == set(APPLICABLE_CONTROL_CATEGORIES)
 
-    closed = apply_controls_to_snapshot(
-        snapshot,
-        [Control(g.control_id, g.control_category, 0.0, list(g.affected_asset_ids)) for g in gaps],
-    )
+    closed = apply_controls_to_snapshot(snapshot, [g.priced(0.0) for g in gaps])
 
     assert find_control_gaps(closed) == []
 
@@ -289,3 +320,201 @@ def test_compare_hypothetical_refuses_a_what_if_that_changes_nothing(
 ) -> None:
     with pytest.raises(ValueError):
         compare_hypothetical(copy.deepcopy(SAMPLE_SNAPSHOT), controls)
+
+
+def _gap(snapshot: dict[str, Any], control_id: str, cost: float) -> Control:
+    return next(g for g in find_control_gaps(snapshot) if g.control_id == control_id).priced(cost)
+
+
+def test_remediating_a_finding_removes_its_loss_and_leaves_the_input_untouched() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    reference = copy.deepcopy(snapshot)
+    fix = _gap(snapshot, "remediate_finding::asset-web-01::finding-0001", 0.0)
+
+    baseline = evaluate_portfolio(snapshot, [])
+    fixed = evaluate_portfolio(snapshot, [fix])
+
+    assert snapshot == reference
+    assert fixed.expected_annual_loss_inr < baseline.expected_annual_loss_inr
+    web = next(
+        a
+        for a in apply_controls_to_snapshot(snapshot, [fix])["assets"]
+        if a["asset_id"] == "asset-web-01"
+    )
+    assert web["findings"][0]["remediated_at"] == snapshot["observed_at"]
+
+
+def test_fixing_one_finding_leaves_other_scenarios_draws_unchanged() -> None:
+    """Common random numbers survive removing a scenario: the other scenario's loss is identical."""
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    fix_web = _gap(snapshot, "remediate_finding::asset-web-01::finding-0001", 0.0)
+    fix_hr = _gap(snapshot, "remediate_finding::asset-hr-db-01::finding-0002", 0.0)
+
+    only_hr_left = evaluate_portfolio(snapshot, [fix_web])
+    only_web_left = evaluate_portfolio(snapshot, [fix_hr])
+    baseline = evaluate_portfolio(snapshot, [])
+
+    assert (
+        only_hr_left.expected_annual_loss_inr + only_web_left.expected_annual_loss_inr
+        == pytest.approx(baseline.expected_annual_loss_inr, rel=1e-9)
+    )
+
+
+@pytest.mark.parametrize(
+    "control",
+    [
+        Control(
+            "fix a ghost", "remediate_finding", 0.0, ["asset-web-01"], finding_id="finding-nope"
+        ),
+        Control("fix nothing", "remediate_finding", 0.0, ["asset-web-01"]),
+        Control("harden a ghost", "harden_backup", 0.0, ["asset-web-01"], service_id="svc-nope"),
+        Control(
+            "harden what is already hard",
+            "harden_backup",
+            0.0,
+            ["asset-web-01"],
+            service_id="svc-core-banking",
+        ),
+    ],
+)
+def test_a_change_that_changes_nothing_is_refused(control: Control) -> None:
+    with pytest.raises(ValueError):
+        apply_controls_to_snapshot(copy.deepcopy(SAMPLE_SNAPSHOT), [control])
+
+
+def test_already_remediated_finding_cannot_be_fixed_again() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    fix = _gap(snapshot, "remediate_finding::asset-web-01::finding-0001", 0.0)
+    snapshot["assets"][0]["findings"][0]["remediated_at"] = "2026-09-19T00:00:00Z"
+
+    with pytest.raises(ValueError, match="already remediated"):
+        apply_controls_to_snapshot(snapshot, [fix])
+
+
+def test_hardening_a_missing_backup_reduces_loss() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    harden = _gap(snapshot, "harden_backup::svc-internal-hr", 0.0)
+
+    assert (
+        evaluate_portfolio(snapshot, [harden]).expected_annual_loss_inr
+        < evaluate_portfolio(snapshot, []).expected_annual_loss_inr
+    )
+
+
+def test_control_on_an_asset_whose_findings_are_fixed_is_rejected_as_no_reduction() -> None:
+    """Overlap: once hr-db's only finding is fixed, MFA there protects nothing modelled."""
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    fix_hr = _gap(snapshot, "remediate_finding::asset-hr-db-01::finding-0002", 1.0)
+    mfa_hr = _gap(snapshot, "mfa_enforced::asset-hr-db-01", 1.0)
+
+    recommendation = recommend_portfolio(snapshot, [fix_hr, mfa_hr], budget_inr=10.0)
+
+    assert [c.control_id for c in recommendation.selected_controls] == [fix_hr.control_id]
+    assert [(r.control.control_id, r.reason) for r in recommendation.rejected] == [
+        (mfa_hr.control_id, "no_reduction")
+    ]
+
+
+def test_one_expensive_control_beats_many_cheap_small_ones() -> None:
+    """The knapsack guard: greedy-by-ratio alone would spend the budget on cheap, small wins."""
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    fix_web = _gap(snapshot, "remediate_finding::asset-web-01::finding-0001", 10_000.0)
+    small = [
+        _gap(snapshot, "mfa_enforced::asset-hr-db-01", 1.0),
+        _gap(snapshot, "edr_active::asset-hr-db-01", 1.0),
+    ]
+    budget = 10_000.0  # the fix alone fits; the fix plus anything else does not
+    search = _Search(snapshot)
+    evaluator = search.evaluate
+    ratio_only = search.greedy([*small, fix_web], budget_inr=budget, priority=_reduction_per_rupee)
+    # Premise: ratio-greedy alone takes the cheap controls and then cannot afford the fix,
+    # although the fix on its own is worth far more than both of them together.
+    assert fix_web.control_id not in {c.control_id for c in ratio_only}
+    assert (
+        evaluator([fix_web]).expected_annual_loss_inr
+        < evaluator(ratio_only).expected_annual_loss_inr
+    )
+
+    recommendation = recommend_portfolio(snapshot, [*small, fix_web], budget)
+
+    assert [c.control_id for c in recommendation.selected_controls] == [fix_web.control_id]
+    assert recommendation.total_cost_inr <= budget
+
+
+def test_steps_are_joint_and_add_up_to_the_portfolio_reduction() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    candidates = [g.priced(10_000.0) for g in find_control_gaps(snapshot)]
+
+    recommendation = recommend_portfolio(snapshot, candidates, budget_inr=1_000_000.0)
+
+    assert recommendation.steps
+    assert recommendation.steps[-1].expected_annual_loss_inr == pytest.approx(
+        recommendation.post_investment_risk_figure.expected_annual_loss_inr
+    )
+    assert sum(s.marginal_reduction_inr for s in recommendation.steps) == pytest.approx(
+        recommendation.risk_reduction_inr
+    )
+    for i, step in enumerate(recommendation.steps):
+        prefix = [s.control for s in recommendation.steps[: i + 1]]
+        assert (
+            step.expected_annual_loss_inr
+            == evaluate_portfolio(snapshot, prefix).expected_annual_loss_inr
+        )
+    selected = {c.control_id for c in recommendation.selected_controls}
+    assert selected | {r.control.control_id for r in recommendation.rejected} == {
+        c.control_id for c in candidates
+    }
+
+
+def test_budget_below_every_cost_selects_nothing_and_says_why() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    candidates = [g.priced(50_000.0) for g in find_control_gaps(snapshot)]
+
+    recommendation = recommend_portfolio(snapshot, candidates, budget_inr=1_000.0)
+
+    assert recommendation.selected_controls == []
+    assert recommendation.risk_reduction_inr == 0.0
+    assert {r.reason for r in recommendation.rejected} == {"over_budget"}
+
+
+def test_priority_plan_orders_by_marginal_reduction_and_is_joint() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    gaps = find_control_gaps(snapshot)
+
+    plan = prioritize_controls(snapshot, gaps)
+
+    assert plan.steps
+    reductions = [s.marginal_reduction_inr for s in plan.steps]
+    assert all(r > 0 for r in reductions)
+    assert reductions == sorted(reductions, reverse=True)
+    joint = evaluate_portfolio(snapshot, [s.gap.priced(0.0) for s in plan.steps])
+    assert plan.steps[-1].expected_annual_loss_inr == joint.expected_annual_loss_inr
+    assert sum(reductions) == pytest.approx(
+        plan.baseline_risk_figure.expected_annual_loss_inr - joint.expected_annual_loss_inr
+    )
+    assert not plan.truncated
+    planned = {s.gap.control_id for s in plan.steps} | {g.control_id for g in plan.no_effect}
+    assert planned == {g.control_id for g in gaps}
+
+
+def test_priority_plan_respects_max_steps_and_flags_truncation() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+
+    plan = prioritize_controls(snapshot, find_control_gaps(snapshot), max_steps=1)
+
+    assert len(plan.steps) == 1
+    assert plan.truncated
+
+
+def test_search_estimate_matches_the_simulated_expected_loss() -> None:
+    """The closed form that orders the search must agree with the Monte Carlo it stands in for.
+
+    If an engine change made them drift apart, the search would quietly try
+    candidates in the wrong order; this pins them together (to within
+    sampling error at the engine's iteration count).
+    """
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    search = _Search(snapshot)
+    for controls in ([], [_mfa_control("asset-hr-db-01")], [_edr_control("asset-hr-db-01")]):
+        simulated = search.evaluate(controls).expected_annual_loss_inr
+        assert search.estimate(controls) == pytest.approx(simulated, rel=0.05)

@@ -164,10 +164,10 @@ def _build_specs() -> dict[str, ToolSpec]:
                 "type": "object",
                 "properties": {
                     "scope": {
-                        "type": "string",
+                        "type": ["string", "null"],
                         "description": (
                             "Optional service_id or asset_id to restrict the figure "
-                            "to. Omit for the whole estate."
+                            "to. Omit, or pass null, for the whole estate."
                         ),
                     }
                 },
@@ -188,10 +188,10 @@ def _build_specs() -> dict[str, ToolSpec]:
                 "type": "object",
                 "properties": {
                     "limit": {
-                        "type": "integer",
+                        "type": ["integer", "null"],
                         "minimum": 1,
                         "maximum": 50,
-                        "description": "How many contributors to return, largest first.",
+                        "description": "How many contributors to return, largest first. Omit, or pass null, for the default.",
                     }
                 },
                 "required": [],
@@ -212,10 +212,10 @@ def _build_specs() -> dict[str, ToolSpec]:
                 "type": "object",
                 "properties": {
                     "asset_id": {
-                        "type": "string",
+                        "type": ["string", "null"],
                         "description": (
-                            "Optional single asset to scope to. Omit to summarize "
-                            "across the whole snapshot."
+                            "Optional single asset to scope to. Omit, or pass null, "
+                            "to summarize across the whole snapshot."
                         ),
                     }
                 },
@@ -265,11 +265,12 @@ def _build_specs() -> dict[str, ToolSpec]:
                         "description": "Total budget available, in INR.",
                     },
                     "candidate_control_ids": {
-                        "type": "array",
+                        "type": ["array", "null"],
                         "items": {"type": "string"},
                         "description": (
                             "Optional restriction to specific candidate controls. "
-                            "Omit to consider every control with cost/effect data."
+                            "Omit, or pass null, to consider every control with "
+                            "cost/effect data."
                         ),
                     },
                 },
@@ -308,6 +309,22 @@ def _build_specs() -> dict[str, ToolSpec]:
                                     "enum": list(APPLICABLE_CONTROL_CATEGORIES),
                                 },
                                 "estimated_cost_inr": {"type": "number"},
+                                "finding_id": {
+                                    "type": ["string", "null"],
+                                    "description": (
+                                        "For remediate_finding only: the open finding_id "
+                                        "(on one of affected_asset_ids) to treat as fixed. "
+                                        "Omit, or pass null, otherwise."
+                                    ),
+                                },
+                                "service_id": {
+                                    "type": ["string", "null"],
+                                    "description": (
+                                        "For harden_backup only: the service_id whose backup "
+                                        "becomes tested with an immutable copy. Omit, or pass "
+                                        "null, otherwise."
+                                    ),
+                                },
                                 "affected_asset_ids": {
                                     "type": "array",
                                     "items": {"type": "string"},
@@ -399,13 +416,25 @@ def _validate_arguments(spec: ToolSpec, arguments: dict[str, Any]) -> dict[str, 
     The model's arguments are untrusted input: an unexpected key would be a
     TypeError inside the wrapper, and a missing required key would be a
     silently wrong call.
+
+    An optional argument sent as an explicit ``null`` — some models emit
+    this instead of omitting the key entirely for an argument they are not
+    using — is dropped here rather than passed through as ``None``, so the
+    wrapper's own Python default applies exactly as it would if the key had
+    been omitted. (Every optional property's schema is declared nullable
+    precisely so a provider that validates tool-call arguments strictly
+    against the schema does not reject the call outright for doing this.)
     """
     properties: dict[str, Any] = spec.input_schema.get("properties", {})
     required: list[str] = spec.input_schema.get("required", [])
     missing = [key for key in required if key not in arguments]
     if missing:
         raise ValueError(f"missing required argument(s): {', '.join(missing)}")
-    return {key: value for key, value in arguments.items() if key in properties}
+    return {
+        key: value
+        for key, value in arguments.items()
+        if key in properties and not (value is None and key not in required)
+    }
 
 
 def execute_tool(tool_name: str, arguments: dict[str, Any]) -> ToolExecution:

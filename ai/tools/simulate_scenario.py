@@ -27,11 +27,15 @@ def _to_control(raw: dict[str, Any]) -> Control:
             f"hypothetical control {raw.get('control_id')!r} needs affected_asset_ids as a "
             "list of asset_id strings — call get_control_posture to find them"
         )
+    finding_id = raw.get("finding_id")
+    service_id = raw.get("service_id")
     return Control(
         control_id=str(raw["control_id"]),
         control_category=str(raw["control_category"]),
         estimated_cost_inr=float(raw.get("estimated_cost_inr") or 0.0),
         affected_asset_ids=list(affected),
+        finding_id=str(finding_id) if finding_id else None,
+        service_id=str(service_id) if service_id else None,
     )
 
 
