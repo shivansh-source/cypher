@@ -46,6 +46,15 @@ of data came from — see `CLAUDE.md` principle 3 at the repo root.
   never be read by `core/` or `governance/` — if a downstream module
   needs `provenance.connector` to decide behavior, that's principle 3 being
   violated.
+- **`network_topology` / `assets[].network.segment_id`** are optional and
+  additive, for attack-graph edge derivation in `core/engine/attack_graph.py`.
+  A snapshot with no `network_topology`, or an asset with a null
+  `segment_id`, means segment membership is **unknown** — this must be
+  treated as maximum uncertainty (could be adjacent to anything), never as
+  "isolated" or "no path in or out." `segment_reachability` is directional
+  and populated only from real topology visibility a connector actually
+  has; `core/` must never infer a reachability edge that wasn't explicitly
+  listed.
 
 ## Adding a new connector
 

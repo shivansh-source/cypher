@@ -20,6 +20,7 @@ from core.assumptions import (
     RTO_MULTIPLIER_BY_BACKUP_POSTURE,
     UNSCORED_EXPLOIT_PROBABILITY_SCALE_BY_CRITICALITY,
 )
+from core.engine.attack_graph import GraphReachability
 
 # Ordinal ranks used only to pick the worst-case tier/posture across an
 # asset's several related services — not a modelling judgement value itself
@@ -162,24 +163,80 @@ def _scale_pert(pert: dict[str, float], factor: float) -> dict[str, float]:
 
 
 def _describe_scenario(
-    scenario: dict[str, Any], exposure_profile: str, criticality_tier: str
+    scenario: dict[str, Any],
+    exposure_profile: str,
+    criticality_tier: str,
+    reachability: GraphReachability | None,
 ) -> str:
     finding = scenario["finding"]
     identifier = finding.get("cve_id") or finding["finding_id"]
-    return (
+    description = (
         f"{finding.get('type', 'finding')} {identifier} on {scenario['asset_id']} "
         f"({exposure_profile}, {criticality_tier}-tier service impact)"
     )
+    # Stated in the description itself so the dashboard, which shows
+    # top_contributors' descriptions as-is, surfaces why this figure moved
+    # once topology became known — never a silent change to the numbers.
+    if reachability is not None and not reachability.is_entry_point:
+        if reachability.routes:
+            routes = ", ".join(
+                f"{route.entry_asset_id} {route.share:.0%} (p={route.reach_probability:.3f})"
+                for route in reachability.routes
+            )
+            description += f"; reached via attack graph: {routes}"
+        else:
+            description += "; unreachable under the known network topology"
+    return description
 
 
-def parameterize_scenario(scenario: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
+def _graph_threat_event_frequency(
+    reachability: GraphReachability, finding_id: str
+) -> dict[str, float]:
+    """Attacks/year that reach this asset *and* find this finding workable, summed over routes.
+
+    Each route contributes its entry point's own baseline rate times the
+    probability a campaign from there reaches this asset given this
+    finding's exploit works. Separate entry points are separate streams of
+    campaigns, so their rates add — each keeps its own rate, rather than
+    every route borrowing the busiest one.
+    """
+    total = {"min": 0.0, "most_likely": 0.0, "max": 0.0}
+    for route in reachability.routes:
+        rate = BASELINE_THREAT_EVENT_FREQUENCY_PER_YEAR[route.entry_exposure_profile]
+        factor = route.reach_given_finding.get(finding_id, route.reach_probability)
+        for key in total:
+            total[key] += rate[key] * factor
+    return total
+
+
+def parameterize_scenario(
+    scenario: dict[str, Any],
+    snapshot: dict[str, Any],
+    *,
+    graph_reachability: dict[str, GraphReachability] | None = None,
+) -> dict[str, Any]:
     """Attach Open FAIR parameters (frequency, vulnerability, loss magnitude
     distributions) to a scenario, using snapshot data and named assumptions.
 
-    Loss Event Frequency is derived as Threat Event Frequency (looked up by
-    the asset's exposure profile) times Vulnerability (this finding's own
-    exploit probability, discounted by the asset's observed controls) — see
-    :func:`_exposure_profile` and :func:`_vulnerability_probability`. Loss
+    Loss Event Frequency is derived as Threat Event Frequency times
+    Vulnerability — see :func:`_exposure_profile` and
+    :func:`_vulnerability_probability`. Vulnerability is this finding's own
+    exploit probability, discounted by the asset's observed controls.
+
+    When the attack graph (``graph_reachability``) covers this asset and
+    the asset is reached only *through* the graph, Threat Event Frequency is
+    no longer the asset's own "internal" rate. It becomes, summed over every
+    route in (see :func:`_graph_threat_event_frequency`), each entry
+    point's rate times the probability a campaign from there reaches this
+    asset given this finding's exploit works. The "internal" rate was a
+    rough proxy for being hard to reach; the graph now measures that
+    directly, so using both would count the same difficulty twice. The
+    chain is then: attacks/year at each entry point x P(they reach this
+    asset) x P(this finding is exploited), summed across entry points.
+
+    An internet-facing asset and an asset with unknown topology (absent
+    from ``graph_reachability``) keep exactly the figures they had before
+    the attack graph existed. Loss
     Magnitude is derived from the worst-case criticality tier among the
     asset's related services, scaled by the worst-case backup posture among
     them — see :func:`_worst_criticality_tier` and
@@ -200,11 +257,19 @@ def parameterize_scenario(scenario: dict[str, Any], snapshot: dict[str, Any]) ->
         scenario: One scenario from
             :func:`core.engine.scenarios.build_loss_event_scenarios`.
         snapshot: The committed snapshot the scenario was derived from.
+        graph_reachability: ``{asset_id: GraphReachability}`` from
+            :func:`core.engine.attack_graph_inference.compute_graph_reachability`,
+            computed once per snapshot by the caller. None, or an asset
+            absent from it, means no graph adjustment.
 
     Returns:
         The scenario augmented with FAIR distribution parameters (e.g.
         threat event frequency, vulnerability/control resistance, primary
-        and secondary loss magnitude distributions).
+        and secondary loss magnitude distributions), plus
+        ``graph_reachability_applied`` and ``attack_routes`` (each route's
+        entry point, share and reach probability) — and a ``description``
+        that says so — so the graph's contribution to any figure is
+        visible, never silent.
 
     Must never:
         Use a bare numeric literal for any parameter — every constant must
@@ -216,7 +281,21 @@ def parameterize_scenario(scenario: dict[str, Any], snapshot: dict[str, Any]) ->
     related_services = _related_services(scenario, snapshot)
 
     exposure_profile = _exposure_profile(asset, related_services)
-    threat_event_frequency = BASELINE_THREAT_EVENT_FREQUENCY_PER_YEAR[exposure_profile]
+    reachability = (graph_reachability or {}).get(scenario["asset_id"])
+    graph_reachability_applied = reachability is not None and not reachability.is_entry_point
+    if reachability is not None and graph_reachability_applied:
+        threat_event_frequency = _graph_threat_event_frequency(reachability, finding["finding_id"])
+        attack_routes = [
+            {
+                "entry_asset_id": route.entry_asset_id,
+                "share": route.share,
+                "reach_probability": route.reach_probability,
+            }
+            for route in reachability.routes
+        ]
+    else:
+        threat_event_frequency = BASELINE_THREAT_EVENT_FREQUENCY_PER_YEAR[exposure_profile]
+        attack_routes = []
     exploit_probability = _exploit_probability(finding)
     active_control_resistances = _active_control_resistances(asset)
     vulnerability = _vulnerability_probability(finding, asset)
@@ -234,10 +313,14 @@ def parameterize_scenario(scenario: dict[str, Any], snapshot: dict[str, Any]) ->
         "threat_event_frequency": threat_event_frequency,
         "exploit_probability": exploit_probability,
         "active_control_resistances": active_control_resistances,
+        "graph_reachability_applied": graph_reachability_applied,
+        "attack_routes": attack_routes,
         "vulnerability": vulnerability,
         "criticality_tier": criticality_tier,
         "backup_posture": backup_posture,
         "loss_event_frequency": loss_event_frequency,
         "loss_magnitude": loss_magnitude,
-        "description": _describe_scenario(scenario, exposure_profile, criticality_tier),
+        "description": _describe_scenario(
+            scenario, exposure_profile, criticality_tier, reachability
+        ),
     }

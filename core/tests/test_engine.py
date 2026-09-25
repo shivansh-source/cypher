@@ -31,6 +31,7 @@ from core.engine import (
     parameterize_scenario,
     run_monte_carlo,
 )
+from core.engine.attack_graph_inference import compute_graph_reachability
 
 SAMPLE_SNAPSHOT: dict[str, Any] = json.loads(
     (Path(__file__).parents[2] / "schema" / "sample_aggregated.json").read_text()
@@ -380,7 +381,11 @@ def test_loss_exceedance_curve_reads_the_same_simulation_as_the_risk_figure() ->
     figure = compute_risk_figure(snapshot)
     curve = compute_loss_exceedance_curve(snapshot)
 
-    scenarios = [parameterize_scenario(s, snapshot) for s in build_loss_event_scenarios(snapshot)]
+    graph_reachability = compute_graph_reachability(snapshot)
+    scenarios = [
+        parameterize_scenario(s, snapshot, graph_reachability=graph_reachability)
+        for s in build_loss_event_scenarios(snapshot)
+    ]
     samples = run_monte_carlo(scenarios)["total_annual_loss_samples_inr"]
 
     assert curve.snapshot_id == figure.snapshot_id

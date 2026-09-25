@@ -401,3 +401,22 @@ DANGEROUS_INTERNET_FACING_PORTS: list[int] = [21, 22, 23, 445, 3306, 3389, 5432,
 # decommissions per snapshot interval) to set a tolerance that only trips
 # on a genuine aggregation defect, not routine change.
 ASSET_COUNT_DELTA_TOLERANCE_FRACTION: float = 0.5
+
+# ---------------------------------------------------------------------------
+# Bayesian attack graph inference
+# ---------------------------------------------------------------------------
+# ASSUMPTION: number of simulated attacks
+# core.engine.attack_graph_inference plays out per target asset to estimate
+# its reach probabilities. Exact inference on a Bayesian attack graph is
+# #P-complete (SIH105 project doc, Conflict Register item C5), so the module
+# estimates by simulation over a bounded subgraph instead — which also lets
+# findings sharing a CVE share one draw (Homer et al., 2013), something a
+# closed-form propagation formula cannot represent.
+# JUSTIFICATION: PLACEHOLDER — at 50,000 samples the standard error on a
+# reach probability near 0.26 is about 0.002 (about 0.8% relative), small
+# next to the uncertainty in every per-hop input. Not derived from a
+# required decision-precision analysis.
+# CALIBRATION: a convergence study, analogous to MONTE_CARLO_ITERATIONS's:
+# how far do reported route shares and the downstream EAL move between
+# runs at this count, for representative bounded-subgraph sizes?
+ATTACK_GRAPH_SAMPLES: int = 50_000

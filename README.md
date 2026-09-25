@@ -14,7 +14,8 @@ reduction, and maps the underlying findings to Indian regulatory frameworks
 **This repository is partially implemented.** `governance/`, `ai/`
 (LLM client, numeric guard, tool registry, chat assistant), `interfaces/api/`,
 `interfaces/dashboard/`, `core/` (the snapshot quality gates and store, the
-Open FAIR + Monte Carlo engine, and the joint-simulation optimizer), four of
+Open FAIR + Monte Carlo engine, the Bayesian attack graph that models
+multi-step "stepping-stone" attacks, and the joint-simulation optimizer), four of
 `infra/connectors/` (`wazuh_connector.py`, `greenbone_connector.py`,
 `prowler_connector.py`, `scoutsuite_connector.py`) and the `ingest` command in
 `interfaces/cli/riskctl.py` are real. Still signatures and docstrings only:
@@ -31,6 +32,18 @@ The one exception is `optimize_investment`: nothing in the system supplies
 candidate-control costs, so the assistant reports it as unavailable, and the
 dashboard's investment view asks the user to declare costs and calls the
 optimizer directly (`POST /optimize`). See `interfaces/api/README.md`.
+
+The attack graph only takes effect when a snapshot carries network
+segmentation (`network_topology` and `assets[].network.segment_id`, both
+optional — see `schema/README.md`). No connector populates those yet, so
+real snapshots are scored exactly as before until one does. When it applies,
+an internal asset is scored on its real paths in: for each internet-facing
+server that leads to it, how often that server is attacked times the chance
+an attacker gets from there to it, summed over those routes. Findings that
+share a CVE are treated as falling together. Every figure it changes says
+so in its description, with each route's percentage share ("reached via
+attack graph: asset-web-01 80% (p=0.263), …"), so a dashboard number that moves when topology
+arrives can always be traced to why. See `docs/ASSUMPTIONS.md`.
 
 ## Why rupees, and why not ML
 
