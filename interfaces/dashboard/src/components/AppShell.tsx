@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore, type ReactNode } from "react";
+import { useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useAgentPanelOpen, useAgentPanelWidth } from "@/lib/agent-panel-state";
+import { AskSurakshaPanel } from "./AskSuraksha";
 import { Nav } from "./Nav";
 import { SnapCard } from "./SnapCard";
 
@@ -53,9 +55,14 @@ function subscribe(listener: () => void): () => void {
 export function AppShell({ children }: { children: ReactNode }) {
   const collapsed = useSyncExternalStore(subscribe, readCollapsed, () => false);
   const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  const agentOpen = useAgentPanelOpen();
+  const agentWidth = useAgentPanelWidth();
 
   return (
-    <div className={`app${collapsed ? " collapsed" : ""}`}>
+    <div
+      className={`app${collapsed ? " collapsed" : ""}${agentOpen ? " agent-open" : ""}`}
+      style={{ "--panel-w": `${agentOpen ? agentWidth : 0}px` } as CSSProperties}
+    >
       <aside className="side">
         <div className="brand-wrap">
           <Link href="/" className="brand" aria-label="Su₹aksha — exposure overview">
@@ -89,6 +96,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
       {children}
+      <AskSurakshaPanel />
     </div>
   );
 }
