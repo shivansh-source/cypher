@@ -60,6 +60,8 @@ or put a shared store behind `ai.sessions.InMemorySessionStore`'s interface.
 |---|---|---|
 | `GET` | `/health` | `{"status": "ok"}` |
 | `GET` | `/health/snapshot-sync` | Last S3 snapshot-sync outcome (`enabled`, `last_success_at`, `last_error`); only active when `SNAPSHOT_S3_BUCKET` is set |
+| `GET` | `/snapshots` | Published snapshots, newest first (needs `X-Suraksha-Token`; see below) |
+| `GET` | `/snapshots/{snapshot_id}/download-url` | A short-lived signed S3 URL for one snapshot; `snapshot_id` is `current` or `sha256:<64 hex>` |
 | `POST` | `/chat` | A complete, guarded turn (below) |
 | `POST` | `/chat/stream` | The same turn as Server-Sent Events |
 | `GET` | `/chat/tools` | Every tool, with whether it can answer today |
@@ -173,3 +175,20 @@ store the `scheduled-ingest` workflow publishes to S3 (`interfaces/api/snapshot_
 `SNAPSHOT_S3_BUCKET` and the read-only `suraksha-api-reader` credentials, plus
 `CORS_ALLOWED_ORIGINS` (the dashboard's public origin). See `.env.example`. The dashboard, on
 Vercel, points `NEXT_PUBLIC_API_BASE_URL` at this service.
+
+### Signed snapshot links
+
+Raw snapshot JSON can be fetched straight from S3 without the API storing or relaying it:
+`GET /snapshots/{id}/download-url` returns a pre-signed URL (default 5 minutes). The routes
+refuse unless `SNAPSHOT_LINKS_TOKEN` is set and sent as `X-Suraksha-Token`. Snapshots hold real
+telemetry, so keep that token server-side (e.g. the dashboard's Next server, never a
+`NEXT_PUBLIC_` variable) and hand the browser only the short-lived URL.
+
+For a browser to fetch a signed URL directly, allow GET from the dashboard's origin on the bucket
+(one-off; the bucket is not Terraform-managed):
+
+```bash
+aws s3api put-bucket-cors --bucket loanease-raw-findings-f00321 --cors-configuration '{
+  "CORSRules": [{"AllowedMethods": ["GET"], "AllowedOrigins": ["https://<your-app>.vercel.app"],
+                 "AllowedHeaders": ["*"], "MaxAgeSeconds": 300}]}'
+```

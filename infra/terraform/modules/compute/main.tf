@@ -82,7 +82,10 @@ resource "aws_instance" "db" {
   tags = { Name = "loanease-db" }
 
   lifecycle {
-    ignore_changes = [ami]
+    # The root volume's Backup=true tag (what the V-06 DLM policy targets) is applied by
+    # aws_ec2_tag.db_volume_backup in modules/backup, not by this resource. Without ignoring
+    # the block's tags, every plan tries to strip it, silently removing the DB's snapshots.
+    ignore_changes = [ami, root_block_device[0].tags]
   }
 }
 
