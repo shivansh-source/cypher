@@ -69,10 +69,36 @@ def _derive_deterministic_seed(parameterized_scenarios: list[dict[str, Any]]) ->
     return int.from_bytes(digest[:8], byteorder="big") % (2**32)
 
 
+def _stream(seed: int, *key: str) -> np.random.Generator:
+    """An independent random stream for one named part of a simulation run.
+
+    Every scenario (and every shared control-health factor) draws from its
+    own stream, keyed by the run's seed plus a stable hash of its name,
+    instead of all of them consuming one sequential stream in list order.
+    With one sequential stream, removing a scenario or changing how many
+    draws one scenario makes shifts the draws of every scenario after it,
+    so two runs that differ in one place differ everywhere — which defeats
+    the common-random-numbers comparison ``core.optimizer`` relies on to
+    tell a control's real effect from sampling noise.
+
+    Args:
+        seed: The run's seed.
+        *key: Names identifying the stream, e.g. a scenario_id and a purpose.
+
+    Returns:
+        A generator whose draws depend only on ``seed`` and ``key``.
+    """
+    words = [
+        int.from_bytes(hashlib.sha256(part.encode("utf-8")).digest()[:8], byteorder="big")
+        for part in key
+    ]
+    return np.random.default_rng([seed, *words])
+
+
 def _sample_shared_control_health(
     parameterized_scenarios: list[dict[str, Any]],
     resolved_iterations: int,
-    rng: np.random.Generator,
+    seed: int,
 ) -> dict[str, np.ndarray]:
     """Sample each referenced shared latent control-health factor once per iteration.
 
@@ -83,6 +109,9 @@ def _sample_shared_control_health(
     together, inducing the positive correlation the SIH105 Notion doc's
     Conflict Register item C3 calls for, instead of each scenario drawing
     independent control noise.
+
+    Each category draws from its own stream (see :func:`_stream`), so
+    whether another category is referenced never changes its draws.
 
     Returns:
         A dict from control category to its ``(iterations,)`` sample array,
@@ -102,9 +131,9 @@ def _sample_shared_control_health(
             SHARED_CONTROL_HEALTH_PERT[category]["most_likely"],
             SHARED_CONTROL_HEALTH_PERT[category]["max"],
             resolved_iterations,
-            rng,
+            _stream(seed, "control_health", category),
         )
-        for category in referenced_categories
+        for category in sorted(referenced_categories)
     }
 
 
@@ -116,23 +145,26 @@ def _sample_scenario_rate(
 ) -> np.ndarray:
     """Sample this scenario's per-iteration loss event rate (events/year).
 
-    If the scenario has no active controls with a matching shared latent
-    factor, this is the simple case: sample directly from the scenario's
-    already-combined ``loss_event_frequency`` distribution, unchanged from
-    before shared-factor modelling existed.
+    The rate is built from the scenario's raw ``threat_event_frequency``
+    times a per-iteration vulnerability: ``exploit_probability`` net of each
+    active control's resistance, scaled by that iteration's shared health
+    draw for the control's category (a category with no shared factor keeps
+    its base resistance every iteration). With no active controls this is
+    exactly the scenario's ``loss_event_frequency`` distribution, since that
+    is ``threat_event_frequency`` scaled by the same vulnerability.
 
-    Otherwise, resistance for each affected control category is scaled by
-    that iteration's shared health draw before combining, and the rate is
-    rebuilt from the scenario's raw ``threat_event_frequency`` and
-    ``exploit_probability`` rather than the pre-combined
-    ``loss_event_frequency`` — because the latter already baked in a fixed,
-    independent resistance value that a shared per-iteration health draw
-    needs to be able to move.
+    Threat events are always drawn the same way, whatever controls are
+    active, so crediting or removing a control changes only this scenario's
+    vulnerability — never which threat-event draws it gets. That keeps a
+    what-if comparison on common random numbers.
+
+    A scenario without ``threat_event_frequency``/``exploit_probability``
+    (e.g. built by hand in a test) is sampled directly from its
+    ``loss_event_frequency``.
     """
     active_resistances: dict[str, float] = scenario.get("active_control_resistances", {})
-    correlated_categories = [c for c in active_resistances if c in shared_health_samples]
 
-    if not correlated_categories:
+    if "threat_event_frequency" not in scenario or "exploit_probability" not in scenario:
         lef = scenario["loss_event_frequency"]
         return _sample_pert(lef["min"], lef["most_likely"], lef["max"], resolved_iterations, rng)
 
@@ -220,31 +252,39 @@ def run_monte_carlo(
     resolved_seed = (
         seed if seed is not None else _derive_deterministic_seed(parameterized_scenarios)
     )
-    rng = np.random.default_rng(resolved_seed)
     shared_health_samples = _sample_shared_control_health(
-        parameterized_scenarios, resolved_iterations, rng
+        parameterized_scenarios, resolved_iterations, resolved_seed
     )
 
     per_scenario_losses: dict[str, np.ndarray] = {}
     for scenario in parameterized_scenarios:
         lm = scenario["loss_magnitude"]
-
+        # Separate streams per scenario and per purpose: see _stream.
+        scenario_id = str(scenario["scenario_id"])
         rate_samples = _sample_scenario_rate(
-            scenario, shared_health_samples, resolved_iterations, rng
+            scenario,
+            shared_health_samples,
+            resolved_iterations,
+            _stream(resolved_seed, "rate", scenario_id),
         )
-        event_counts = rng.poisson(np.clip(rate_samples, 0, None))
+        event_counts = _stream(resolved_seed, "events", scenario_id).poisson(
+            np.clip(rate_samples, 0, None)
+        )
+        magnitude_rng = _stream(resolved_seed, "magnitude", scenario_id)
 
-        annual_losses = np.zeros(resolved_iterations)
-        max_events = int(event_counts.max()) if resolved_iterations else 0
-        for count in range(1, max_events + 1):
-            mask = event_counts == count
-            n_masked = int(mask.sum())
-            if n_masked == 0:
-                continue
+        # One magnitude per loss event across every simulated year, drawn in
+        # a single call, then summed back into the year each event fell in.
+        total_events = int(event_counts.sum())
+        if total_events:
             magnitude_samples = _sample_pert(
-                lm["min"], lm["most_likely"], lm["max"], (n_masked, count), rng
+                lm["min"], lm["most_likely"], lm["max"], total_events, magnitude_rng
             )
-            annual_losses[mask] = magnitude_samples.sum(axis=1)
+            event_year = np.repeat(np.arange(resolved_iterations), event_counts)
+            annual_losses: np.ndarray = np.bincount(
+                event_year, weights=magnitude_samples, minlength=resolved_iterations
+            )
+        else:
+            annual_losses = np.zeros(resolved_iterations, dtype=np.float64)
 
         per_scenario_losses[scenario["scenario_id"]] = annual_losses
 

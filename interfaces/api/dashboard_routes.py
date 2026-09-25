@@ -36,6 +36,7 @@ from core.optimizer import (
     APPLICABLE_CONTROL_CATEGORIES,
     Control,
     find_control_gaps,
+    prioritize_controls,
     recommend_portfolio,
 )
 from core.snapshot import validate_snapshot
@@ -59,6 +60,18 @@ _CONTROL_LIBRARY_DIR = Path(__file__).resolve().parents[2] / "governance" / "con
 #: guard for the API (each candidate costs at least one full Monte Carlo
 #: run), not a modelling constant.
 _MAX_CANDIDATE_CONTROLS = 500
+
+#: Most steps ``GET /optimize/plan`` lists. A response-size and latency
+#: guard (each step costs Monte Carlo runs), not a modelling constant; the
+#: response says when more steps would still reduce loss.
+_MAX_PLAN_STEPS = 12
+
+#: Priority plans already computed, by snapshot_id. A committed snapshot is
+#: immutable and content-hashed (principle 5) and the assumptions are fixed
+#: for the life of the process, so a plan for a given snapshot_id never
+#: changes; only the most recent few are kept.
+_PLAN_CACHE: dict[str, dict[str, Any]] = {}
+_PLAN_CACHE_SIZE = 4
 
 #: Scenario fields ``core.engine.parameterize_scenario`` adds that the
 #: dashboard shows as an asset's FAIR parameters. The raw ``finding`` and
@@ -90,6 +103,8 @@ class HypotheticalControl(BaseModel):
     control_category: str = Field(min_length=1)
     affected_asset_ids: list[str] = Field(min_length=1)
     estimated_cost_inr: float = Field(default=0.0, ge=0)
+    finding_id: str | None = None
+    service_id: str | None = None
 
 
 class SimulateRequest(BaseModel):
@@ -109,6 +124,8 @@ class CandidateControl(BaseModel):
     control_category: str = Field(min_length=1)
     affected_asset_ids: list[str] = Field(min_length=1)
     estimated_cost_inr: float = Field(ge=0)
+    finding_id: str | None = Field(default=None, description="For remediate_finding.")
+    service_id: str | None = Field(default=None, description="For harden_backup.")
 
 
 class OptimizeRequest(BaseModel):
@@ -358,6 +375,31 @@ def optimize_candidates_route() -> Any:
     return handler
 
 
+def optimize_plan_route() -> Any:
+    """GET /optimize/plan — ``core.optimizer.prioritize_controls`` on the current snapshot.
+
+    Needs no costs: every candidate change from ``find_control_gaps``,
+    ordered by how much each reduces Expected Annual Loss given the ones
+    before it, each step a joint re-simulation (principle 7). At most
+    ``_MAX_PLAN_STEPS`` steps; ``truncated`` says whether more would help.
+    """
+
+    def handler() -> dict[str, Any]:
+        snapshot = current_snapshot_or_404()
+        snapshot_id = snapshot["snapshot_id"]
+        cached = _PLAN_CACHE.get(snapshot_id)
+        if cached is not None:
+            return cached
+        plan = prioritize_controls(snapshot, find_control_gaps(snapshot), max_steps=_MAX_PLAN_STEPS)
+        response = {"snapshot_id": snapshot_id, **asdict(plan)}
+        if len(_PLAN_CACHE) >= _PLAN_CACHE_SIZE:
+            _PLAN_CACHE.pop(next(iter(_PLAN_CACHE)))
+        _PLAN_CACHE[snapshot_id] = response
+        return response
+
+    return handler
+
+
 def optimize_route() -> Any:
     """POST /optimize — ``core.optimizer.recommend_portfolio`` over declared-cost candidates.
 
@@ -390,6 +432,8 @@ def optimize_route() -> Any:
                 control_category=c.control_category,
                 estimated_cost_inr=c.estimated_cost_inr,
                 affected_asset_ids=list(c.affected_asset_ids),
+                finding_id=c.finding_id,
+                service_id=c.service_id,
             )
             for c in request.candidate_controls
         ]
@@ -494,5 +538,6 @@ def register_dashboard_routes(app: Any) -> None:
     app.get("/frameworks/{framework}/status")(framework_status_route())
     app.post("/simulate")(simulate_route())
     app.get("/optimize/candidates")(optimize_candidates_route())
+    app.get("/optimize/plan")(optimize_plan_route())
     app.post("/optimize")(optimize_route())
     app.get("/assumptions")(assumptions_route())

@@ -36,6 +36,7 @@ import type {
   HypotheticalComparison,
   LossExceedanceCurve,
   PortfolioRecommendation,
+  PriorityPlan,
   RiskFigure,
   SnapshotProvenance,
 } from "./types";
@@ -220,6 +221,12 @@ export async function fetchControlGaps(): Promise<ApiResult<ControlCandidates>> 
   return request<ControlCandidates>("/optimize/candidates");
 }
 
+/** Every candidate change, ordered by how much each cuts loss given the ones before it. */
+export async function fetchPriorityPlan(): Promise<ApiResult<PriorityPlan>> {
+  if (DEMO_MODE) return demoUnavailable("the priority plan");
+  return request<PriorityPlan>("/optimize/plan");
+}
+
 /** Every constant in core/assumptions.py with its documented rationale. */
 export async function fetchAssumptions(): Promise<ApiResult<AssumptionEntry[]>> {
   if (DEMO_MODE) return demoResult("assumptions");
@@ -231,7 +238,10 @@ export async function fetchAssumptions(): Promise<ApiResult<AssumptionEntry[]>> 
  * a baseline on the same random draws (`ai.tools.simulate_scenario`).
  */
 export async function simulateScenario(
-  controls: Pick<Control, "control_id" | "control_category" | "affected_asset_ids">[],
+  controls: Pick<
+    Control,
+    "control_id" | "control_category" | "affected_asset_ids" | "finding_id" | "service_id"
+  >[],
 ): Promise<ApiResult<HypotheticalComparison>> {
   if (DEMO_MODE) return demoUnavailable("what-if simulation");
   return request<HypotheticalComparison>("/simulate", {

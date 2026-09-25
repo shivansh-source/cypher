@@ -15,6 +15,14 @@ const SCENARIO_TEXT: Record<string, { title: string; verb: string }> = {
     title: "Deploy a healthy EDR agent on every asset without one",
     verb: "without a healthy EDR agent",
   },
+  remediate_finding: {
+    title: "Fix every open finding",
+    verb: "with open findings",
+  },
+  harden_backup: {
+    title: "Give every service a tested, immutable backup",
+    verb: "relying on a weaker backup",
+  },
 };
 
 function assetList(ids: string[]): string {
@@ -47,8 +55,8 @@ export function WhatIf({ candidates }: { candidates: ApiResult<ControlCandidates
   if (categories.length === 0) {
     return (
       <p className="notice info">
-        Every control the engine can model ({candidates.data.applicable_categories.join(", ")}) is
-        already observed active on every asset, so there is nothing to toggle.
+        Nothing to try: every modelled control is active on every asset, no finding is open, and
+        every service already has a tested, immutable backup.
       </p>
     );
   }
@@ -66,10 +74,12 @@ export function WhatIf({ candidates }: { candidates: ApiResult<ControlCandidates
     const response = await simulateScenario(
       gaps
         .filter((gap) => next.includes(gap.control_category))
-        .map(({ control_id, control_category, affected_asset_ids }) => ({
+        .map(({ control_id, control_category, affected_asset_ids, finding_id, service_id }) => ({
           control_id,
           control_category,
           affected_asset_ids,
+          finding_id,
+          service_id,
         })),
     );
     // A later toggle supersedes this one; never show a stale combination's result.
@@ -82,9 +92,13 @@ export function WhatIf({ candidates }: { candidates: ApiResult<ControlCandidates
     <>
       <div className="toggles">
         {categories.map((category) => {
-          const assets = gaps
-            .filter((gap) => gap.control_category === category)
-            .flatMap((gap) => gap.affected_asset_ids);
+          const assets = Array.from(
+            new Set(
+              gaps
+                .filter((gap) => gap.control_category === category)
+                .flatMap((gap) => gap.affected_asset_ids),
+            ),
+          );
           const text = SCENARIO_TEXT[category] ?? { title: category, verb: "affected" };
           return (
             <label key={category} className="tg">

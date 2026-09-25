@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
-import { Caveat } from "@/components/Caveat";
 import { DemoBanner } from "@/components/DemoBanner";
 import { Topbar } from "@/components/Topbar";
 
@@ -32,7 +31,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <AppShell>
           <main>
             <Topbar />
-            <Caveat />
             {children}
           </main>
         </AppShell>

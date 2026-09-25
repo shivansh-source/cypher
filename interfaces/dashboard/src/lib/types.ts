@@ -180,6 +180,10 @@ export interface Control {
   control_category: string;
   estimated_cost_inr: number;
   affected_asset_ids: string[];
+  /** For `remediate_finding`: the open finding to fix. */
+  finding_id?: string | null;
+  /** For `harden_backup`: the service whose backup is hardened. */
+  service_id?: string | null;
 }
 
 /** Mirrors `core.optimizer.ControlGap` — carries no cost and no benefit. */
@@ -187,6 +191,42 @@ export interface ControlGap {
   control_id: string;
   control_category: string;
   affected_asset_ids: string[];
+  finding_id?: string | null;
+  service_id?: string | null;
+}
+
+/** Mirrors `core.optimizer.PortfolioStep` — every figure a joint simulation. */
+export interface PortfolioStep {
+  control: Control;
+  cumulative_cost_inr: number;
+  expected_annual_loss_inr: number;
+  value_at_risk_inr: number;
+  /** Difference of two joint simulations; the steps add up to the portfolio's reduction. */
+  marginal_reduction_inr: number;
+}
+
+/** Mirrors `core.optimizer.RejectedControl`. */
+export interface RejectedControl {
+  control: Control;
+  reason: "over_budget" | "no_reduction";
+}
+
+/** Mirrors `core.optimizer.PlanStep`. */
+export interface PlanStep {
+  gap: ControlGap;
+  expected_annual_loss_inr: number;
+  value_at_risk_inr: number;
+  marginal_reduction_inr: number;
+}
+
+/** `GET /optimize/plan` — mirrors `core.optimizer.PriorityPlan`. */
+export interface PriorityPlan {
+  snapshot_id: string;
+  baseline_risk_figure: RiskFigure;
+  steps: PlanStep[];
+  no_effect: ControlGap[];
+  /** True when the step limit stopped the plan while more changes would still help. */
+  truncated: boolean;
 }
 
 /** `GET /optimize/candidates`. */
@@ -208,6 +248,11 @@ export interface PortfolioRecommendation {
    * individual control deltas (CLAUDE.md principle 7).
    */
   risk_reduction_inr: number;
+  value_at_risk_reduction_inr: number;
+  /** One per selected control, in the order the search added them. */
+  steps: PortfolioStep[];
+  /** Every candidate not selected, and why. */
+  rejected: RejectedControl[];
 }
 
 /** `POST /simulate` — mirrors `ai.tools.simulate_scenario`'s result. */

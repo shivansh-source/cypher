@@ -126,8 +126,10 @@ export function shortSnapshotId(snapshotId: string): string {
 
 /** Human names for the control categories `core.optimizer` can apply. */
 const CONTROL_CATEGORY_LABELS: Record<string, string> = {
-  mfa_enforced: "MFA enforced",
-  edr_active: "Healthy EDR agent",
+  mfa_enforced: "Enforce MFA",
+  edr_active: "Deploy a healthy EDR agent",
+  remediate_finding: "Fix a finding",
+  harden_backup: "Harden backups",
 };
 
 export function controlCategoryLabel(category: string): string {

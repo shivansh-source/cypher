@@ -6,6 +6,54 @@ of the intended architecture. Where design intent (repo-root `CLAUDE.md`,
 `docs/`) and actual code diverge, both are called out explicitly, especially
 in §9.
 
+> **Update, 2026-09-26 — `core/optimizer.py` is no longer a stub.** The
+> rest of this document is the original 2026-09-22 snapshot and has not
+> been re-audited beyond the optimizer; treat any other file's status here
+> as unverified against the current repo. The optimizer-specific
+> corrections below are current as of this date.
+>
+> - `core/optimizer.py`'s `apply_controls_to_snapshot`, `evaluate_portfolio`
+>   and `recommend_portfolio` are fully implemented, not stubs (§4, §9.1
+>   below are stale on this point). Two more control categories exist
+>   beyond `mfa_enforced`/`edr_active`: `remediate_finding` (fix one open
+>   finding) and `harden_backup` (give a service a tested, immutable
+>   backup) — see `APPLICABLE_CONTROL_CATEGORIES`.
+> - `recommend_portfolio` now runs a lazy-greedy search ordered by a
+>   closed-form expected-loss estimate (`_ExpectedLossEstimator`, never
+>   reported — only used to pick what to joint-simulate next) with a
+>   second seed (best single affordable control first) to guard against
+>   the classic knapsack failure of ratio-greedy alone. It also returns
+>   `steps` (each a joint simulation) and `rejected` (each candidate left
+>   out, with why: `"over_budget"` or `"no_reduction"`).
+>   `find_control_gaps` lists every open finding and every service with a
+>   weak backup, in addition to the MFA/EDR gaps it already listed.
+>   `prioritize_controls` is new: an unpriced, cost-free ranking of every
+>   candidate by marginal risk reduction, exposed as `GET /optimize/plan`.
+> - `core/engine/simulation.py` now draws each scenario's (and each shared
+>   control-health factor's) random numbers from its own independent
+>   stream, keyed by scenario id, instead of one sequential stream in list
+>   order — so removing or adding a scenario no longer shifts every other
+>   scenario's draws. This is required for `recommend_portfolio`'s
+>   common-random-numbers comparisons to hold as portfolios of different
+>   sizes are tried, and it moved the headline Expected Annual Loss on the
+>   shipped sample data (sampling variation, not a modelling change — the
+>   published-FAIR-example golden test in `core/tests/test_engine.py` still
+>   passes).
+> - The `ai/tools/optimize_investment.py` wrapper the chat assistant would
+>   call is **still** `raise NotImplementedError` — only the dashboard's
+>   `POST /optimize` and `GET /optimize/plan` (`interfaces/api/dashboard_routes.py`)
+>   call `core.optimizer` directly, bypassing that tool wrapper entirely.
+>   `ai/tools/simulate_scenario.py` (`compare_hypothetical`) is implemented
+>   and was updated to pass through the new `finding_id`/`service_id`
+>   fields.
+> - The dashboard's `/investment` page (`interfaces/dashboard/src/app/investment/page.tsx`)
+>   and `InvestmentPlanner.tsx` were rewritten to show the cost-free
+>   priority plan first and a budgeted recommendation second; see §6 for
+>   the dashboard's general shape, which §9.10's route-mismatch gap no
+>   longer describes (`/snapshot`, `/snapshot/gates`,
+>   `/frameworks/{framework}/status` are registered routes today, along
+>   with `/optimize/plan`).
+
 ---
 
 ## 1. Repo structure
@@ -28,7 +76,7 @@ ps105/
 ├── core/                        # The only place that produces a rupee figure
 │   ├── assumptions.py           # Every tunable modelling constant, named & justified
 │   ├── snapshot.py              # 5 quality gates + commit lifecycle (all stubs)
-│   ├── optimizer.py             # Budget-constrained control portfolio optimizer (stubs)
+│   ├── optimizer.py             # Budget-constrained control portfolio optimizer (implemented — see 2026-09-26 update above)
 │   ├── engine/                  # Open FAIR + Monte Carlo engine (fully implemented)
 │   │   ├── models.py, scenarios.py, parameterization.py, simulation.py, risk_figure.py
 │   └── tests/
@@ -129,7 +177,7 @@ There is no separate "intent" enum. The set of things the model can be routed to
 
 ## 3. Tools / functions the LLM can call
 
-All 6 tools are declared in **`ai/tool_registry.py`** (`_build_specs()`), each a thin wrapper module under **`ai/tools/`**. Every wrapper's entire body is `raise NotImplementedError` today — they are fully specified (docstring, signature, schema) but not implemented, because the `core/` functions they'd delegate to (`core.snapshot`, `core.optimizer`, most of `core.engine`'s callers) are themselves stubs.
+All 6 tools are declared in **`ai/tool_registry.py`** (`_build_specs()`), each a thin wrapper module under **`ai/tools/`**. As of 2026-09-22, every wrapper's entire body was `raise NotImplementedError` — fully specified (docstring, signature, schema) but not implemented, because the `core/` functions they'd delegate to were themselves stubs. As of the 2026-09-26 update above, `simulate_scenario` is implemented (delegates to `core.optimizer.compare_hypothetical`, now real); `optimize_investment` is still `raise NotImplementedError`. The status of the other four tools below is unverified since 2026-09-22.
 
 | Tool name | File | Delegates to (unimplemented) | Input schema (required in **bold**) |
 |---|---|---|---|
@@ -137,8 +185,8 @@ All 6 tools are declared in **`ai/tool_registry.py`** (`_build_specs()`), each a
 | `get_top_contributors` | `ai/tools/get_top_contributors.py` | `core.engine.compute_risk_figure().top_contributors` | `limit?: integer [1,50]` |
 | `get_control_posture` | `ai/tools/get_control_posture.py` | current snapshot's `edr`/`identity_access`/`network`/`backup` fields directly | `asset_id?: string` |
 | `get_framework_status` | `ai/tools/get_framework_status.py` | `governance.mapper.compute_control_status` | **`framework: string`** (enum = files under `governance/control_library/*.yaml`) |
-| `optimize_investment` | `ai/tools/optimize_investment.py` | `core.optimizer.recommend_portfolio` | **`budget_inr: number`**, `candidate_control_ids?: string[]` |
-| `simulate_scenario` | `ai/tools/simulate_scenario.py` | `core.optimizer.apply_controls_to_snapshot` + `core.engine.compute_risk_figure` | **`hypothetical_controls: Control[]`** |
+| `optimize_investment` | `ai/tools/optimize_investment.py` | `core.optimizer.recommend_portfolio` (implemented) | **`budget_inr: number`**, `candidate_control_ids?: string[]` |
+| `simulate_scenario` | `ai/tools/simulate_scenario.py` | `core.optimizer.compare_hypothetical` (implemented, via `apply_controls_to_snapshot` + `core.engine.compute_risk_figure`) | **`hypothetical_controls: Control[]`** (each may also carry `finding_id`/`service_id`) |
 | `explain_number` | `ai/tools/explain_number.py` | derivation trail (scenario params, `core.assumptions` constants, snapshot data) | **`figure_reference: string`** |
 
 Example signature (all follow this pattern — `dict[str, Any]` return, no computation in the wrapper itself):
@@ -240,9 +288,9 @@ _FLAG_TEMPLATE = "[UNVERIFIED: {claim}]"
 
 Fully specified via docstrings: `check_asset_count_delta`, `check_no_findings_from_unreachable_scanners`, `check_criticality_present_or_unknown`, `check_provenance_non_null`, `check_no_ordinal_in_numeric_field`, run together (never short-circuiting) by `validate_snapshot`, then `commit_snapshot` promotes a candidate (computing its content-hash `snapshot_id`) only if every gate passed.
 
-### Optimizer — `core/optimizer.py` (**stub**)
+### Optimizer — `core/optimizer.py` (**implemented** — see the 2026-09-26 update at the top of this document)
 
-`Control` and `PortfolioRecommendation` dataclasses exist; `apply_controls_to_snapshot`, `evaluate_portfolio`, `recommend_portfolio` all raise `NotImplementedError`. Docstrings are explicit that any internal search heuristic is allowed, but the final reported `risk_reduction_inr` must come from an actual `core.engine.compute_risk_figure` joint re-simulation, never summed per-control deltas.
+`Control`, `ControlGap`, `PortfolioRecommendation` (with `steps`/`rejected`), `PriorityPlan` (with `steps`/`no_effect`/`truncated`) dataclasses. `apply_controls_to_snapshot`, `evaluate_portfolio`, `recommend_portfolio`, `find_control_gaps`, `compare_hypothetical`, and the new `prioritize_controls` are all implemented. The search's internal heuristic (a closed-form expected-loss estimate, `_ExpectedLossEstimator`) is never reported — every accepted control and every returned figure comes from an actual `core.engine.compute_risk_figure` joint re-simulation (`core/tests/test_optimizer.py` pins this, including that overlapping controls are not double-counted).
 
 ### Snapshot storage (`aggregated.json` equivalent)
 
@@ -297,6 +345,15 @@ Note: `interfaces/cli/riskctl.py::ingest_command` already calls `validate_snapsh
 | GET | `/health` | inline lambda | `{"status": "ok"}` |
 | GET | `/exposure?scope=` | `get_exposure_route()` | `execute_tool("get_exposure", ...)` → 501 while unimplemented |
 | GET | `/optimize?budget_inr=` | `optimize_investment_route()` | `execute_tool("optimize_investment", ...)` → 501 while unimplemented |
+
+**[2026-09-26]** The routes below did not exist in this table as of 2026-09-22 and are unrelated to `optimize_investment_route()` above; they live in `interfaces/api/dashboard_routes.py::register_dashboard_routes`, called from `create_app()`. They call `core.optimizer` directly, not `execute_tool`:
+
+| Method | Path | Handler | Behind it |
+|---|---|---|---|
+| GET | `/optimize/candidates` | `optimize_candidates_route()` | `core.optimizer.find_control_gaps` on the current snapshot |
+| GET | `/optimize/plan` | `optimize_plan_route()` | `core.optimizer.prioritize_controls` — cost-free priority order, cached per `snapshot_id` |
+| POST | `/optimize` | `optimize_route()` | `core.optimizer.recommend_portfolio` over declared-cost candidates |
+| POST | `/simulate` | `simulate_route()` | `execute_tool("simulate_scenario", ...)` (this one *does* go through the tool wrapper) |
 | POST | `/chat` | `chat_route()` | `ChatEngine.run_turn` → guarded `ChatResponse` |
 | POST | `/chat/stream` | `chat_stream_route()` | `ChatEngine.stream_turn` → SSE (`session`/`text_delta`/`tool_call`/`tool_result`/`final`/`error`) |
 | GET | `/chat/tools` | `chat_tools_route()` | Lists every registered tool + `available: bool` (probed by calling `execute_tool` with placeholder args) |
@@ -398,7 +455,7 @@ Only names are listed above, not values — `.env` itself is gitignored; `.env.e
 
 Cross-referencing repo-root `CLAUDE.md`'s principles/design against actual code:
 
-1. **The entire `core/` snapshot + optimizer layer is unimplemented.** `core/snapshot.py` (all 5 gates, `validate_snapshot`, `commit_snapshot`) and `core/optimizer.py` (`apply_controls_to_snapshot`, `evaluate_portfolio`, `recommend_portfolio`) are fully specified via docstrings but every function body is `raise NotImplementedError`. Only `core/engine/` is actually implemented.
+1. **[Corrected 2026-09-26] `core/optimizer.py` is implemented**, not a stub — see the update note at the top of this document. `core/snapshot.py`'s status (all 5 gates, `validate_snapshot`, `commit_snapshot`) is unverified since 2026-09-22; a live snapshot store was observed under `data/snapshots/` during the 2026-09-26 work, which contradicts this bullet's premise for `core/snapshot.py` too, but that subsystem was not itself re-audited.
 2. **No snapshot store/persistence exists.** `SNAPSHOT_STORE_PATH` is defined in `.env.example` but nothing reads/writes it; `commit_snapshot` (which would persist) is itself a stub. `interfaces/cli/riskctl.py::ingest_command` hardcodes `previous = None` with an explicit `# TODO: read the actual current snapshot once a snapshot store exists`.
 3. **All 6 `ai/tools/` wrappers are stubs** (`raise NotImplementedError`), because what they'd call (`core.engine`'s scoped entry points, `core.snapshot`, `core.optimizer`, `governance.mapper`) is partially or fully unimplemented. This means the chat assistant and `/exposure`, `/optimize` API routes currently answer every question with a structured "unavailable" result, never a number — which is the intended fail-safe behavior of `ai.tool_registry.execute_tool`, working as designed even though nothing is implemented yet.
 4. **5 of 9 connectors are unimplemented stubs**: `cmdb_connector.py` (the intended canonical asset-identity source), `iam_connector.py`, `nessus_connector.py`, `nmap_connector.py`, `threat_intel_connector.py`. Only Wazuh, Greenbone, Prowler, ScoutSuite are implemented and wired into `riskctl ingest`.

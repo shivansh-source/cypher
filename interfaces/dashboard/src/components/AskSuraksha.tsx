@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  AGENT_PANEL_MAX_WIDTH,
+  AGENT_PANEL_MIN_WIDTH,
+  closeAgentPanel,
+  setAgentPanelWidth,
+  toggleAgentPanel,
+  useAgentPanelOpen,
+  useAgentPanelWidth,
+} from "@/lib/agent-panel-state";
 import { deleteChatSession, streamChat, type ApiResult } from "@/lib/api";
 import { humanize, shortSnapshotId } from "@/lib/format";
 import type { ChatResponse, ChatToolCall } from "@/lib/types";
@@ -86,7 +95,37 @@ function settledSteps(calls: ChatToolCall[], live: ToolStep[]): ToolStep[] {
 }
 
 /**
- * Ask Suraksha: the natural-language front door to the engine tools.
+ * The trigger that opens the docked Ask Suraksha panel — lives in the
+ * topbar, separate from the panel itself (in `AppShell`) so the panel can
+ * stay mounted (and its conversation alive) while the trigger toggles its
+ * visibility from anywhere in the page chrome.
+ */
+export function AskSurakshaTrigger() {
+  const open = useAgentPanelOpen();
+  return (
+    <button
+      className="btn askbtn"
+      type="button"
+      aria-haspopup="true"
+      aria-expanded={open}
+      aria-controls="askPanel"
+      onClick={toggleAgentPanel}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3l1.8 4.9L19 9.7l-4.2 3.2 1.4 5.1L12 15.2 7.8 18l1.4-5.1L5 9.7l5.2-1.8z" />
+      </svg>
+      Ask Suraksha
+    </button>
+  );
+}
+
+/**
+ * Ask Suraksha: the natural-language front door to the engine tools,
+ * docked to the right edge of the shell and compressing the main column
+ * while open — the same shape as an editor's agent sidebar, not a modal
+ * laid over the page. Always mounted (see `AppShell`), so opening and
+ * closing it never loses the conversation; `useAgentPanelOpen` only
+ * toggles its visibility and width.
  *
  * Uses `POST /chat/stream` for its tool events only: every tool the model
  * calls — several per round, over several rounds — appears in the relay as it
@@ -97,27 +136,24 @@ function settledSteps(calls: ChatToolCall[], live: ToolStep[]): ToolStep[] {
  * drops syntax but never rewrites the text, and any `[UNVERIFIED: …]` flag
  * the guard inserted stays visible and highlighted.
  */
-export function AskSuraksha() {
-  const [open, setOpen] = useState(false);
+export function AskSurakshaPanel() {
+  const open = useAgentPanelOpen();
+  const width = useAgentPanelWidth();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const nextId = useRef(0);
-  const openerRef = useRef<HTMLButtonElement>(null);
-  const sheetRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const [resetting, setResetting] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const pending = resetting || turns.some((turn) => turn.state === "pending");
 
   useEffect(() => {
     if (!open) return;
-    document.body.classList.add("modal-open");
-    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 30);
-    return () => {
-      document.body.classList.remove("modal-open");
-      window.clearTimeout(focusTimer);
-    };
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 220);
+    return () => window.clearTimeout(focusTimer);
   }, [open]);
 
   useEffect(() => {
@@ -211,138 +247,146 @@ export function AskSuraksha() {
     inputRef.current?.focus();
   }
 
-  function close() {
-    setOpen(false);
-    openerRef.current?.focus();
-  }
-
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
-      close();
-      return;
-    }
-    if (event.key !== "Tab" || !sheetRef.current) return;
-    const focusable = Array.from(
-      sheetRef.current.querySelectorAll<HTMLElement>(
-        "button:not([disabled]), input:not([disabled]), summary, a[href]",
-      ),
-    ).filter((element) => element.offsetParent !== null);
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
+      closeAgentPanel();
     }
   }
 
+  function startResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = width;
+    setDragging(true);
+    function onMove(moveEvent: PointerEvent) {
+      const next = startWidth + (startX - moveEvent.clientX);
+      setAgentPanelWidth(next);
+    }
+    function onUp() {
+      setDragging(false);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
   return (
-    <>
-      <button
-        ref={openerRef}
-        className="btn askbtn"
-        type="button"
-        aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 3l1.8 4.9L19 9.7l-4.2 3.2 1.4 5.1L12 15.2 7.8 18l1.4-5.1L5 9.7l5.2-1.8z" />
-        </svg>
-        Ask Suraksha
-      </button>
-
-      {open ? (
-        <div className="modal" onKeyDown={onKeyDown}>
-          <div className="scrim" onClick={close} />
-          <div
-            className="card sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="askTitle"
-            ref={sheetRef}
-          >
-            <div className="card-h">
-              <div>
-                <h2 id="askTitle">Ask Suraksha</h2>
-                <p>
-                  The assistant picks which engine tool answers your question and
-                  narrates what it returned; it never calculates a figure. Every
-                  number is checked against engine output before it is shown.
-                </p>
-              </div>
-              <div className="ctrls">
-                {turns.length > 0 ? (
-                  <button
-                    className="btn ghost"
-                    type="button"
-                    disabled={pending}
-                    onClick={startOver}
-                  >
-                    New conversation
-                  </button>
-                ) : null}
-                <button className="iconbtn" type="button" aria-label="Close" onClick={close}>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="ask">
-              <div className="presets">
-                {PRESETS.map((preset) => (
-                  <button key={preset} type="button" disabled={pending} onClick={() => ask(preset)}>
-                    {preset}
-                  </button>
-                ))}
-              </div>
-
-              <div className="thread" aria-live="polite" ref={threadRef}>
-                {turns.length === 0 ? (
-                  <p className="small muted">
-                    Ask about current exposure, what drives it, control posture, a
-                    what-if, or where a figure came from. Any number the assistant
-                    cannot trace to a tool result in this conversation is flagged
-                    inline as unverified.
-                  </p>
-                ) : (
-                  turns.map((turn) => <TurnView key={turn.id} turn={turn} />)
-                )}
-              </div>
-
-              <form
-                className="askform"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  ask(draft);
-                }}
+    <div
+      id="askPanel"
+      className={`agentpanel${open ? " is-open" : ""}${dragging ? " is-resizing" : ""}`}
+      style={{ width: open ? width : 0, minWidth: open ? width : 0 }}
+      role="complementary"
+      aria-label="Ask Suraksha"
+      aria-hidden={!open}
+      inert={!open}
+      ref={panelRef}
+      onKeyDown={onKeyDown}
+    >
+      <div
+        className="agentpanel-resize"
+        onPointerDown={startResize}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize Ask Suraksha panel"
+        aria-valuenow={width}
+        aria-valuemin={AGENT_PANEL_MIN_WIDTH}
+        aria-valuemax={AGENT_PANEL_MAX_WIDTH}
+        tabIndex={open ? 0 : -1}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowLeft") setAgentPanelWidth(width + 16);
+          if (event.key === "ArrowRight") setAgentPanelWidth(width - 16);
+        }}
+      />
+      <div className="agentpanel-inner" style={{ width }}>
+        <div className="agentpanel-head">
+          <div className="agentpanel-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3l1.8 4.9L19 9.7l-4.2 3.2 1.4 5.1L12 15.2 7.8 18l1.4-5.1L5 9.7l5.2-1.8z" />
+            </svg>
+          </div>
+          <div className="agentpanel-title">
+            <h2>Ask Suraksha</h2>
+            <p>Picks the engine tool, narrates what it returned, never calculates a figure.</p>
+          </div>
+          <div className="ctrls">
+            {turns.length > 0 ? (
+              <button
+                className="iconbtn"
+                type="button"
+                disabled={pending}
+                title="New conversation"
+                aria-label="New conversation"
+                onClick={startOver}
               >
-                <label htmlFor="askInput" className="sr-only">
-                  Question
-                </label>
-                <input
-                  id="askInput"
-                  ref={inputRef}
-                  value={draft}
-                  maxLength={8000}
-                  onChange={(event) => setDraft(event.target.value)}
-                  placeholder="e.g. What is our highest financial risk today?"
-                  autoComplete="off"
-                />
-                <button className="btn" type="submit" disabled={pending || !draft.trim()}>
-                  {pending ? "Asking…" : "Ask"}
-                </button>
-              </form>
-            </div>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 4v5h5M20 20v-5h-5" />
+                  <path d="M19.5 9a8 8 0 00-14.9-2M4.5 15a8 8 0 0014.9 2" />
+                </svg>
+              </button>
+            ) : null}
+            <button
+              className="iconbtn"
+              type="button"
+              aria-label="Close Ask Suraksha"
+              onClick={closeAgentPanel}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
           </div>
         </div>
-      ) : null}
-    </>
+
+        <div className="ask">
+          <div className="presets">
+            {PRESETS.map((preset) => (
+              <button key={preset} type="button" disabled={pending} onClick={() => ask(preset)}>
+                {preset}
+              </button>
+            ))}
+          </div>
+
+          <div className="thread" aria-live="polite" ref={threadRef}>
+            {turns.length === 0 ? (
+              <p className="small muted">
+                Ask about current exposure, what drives it, control posture, a
+                what-if, or where a figure came from. Any number the assistant
+                cannot trace to a tool result in this conversation is flagged
+                inline as unverified.
+              </p>
+            ) : (
+              turns.map((turn) => <TurnView key={turn.id} turn={turn} />)
+            )}
+          </div>
+
+          <form
+            className="askform"
+            onSubmit={(event) => {
+              event.preventDefault();
+              ask(draft);
+            }}
+          >
+            <label htmlFor="askInput" className="sr-only">
+              Question
+            </label>
+            <input
+              id="askInput"
+              ref={inputRef}
+              value={draft}
+              maxLength={8000}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="e.g. What is our highest financial risk today?"
+              autoComplete="off"
+            />
+            <button className="btn" type="submit" disabled={pending || !draft.trim()}>
+              {pending ? "Asking…" : "Ask"}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
   );
 }
 

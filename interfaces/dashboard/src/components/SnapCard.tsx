@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { fetchQualityGates, fetchSnapshotProvenance, type ApiResult } from "@/lib/api";
-import { formatTimestamp, shortSnapshotId } from "@/lib/format";
+import { formatDate, formatTimestamp, shortSnapshotId } from "@/lib/format";
 import type { GateReport, SnapshotProvenance } from "@/lib/types";
 
 interface Loaded {
@@ -36,20 +37,25 @@ export function SnapCard() {
   }, [pathname]);
 
   return (
-    <div className="snapcard" aria-live="polite">
-      <div className="eyebrow">Current snapshot</div>
+    <Link className="snapcard" href="/data-quality" aria-live="polite">
       {loaded === null ? (
         <p className="small muted">Loading snapshot…</p>
       ) : loaded.provenance.state !== "ok" ? (
-        <p className="small muted">
-          {loaded.provenance.state === "unavailable"
-            ? "No snapshot has been committed yet."
-            : "The API could not be reached."}
-        </p>
+        <>
+          <span className="sc-status warn">
+            <span className="lamp off" aria-hidden="true" />
+            <b>No current snapshot</b>
+          </span>
+          <p className="small muted">
+            {loaded.provenance.state === "unavailable"
+              ? "Nothing has been committed yet."
+              : "The API could not be reached."}
+          </p>
+        </>
       ) : (
         <SnapDetails provenance={loaded.provenance.data} gates={loaded.gates} />
       )}
-    </div>
+    </Link>
   );
 }
 
@@ -61,40 +67,47 @@ function SnapDetails({
   gates: ApiResult<GateReport>;
 }) {
   const reachable = provenance.scan_scope.reachable_scanners.length;
-  const total = reachable + provenance.scan_scope.unreachable_scanners.length;
+  const missing = provenance.scan_scope.unreachable_scanners.length;
+  const total = reachable + missing;
   const passed = gates.state === "ok" ? gates.data.gates.filter((g) => g.passed).length : null;
   const gateCount = gates.state === "ok" ? gates.data.gates.length : null;
+  const failing = passed !== null && gateCount !== null ? gateCount - passed : null;
+
+  // Worst first: a failing gate outranks a missing scanner; unknown gates never read as passing.
+  const status =
+    failing === null
+      ? { tone: "warn", text: "Gate results unavailable" }
+      : failing > 0
+        ? { tone: "crit", text: `${failing} gate${failing === 1 ? "" : "s"} failing` }
+        : missing > 0
+          ? { tone: "warn", text: `${missing} scanner${missing === 1 ? "" : "s"} missing` }
+          : { tone: "good", text: "All checks pass" };
+
   return (
     <>
-      <div className="mono small wrap" title={provenance.snapshot_id}>
-        {shortSnapshotId(provenance.snapshot_id)}
-      </div>
-      <div className="row">
-        <span className="muted">Observed</span>
-        <span className="mono">{formatTimestamp(provenance.observed_at)}</span>
-      </div>
-      <div className="row">
-        <span className="muted">Quality gates</span>
-        {passed === null || gateCount === null ? (
-          <span className="mono muted">unavailable</span>
-        ) : (
-          <span
-            className="mono"
-            style={{ color: passed === gateCount ? "var(--good)" : "var(--crit)" }}
-          >
-            {passed} / {gateCount} pass
-          </span>
-        )}
-      </div>
-      <div className="row">
-        <span className="muted">Scanners reporting</span>
-        <span
-          className="mono"
-          style={{ color: reachable === total ? undefined : "var(--warn)" }}
-        >
-          {reachable} / {total}
+      <span className={`sc-status ${status.tone}`}>
+        <span className={`lamp ${status.tone === "good" ? "" : status.tone}`} aria-hidden="true" />
+        <b>{status.text}</b>
+      </span>
+      <span className="small muted" title={formatTimestamp(provenance.observed_at)}>
+        {provenance.valid_to === null ? "Current snapshot" : "Superseded snapshot"}, observed{" "}
+        {formatDate(provenance.observed_at)}
+      </span>
+      <span className="sc-stats">
+        <span className={failing === null ? "" : failing > 0 ? "crit" : "good"}>
+          <b>{passed === null || gateCount === null ? "—" : `${passed}/${gateCount}`}</b>
+          gates pass
         </span>
-      </div>
+        <span className={missing > 0 ? "warn" : ""}>
+          <b>
+            {reachable}/{total}
+          </b>
+          scanners
+        </span>
+      </span>
+      <span className="sc-id mono" title={provenance.snapshot_id}>
+        {shortSnapshotId(provenance.snapshot_id)}
+      </span>
     </>
   );
 }
