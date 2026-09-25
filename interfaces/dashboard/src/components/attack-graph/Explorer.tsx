@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { fetchAttackGraphTarget } from "@/lib/api";
 import {
@@ -15,7 +14,6 @@ import {
 } from "@/lib/attack-map";
 import { formatCount, formatPercent } from "@/lib/format";
 import { assetName } from "@/lib/labels";
-import { SAMPLE_ATTACK_GRAPH } from "@/lib/sample-attack-graph";
 import type { AssetView, AttackGraphNode, AttackGraphResponse } from "@/lib/types";
 import { KEY_PAN_STEP, useZoomPan, type View } from "@/lib/use-zoom-pan";
 import { NodeDrawer, TopologyDrawer, type DrawerTab, type TargetState } from "./NodeDrawer";
@@ -37,12 +35,8 @@ const SEARCH_RESULTS = 8;
 
 type Panel = { kind: "node"; id: string } | { kind: "topology" } | null;
 
-function pageUrl(sample: boolean, target: string | null): string {
-  const params = new URLSearchParams();
-  if (sample) params.set("sample", "1");
-  if (target) params.set("target", target);
-  const query = params.toString();
-  return `/attack-paths${query ? `?${query}` : ""}`;
+function pageUrl(target: string | null): string {
+  return target ? `/attack-paths?target=${encodeURIComponent(target)}` : "/attack-paths";
 }
 
 /**
@@ -51,22 +45,17 @@ function pageUrl(sample: boolean, target: string | null): string {
  * Drag or two-finger scroll to pan, pinch or mouse wheel to zoom (see
  * `useZoomPan`); selecting an asset opens a detail drawer over
  * the canvas and highlights the bounded subgraph behind its figures. Every
- * probability and figure drawn comes from the API (or, on the sample network,
- * captured engine output); nothing is estimated here.
+ * probability and figure drawn comes from the API; nothing is estimated here.
  */
 export function AttackGraphExplorer({
   graph,
   inventory,
-  sample,
-  showSampleLink,
   initialSelectedId,
   initialTarget,
 }: {
   graph: AttackGraphResponse;
   /** `/assets` for the same snapshot, or null when it is unavailable or from another snapshot. */
   inventory: AssetView[] | null;
-  sample: boolean;
-  showSampleLink: boolean;
   initialSelectedId: string | null;
   initialTarget: TargetState | null;
 }) {
@@ -113,16 +102,6 @@ export function AttackGraphExplorer({
   const loadTarget = useCallback(
     (node: AttackGraphNode) => {
       if (node.role === "unknown" || targets[node.asset_id]) return;
-      if (sample) {
-        const data = SAMPLE_ATTACK_GRAPH.targets[node.asset_id];
-        setTargets((t) => ({
-          ...t,
-          [node.asset_id]: data
-            ? { state: "ok", data }
-            : { state: "unavailable", reason: "The sample network has no simulation for this asset." },
-        }));
-        return;
-      }
       setTargets((t) => ({ ...t, [node.asset_id]: { state: "loading" } }));
       void fetchAttackGraphTarget(node.asset_id).then((result) => {
         const checked: TargetState =
@@ -135,7 +114,7 @@ export function AttackGraphExplorer({
         setTargets((t) => ({ ...t, [node.asset_id]: checked }));
       });
     },
-    [targets, sample, graph.snapshot_id],
+    [targets, graph.snapshot_id],
   );
 
   const select = useCallback(
@@ -144,7 +123,7 @@ export function AttackGraphExplorer({
       if (!node) return;
       setPanel({ kind: "node", id });
       loadTarget(node);
-      window.history.replaceState(null, "", pageUrl(sample, id));
+      window.history.replaceState(null, "", pageUrl(id));
       // Keep the chosen node in view, clear of the drawer.
       const placed = layout.nodeAt.get(id);
       if (placed) {
@@ -156,13 +135,13 @@ export function AttackGraphExplorer({
         }
       }
     },
-    [nodesById, loadTarget, sample, layout, size, view, zp],
+    [nodesById, loadTarget, layout, size, view, zp],
   );
 
   const close = useCallback(() => {
     setPanel(null);
-    window.history.replaceState(null, "", pageUrl(sample, null));
-  }, [sample]);
+    window.history.replaceState(null, "", pageUrl(null));
+  }, []);
 
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => {
@@ -333,12 +312,6 @@ export function AttackGraphExplorer({
 
       <div className="gx-top" style={{ right: drawerW + 12 }} data-canvas-ignore>
         <div className="gx-chips">
-          {sample ? (
-            <span className="gx-chip sample">
-              Sample network, invented assets
-              <Link href="/attack-paths">Back to your snapshot</Link>
-            </span>
-          ) : null}
           {!graph.topology_declared ? <span className="gx-chip warn">No network topology in this snapshot</span> : null}
           <span className="gx-chip"><i className="dot r-entry" />{formatCount(counts.entry)} entry points</span>
           <span className="gx-chip"><i className="dot r-reachable" />{formatCount(counts.reachable)} reachable</span>
@@ -358,11 +331,6 @@ export function AttackGraphExplorer({
           >
             Topology
           </button>
-          {showSampleLink && !sample ? (
-            <Link className="gx-btn" href="/attack-paths?sample=1">
-              Sample network
-            </Link>
-          ) : null}
         </div>
       </div>
 
@@ -418,10 +386,9 @@ export function AttackGraphExplorer({
           nameOf={nameOf}
           onClose={close}
           onSelect={select}
-          sample={sample}
         />
       ) : panel?.kind === "topology" ? (
-        <TopologyDrawer graph={graph} nameOf={nameOf} onClose={close} onSelect={select} sample={sample} />
+        <TopologyDrawer graph={graph} nameOf={nameOf} onClose={close} onSelect={select} />
       ) : null}
     </div>
   );

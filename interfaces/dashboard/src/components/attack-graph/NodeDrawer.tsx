@@ -10,8 +10,7 @@ import type { AssetView, AttackGraphNode, AttackGraphResponse, AttackGraphTarget
 /**
  * The panel that slides over the attack graph: one asset's detail, or the
  * network's topology. Every figure shown is engine output passed in from the
- * API (or, on the sample network, captured engine output); nothing here is
- * computed beyond formatting.
+ * API; nothing here is computed beyond formatting.
  */
 
 export type TargetState = ApiResult<AttackGraphTarget> | { state: "loading" };
@@ -36,7 +35,6 @@ interface Common {
   nameOf: (id: string) => string;
   onClose: () => void;
   onSelect: (assetId: string) => void;
-  sample: boolean;
 }
 
 export function NodeDrawer({
@@ -53,7 +51,7 @@ export function NodeDrawer({
   tab: DrawerTab;
   onTab: (tab: DrawerTab) => void;
 }) {
-  const { graph, nameOf, onClose, sample } = common;
+  const { graph, nameOf, onClose } = common;
   const segmentName = graph.segments.find((s) => s.segment_id === node.segment_id)?.name ?? node.segment_id;
   const openFindings = asset?.findings.filter((f) => f.scenario !== null) ?? [];
   const tabs: { id: DrawerTab; label: string; count?: number }[] = [
@@ -70,18 +68,16 @@ export function NodeDrawer({
           <span className={`gd-role r-${node.role}`} aria-hidden="true" />
           Asset
           <span className="gd-actions">
-            {!sample ? (
-              <Link
-                className="gd-icon"
-                href={`/assets?asset=${encodeURIComponent(node.asset_id)}`}
-                title="Open in Assets & findings"
-                aria-label="Open in Assets & findings"
-              >
-                <svg viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M9.5 2.5h4v4M13.5 2.5L7.5 8.5M12 9.5v4h-9.5v-9.5h4" />
-                </svg>
-              </Link>
-            ) : null}
+            <Link
+              className="gd-icon"
+              href={`/assets?asset=${encodeURIComponent(node.asset_id)}`}
+              title="Open in Assets & findings"
+              aria-label="Open in Assets & findings"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M9.5 2.5h4v4M13.5 2.5L7.5 8.5M12 9.5v4h-9.5v-9.5h4" />
+              </svg>
+            </Link>
             <button className="gd-icon" type="button" onClick={onClose} title="Close (Esc)" aria-label="Close details">
               <svg viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M4 4l8 8M12 4l-8 8" />
@@ -356,7 +352,6 @@ function Routes({ node, asset, nameOf, onSelect }: Common & { node: AttackGraphN
 function Findings({
   node,
   findings,
-  sample,
 }: Common & { node: AttackGraphNode; findings: AssetView["findings"] }) {
   if (findings.length === 0) {
     return (
@@ -375,16 +370,12 @@ function Findings({
         return (
           <li key={finding.finding_id}>
             <div className="gd-f-h">
-              {sample ? (
-                <b>{findingTitle(finding)}</b>
-              ) : (
-                <Link
-                  className="rowlink"
-                  href={`/assets?asset=${encodeURIComponent(node.asset_id)}&finding=${encodeURIComponent(finding.finding_id)}#finding-${encodeURIComponent(finding.finding_id)}`}
-                >
-                  {findingTitle(finding)}
-                </Link>
-              )}
+              <Link
+                className="rowlink"
+                href={`/assets?asset=${encodeURIComponent(node.asset_id)}&finding=${encodeURIComponent(finding.finding_id)}#finding-${encodeURIComponent(finding.finding_id)}`}
+              >
+                {findingTitle(finding)}
+              </Link>
               <span className="num gd-f-eal">{formatInr(s.expected_annual_loss_inr)}</span>
             </div>
             <div className="gd-badges tight">
