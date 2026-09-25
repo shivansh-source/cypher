@@ -25,12 +25,19 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from ai.tool_registry import execute_tool
+from core.assumptions import ATTACK_GRAPH_SAMPLES
 from core.engine import (
     build_loss_event_scenarios,
     compute_loss_exceedance_curve,
     compute_risk_figure,
     expected_annual_loss_by_asset,
     parameterize_scenario,
+)
+from core.engine.attack_graph import build_attack_graph
+from core.engine.attack_graph_inference import (
+    compute_compromise_probabilities,
+    compute_graph_reachability,
+    extract_bounded_subgraph,
 )
 from core.optimizer import (
     APPLICABLE_CONTROL_CATEGORIES,
@@ -84,6 +91,8 @@ _SCENARIO_PARAMETER_FIELDS = (
     "exploit_probability",
     "active_control_resistances",
     "vulnerability",
+    "graph_reachability_applied",
+    "attack_routes",
     "loss_event_frequency",
     "criticality_tier",
     "backup_posture",
@@ -253,9 +262,15 @@ def assets_route() -> Any:
         figure = compute_risk_figure(snapshot)
         contribution_by_scenario = {c.scenario_id: c for c in figure.top_contributors}
         asset_eal = expected_annual_loss_by_asset(figure)
+        # The same reachability compute_risk_figure applied (same snapshot,
+        # same default seed), so the parameters shown are the ones that
+        # produced each figure rather than the pre-graph ones.
+        graph_reachability = compute_graph_reachability(snapshot)
         scenario_by_finding: dict[tuple[str, str], dict[str, Any]] = {}
         for scenario in build_loss_event_scenarios(snapshot):
-            parameterized = parameterize_scenario(scenario, snapshot)
+            parameterized = parameterize_scenario(
+                scenario, snapshot, graph_reachability=graph_reachability
+            )
             contribution = contribution_by_scenario[parameterized["scenario_id"]]
             scenario_by_finding[(scenario["asset_id"], scenario["finding"]["finding_id"])] = {
                 **{key: parameterized[key] for key in _SCENARIO_PARAMETER_FIELDS},
@@ -479,6 +494,143 @@ def _documented_sections(block: list[str]) -> dict[str, str | None]:
     }
 
 
+def attack_graph_route() -> Any:
+    """GET /attack-graph — the attack graph's structure and every asset's routes in.
+
+    Structure is ``core.engine.attack_graph.build_attack_graph``'s, reported
+    both at segment level (segments with their member assets, plus the
+    directed ``segment_reachability`` pairs) and as the asset-to-asset
+    ``edges`` those expand to, each with the ``reason`` that derived it.
+    Routes are ``compute_graph_reachability``'s, with the default seed
+    ``compute_risk_figure`` uses, so they are the routes behind the current
+    figures.
+
+    Each asset's ``role`` is ``entry`` (internet-facing), ``reachable`` (at
+    least one route in), ``unreachable`` (topology known, no route in) or
+    ``unknown`` (null ``segment_id``: omitted from the graph's inference,
+    never reported as unreachable).
+    """
+
+    def handler() -> dict[str, Any]:
+        snapshot = current_snapshot_or_404()
+        graph = build_attack_graph(snapshot)
+        reachability = compute_graph_reachability(snapshot)
+        topology = snapshot.get("network_topology")
+
+        declared = topology["segments"] if topology else []
+        segment_names = {segment["segment_id"]: segment["name"] for segment in declared}
+        # A segment_id an asset reports but the topology does not declare still
+        # groups its assets (build_attack_graph links them); it just has no name.
+        for node in graph.nodes.values():
+            if node.segment_id is not None:
+                segment_names.setdefault(node.segment_id, node.segment_id)
+
+        assets_by_id = {asset["asset_id"]: asset for asset in snapshot["assets"]}
+        nodes: list[dict[str, Any]] = []
+        for asset_id, node in graph.nodes.items():
+            open_findings = [
+                f for f in assets_by_id[asset_id]["findings"] if f.get("remediated_at") is None
+            ]
+            known = reachability.get(asset_id)
+            if known is None:
+                role = "unknown"
+            elif known.is_entry_point:
+                role = "entry"
+            else:
+                role = "reachable" if known.routes else "unreachable"
+            nodes.append(
+                {
+                    "asset_id": asset_id,
+                    "segment_id": node.segment_id,
+                    "internet_facing": node.internet_facing,
+                    "role": role,
+                    "open_finding_count": len(open_findings),
+                    "kev_finding_count": sum(1 for f in open_findings if f.get("kev_listed")),
+                    "routes": [asdict(route) for route in known.routes] if known else [],
+                }
+            )
+
+        return {
+            "snapshot_id": snapshot["snapshot_id"],
+            "observed_at": snapshot["observed_at"],
+            "samples": ATTACK_GRAPH_SAMPLES,
+            "topology_declared": topology is not None,
+            "segments": [
+                {
+                    "segment_id": segment_id,
+                    "name": name,
+                    "declared": segment_id in {s["segment_id"] for s in declared},
+                    "asset_ids": [
+                        n.asset_id for n in graph.nodes.values() if n.segment_id == segment_id
+                    ],
+                }
+                for segment_id, name in segment_names.items()
+            ],
+            "segment_links": topology["segment_reachability"] if topology else [],
+            "edge_count": len(graph.edges),
+            "edges": [asdict(edge) for edge in graph.edges],
+            "nodes": nodes,
+        }
+
+    return handler
+
+
+def attack_graph_target_route() -> Any:
+    """GET /attack-graph/targets/{asset_id} — one asset's bounded subgraph, perimeter-wide.
+
+    ``extract_bounded_subgraph`` scopes the graph to the assets on some path
+    from an entry point to this one, and ``compute_compromise_probabilities``
+    simulates every entry point attacked at once over it: the worst-case
+    display view that function documents, not the per-route view the
+    engine's figures use (that one is each node's ``routes`` in
+    ``/attack-graph``). Edges are the subgraph's own, each with the
+    ``reason`` that derived it.
+
+    404 for an asset not in the snapshot. 409 for an asset whose segment is
+    unknown: inference over it would report "unreachable" for what is
+    really "unknown", which the engine itself refuses to do.
+    """
+    from fastapi import HTTPException
+
+    def handler(asset_id: str) -> dict[str, Any]:
+        snapshot = current_snapshot_or_404()
+        graph = build_attack_graph(snapshot)
+        node = graph.nodes.get(asset_id)
+        if node is None:
+            raise HTTPException(
+                status_code=404, detail=f"Asset {asset_id!r} is not in the current snapshot."
+            )
+        if node.segment_id is None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"{asset_id} has no known network segment, so the attack graph cannot say "
+                    "what reaches it. That is unknown, not unreachable: the engine scores it "
+                    "without the graph. Report its segment_id from a connector with topology "
+                    "visibility to include it."
+                ),
+            )
+        subgraph = extract_bounded_subgraph(graph, asset_id)
+        result = compute_compromise_probabilities(snapshot, subgraph)
+        included = subgraph.included_asset_ids
+        return {
+            "snapshot_id": snapshot["snapshot_id"],
+            "asset_id": asset_id,
+            "samples": result.samples,
+            "included_asset_ids": sorted(included),
+            "compromise_probability": result.crown_jewel_compromise_probability,
+            "node_probabilities": result.node_probabilities,
+            "reached_probabilities": result.reached_probabilities,
+            "edges": [
+                asdict(edge)
+                for edge in graph.edges
+                if edge.source_asset_id in included and edge.target_asset_id in included
+            ],
+        }
+
+    return handler
+
+
 def assumptions_route() -> Any:
     """GET /assumptions — every constant in ``core/assumptions.py``, live.
 
@@ -540,4 +692,6 @@ def register_dashboard_routes(app: Any) -> None:
     app.get("/optimize/candidates")(optimize_candidates_route())
     app.get("/optimize/plan")(optimize_plan_route())
     app.post("/optimize")(optimize_route())
+    app.get("/attack-graph")(attack_graph_route())
+    app.get("/attack-graph/targets/{asset_id}")(attack_graph_target_route())
     app.get("/assumptions")(assumptions_route())

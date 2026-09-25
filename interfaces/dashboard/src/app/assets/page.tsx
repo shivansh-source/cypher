@@ -307,6 +307,7 @@ function AssetDetail({
           {open.map((finding) => (
             <FairChain
               key={finding.finding_id}
+              assetId={asset.asset_id}
               finding={finding}
               scenario={finding.scenario!}
               observedAt={observedAt}
@@ -354,12 +355,14 @@ function AssetDetail({
  * parameters exactly as returned.
  */
 function FairChain({
+  assetId,
   finding,
   scenario,
   observedAt,
   highlighted,
   iterations,
 }: {
+  assetId: string;
   finding: AssetFinding;
   scenario: ScenarioParameters;
   observedAt: string;
@@ -399,7 +402,17 @@ function FairChain({
           <span className="rng">
             {formatDecimal(tef.min, 2)} – {formatDecimal(tef.max, 2)}
           </span>
-          <span className="why">{phrase(scenario.exposure_profile)}</span>
+          <span className="why">
+            {scenario.graph_reachability_applied ? (
+              <Link href={`/attack-paths?target=${encodeURIComponent(assetId)}`}>
+                {scenario.attack_routes && scenario.attack_routes.length > 0
+                  ? `Arriving by ${scenario.attack_routes.length} attack route${scenario.attack_routes.length === 1 ? "" : "s"}`
+                  : "No attack route reaches it"}
+              </Link>
+            ) : (
+              phrase(scenario.exposure_profile)
+            )}
+          </span>
         </div>
         <span className="op" aria-hidden="true">
           ×
