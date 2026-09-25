@@ -49,7 +49,7 @@ const LINKS: { href: string; label: string; icon: ReactNode }[] = [
   },
   {
     href: "/data-quality",
-    label: "Data & model",
+    label: "Data & coverage",
     icon: (
       <>
         <ellipse cx="12" cy="6" rx="8" ry="3" />

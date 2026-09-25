@@ -1,13 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { AskSuraksha } from "./AskSuraksha";
+import { AskSurakshaTrigger } from "./AskSuraksha";
 
 const VIEWS: { prefix: string; eyebrow: string; title: string }[] = [
   { prefix: "/assets", eyebrow: "Technical view", title: "Assets & findings" },
   { prefix: "/investment", eyebrow: "Budget decision", title: "Investment optimization" },
   { prefix: "/compliance", eyebrow: "Governance view", title: "Compliance & frameworks" },
-  { prefix: "/data-quality", eyebrow: "Provenance view", title: "Data quality & model" },
+  { prefix: "/data-quality", eyebrow: "Provenance view", title: "Data quality & coverage" },
 ];
 
 const OVERVIEW = { eyebrow: "Executive view", title: "Exposure overview" };
@@ -22,7 +22,7 @@ export function Topbar() {
         <div className="eyebrow">{view.eyebrow}</div>
         <h1>{view.title}</h1>
       </div>
-      <AskSuraksha />
+      <AskSurakshaTrigger />
     </header>
   );
 }
