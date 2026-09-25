@@ -43,6 +43,14 @@ module "network" {
   portal_http_cidrs = [var.my_ip_cidr]
 }
 
+module "pipeline" {
+  source = "../../modules/pipeline"
+
+  bucket_name   = var.raw_findings_bucket
+  github_repo   = var.github_repo
+  github_branch = var.github_branch
+}
+
 module "compute" {
   source = "../../modules/compute"
 
@@ -56,6 +64,9 @@ module "compute" {
   flask_version         = var.flask_version
   werkzeug_version      = var.werkzeug_version
   bastion_instance_type = var.bastion_instance_type
+
+  # Lets the bastion's daily export cron write to S3 inputs/ (and nothing else).
+  bastion_instance_profile = module.pipeline.bastion_instance_profile
 }
 
 module "iam" {

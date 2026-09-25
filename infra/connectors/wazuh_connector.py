@@ -15,7 +15,9 @@ credentials must authenticate, or :meth:`WazuhConnector.fetch` raises
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -38,6 +40,7 @@ _WAZUH_API_PASSWORD_ENV = "WAZUH_API_PASSWORD"
 _WAZUH_INDEXER_URL_ENV = "WAZUH_INDEXER_URL"
 _WAZUH_INDEXER_USERNAME_ENV = "WAZUH_INDEXER_USERNAME"
 _WAZUH_INDEXER_PASSWORD_ENV = "WAZUH_INDEXER_PASSWORD"
+_WAZUH_EXPORT_PATH_ENV = "WAZUH_EXPORT_PATH"
 
 
 class WazuhConnectorError(RuntimeError):
@@ -60,9 +63,17 @@ class WazuhConnector(Connector):
     name: str = "wazuh_connector"
 
     def fetch(self) -> Any:
-        """Retrieve raw agent status and recent alerts from the Wazuh API.
+        """Retrieve raw agent status and recent alerts, from an export file or the Wazuh API.
 
-        Authenticates against the Wazuh manager API, lists agents, and for
+        If ``WAZUH_EXPORT_PATH`` is set, reads that JSON bundle instead of
+        calling any API: an operator-produced file in exactly the shape this
+        method otherwise returns (``{"agents": [...], "alerts": [...]}``),
+        built by ``infra/inventory/build_wazuh_bundle.py``. This exists
+        because a manager-only Wazuh deployment has no indexer to query. The
+        bundle is not written back to the object store: the input file is
+        itself the audit artifact.
+
+        Otherwise authenticates against the Wazuh manager API, lists agents, and for
         each agent retrieves its installed-package and open-port
         syscollector inventory. Separately queries the Wazuh indexer for
         alerts within :data:`ALERT_LOOKBACK_HOURS`.
@@ -79,6 +90,10 @@ class WazuhConnector(Connector):
                 depends on. Must not return an empty result to mean
                 "could not fetch".
         """
+        export_path = _env.get_optional(_WAZUH_EXPORT_PATH_ENV)
+        if export_path:
+            return self._read_export(Path(export_path))
+
         api_url = _env.require(_WAZUH_API_URL_ENV, self.name, WazuhConnectorError)
         api_username = _env.require(_WAZUH_API_USERNAME_ENV, self.name, WazuhConnectorError)
         api_password = _env.require(_WAZUH_API_PASSWORD_ENV, self.name, WazuhConnectorError)
@@ -105,6 +120,32 @@ class WazuhConnector(Connector):
         raw: dict[str, Any] = {"agents": agents_raw, "alerts": alerts}
         _object_store.write_raw(self.name, raw)
         return raw
+
+    def _read_export(self, path: Path) -> dict[str, Any]:
+        """Read and validate a Wazuh bundle file (see :meth:`fetch`).
+
+        Raises:
+            WazuhConnectorError: If the file cannot be read or parsed, is not
+                an object, or has no ``agents`` list (an empty ``alerts``
+                list is legitimate; a bundle with no agent list cannot say
+                anything about EDR posture and must not be read as "no
+                agents installed").
+        """
+        try:
+            bundle = json.loads(path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            raise WazuhConnectorError(f"{self.name}: could not read {path}: {exc}") from exc
+        except json.JSONDecodeError as exc:
+            raise WazuhConnectorError(f"{self.name}: {path} is not valid JSON: {exc}") from exc
+        if (
+            not isinstance(bundle, dict)
+            or not isinstance(bundle.get("agents"), list)
+            or not isinstance(bundle.get("alerts"), list)
+        ):
+            raise WazuhConnectorError(
+                f"{self.name}: {path} must be a JSON object with 'agents' and 'alerts' lists"
+            )
+        return bundle
 
     def _authenticate(self, api_url: str, username: str, password: str) -> str:
         """Authenticate against the Wazuh manager API and return a JWT.

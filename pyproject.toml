@@ -25,6 +25,9 @@ dependencies = [
     "python-gvm",
 ]
 
+[project.scripts]
+riskctl = "interfaces.cli.riskctl:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest",
@@ -37,7 +40,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["core/tests", "governance/tests", "ai/tests", "infra/tests"]
+testpaths = ["core/tests", "governance/tests", "ai/tests", "infra/tests", "interfaces/tests"]
 
 [tool.mypy]
 python_version = "3.11"

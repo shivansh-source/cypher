@@ -1,6 +1,14 @@
 import type { ApiResult } from "@/lib/api";
-import { formatCount, formatTimestamp, shortSnapshotId } from "@/lib/format";
+import { formatAge, formatCount, formatTimestamp, hoursSince, shortSnapshotId } from "@/lib/format";
 import type { SnapshotProvenance } from "@/lib/types";
+
+/**
+ * A snapshot older than this is flagged as stale. Snapshots are refreshed daily, so a day and
+ * a half means a scheduled refresh was missed or rejected by a quality gate; the previous
+ * snapshot correctly stays current, but a reader must be told how old it is. Operational
+ * threshold, not a modelling constant.
+ */
+const STALE_AFTER_HOURS = 36;
 
 /**
  * The provenance line that qualifies every figure on the page.
@@ -27,6 +35,9 @@ export function ProvenanceStrip({
 
   const snapshot = result.data;
   const unreachable = snapshot.scan_scope.unreachable_scanners;
+  const age = formatAge(snapshot.observed_at);
+  const ageHours = hoursSince(snapshot.observed_at);
+  const isStale = ageHours !== null && ageHours > STALE_AFTER_HOURS;
 
   return (
     <div className="card provstrip">
@@ -38,6 +49,7 @@ export function ProvenanceStrip({
         </Item>
         <Item label="Observed">
           <span className="mono">{formatTimestamp(snapshot.observed_at)}</span>
+          {age ? <span> ({age})</span> : null}
         </Item>
         <Item label="Status">{snapshot.valid_to === null ? "Current" : "Superseded"}</Item>
         <Item label="Assets">
@@ -58,6 +70,13 @@ export function ProvenanceStrip({
           </span>
         </Item>
       </dl>
+
+      {isStale ? (
+        <p className="notice" style={{ marginTop: 12 }}>
+          <strong>Stale snapshot:</strong> this snapshot was observed {age}. The scheduled refresh
+          has not produced a newer one, so these figures describe the estate as it was then.
+        </p>
+      ) : null}
 
       {unreachable.length > 0 ? (
         <p className="notice" style={{ marginTop: 12 }}>

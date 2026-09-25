@@ -35,6 +35,7 @@ resource "aws_instance" "bastion_scanner" {
   subnet_id              = var.public_subnet_id
   vpc_security_group_ids = [var.bastion_sg_id]
   key_name               = var.key_name
+  iam_instance_profile   = var.bastion_instance_profile
   user_data              = file("${path.module}/scripts/scanner_bootstrap.sh")
 
   user_data_replace_on_change = true

@@ -12,6 +12,7 @@ modules/network/    VPC 10.20.0.0/16, one public subnet, no NAT
 modules/compute/    4 instances (portal, bastion+scanner, db, endpoint-sim) + bootstrap scripts
 modules/iam/        V-03 role, V-04 user, V-05 user+key
 modules/backup/     V-06 DLM policy
+modules/pipeline/   least-privilege IAM for the daily ingest pipeline (NOT planted; see below)
 ```
 
 ## State lives in S3, not in this repo
@@ -43,3 +44,19 @@ committed). Public IPs change on every stop/start; re-read `terraform output`.
 - No auto-stop exists: instances bill continuously while running.
 - The account is on the AWS Free Plan with an 8 vCPU limit, so do not add a
   fifth instance without stopping one.
+
+## Pipeline permissions (`modules/pipeline`)
+
+Separate from the planted-vulnerability IAM. Creates, in the existing raw-findings bucket's
+`inputs/`, `snapshots/` and `latest/` prefixes:
+
+- `gha-suraksha-ingest`: assumable only by the `ps105` repo's default branch via GitHub OIDC;
+  SecurityAudit + ViewOnlyAccess (for Prowler/PMapper) plus S3 access to those prefixes.
+- `suraksha-bastion-exporter`: instance profile for the bastion; PutObject on `inputs/*` only.
+- `suraksha-api-reader`: user for the hosted API; read-only on `snapshots/*`. **Create its
+  access key by hand** (`aws iam create-access-key --user-name suraksha-api-reader`) so the
+  secret never enters Terraform state.
+
+Applying it modifies the live account (and attaches a profile to the running bastion), so run
+`terraform plan` first and review it. After apply, set the repository variables `AWS_ROLE_ARN`
+(`terraform output pipeline_gha_role_arn`) and `RAW_FINDINGS_BUCKET`.
