@@ -152,7 +152,7 @@ persistence/scheduling (`db`, `connector-scheduler`). `dashboard` talks to
   (currently `export_ec2_inventory.py`, the AWS stand-in for a CMDB).
 - `infra/terraform/` — the LoanEase sandbox that generates the telemetry; see
   its own `README.md` and `manifest.yaml`.
-- `infra/bastion/` — the daily Wazuh export cron that runs on the bastion.
+- `infra/bastion/` — Wazuh + Greenbone exports that run on the bastion, triggered by the workflow through SSM (no bastion cron).
 - `infra/Dockerfile.api` — container image for the hosted API.
 - `.github/workflows/scheduled-ingest.yml` — the daily / on-demand pipeline: Prowler + PMapper,
   then `riskctl ingest`, then publishes the snapshot store to S3.
@@ -160,8 +160,9 @@ persistence/scheduling (`db`, `connector-scheduler`). `dashboard` talks to
 ## Daily pipeline at a glance
 
 ```
-bastion cron (20:00 UTC)  -> S3 inputs/wazuh_bundle.json
-you, by hand              -> S3 inputs/greenbone_report.csv   (after a scan; not automated)
+every workflow run refreshes these via SSM (daily, or when refresh_host_data is ticked); or by hand on the bastion:
+    Wazuh export          -> S3 inputs/wazuh_bundle.json
+    Greenbone export      -> S3 inputs/greenbone_report.xml   (latest existing report; no rescan)
 workflow (21:00 UTC / manual "Run workflow"):
     Prowler + PMapper     -> S3 latest/prowler_connector.json, inputs/pmapper.json
     EC2 inventory         -> built inside the ingest job

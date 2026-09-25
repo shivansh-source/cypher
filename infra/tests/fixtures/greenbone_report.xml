@@ -16,6 +16,11 @@
         <threat>Log</threat>
         <severity>0.0</severity>
         <creation_time>2026-09-24T12:50:00Z</creation_time>
+        <detection>
+          <result id="detection-not-a-finding">
+            <details><detail><name>source_name</name><value>Example detection source</value></detail></details>
+          </result>
+        </detection>
       </result>
       <result id="aaaaaaaa-0000-0000-0000-000000000002">
         <name>Example service finding</name>

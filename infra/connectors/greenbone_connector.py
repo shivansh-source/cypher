@@ -93,9 +93,12 @@ def _element_text(element: Any) -> str | None:
 def _results_to_dicts(results_root: Any) -> list[dict[str, Any]]:
     """Convert a ``get_results`` response, or a full report export, into plain dicts.
 
-    Every ``result`` element under ``results_root`` is read, however deeply
-    nested — a ``get_results`` response holds them directly, while a GSA
-    report export nests them under ``report/report/results``.
+    Findings are the ``result`` elements that are direct children of a
+    ``results`` element (a report export nests them under
+    ``report/report/results``) or of ``results_root`` itself (a
+    ``get_results`` response). ``result`` elements nested deeper — the
+    ``detection`` blocks inside a finding, which name the check that found
+    it — are not findings and are never read.
 
     Preserves GVM's own field names (``host``, NVT ``oid``, ``name``,
     ``cvss`` via ``severity``, ``threat``, ``cve``, result ``id``) without
@@ -103,7 +106,9 @@ def _results_to_dicts(results_root: Any) -> list[dict[str, Any]]:
     :meth:`GreenboneConnector.normalize`, not here.
     """
     records: list[dict[str, Any]] = []
-    for result in results_root.iter("result"):
+    containers = [results_root]
+    containers.extend(el for el in results_root.iter("results") if el is not results_root)
+    for result in (r for container in containers for r in container.findall("result")):
         nvt = result.find("nvt")
         records.append(
             {

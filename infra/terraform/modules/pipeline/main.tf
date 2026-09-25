@@ -139,3 +139,59 @@ resource "aws_iam_user_policy" "api_reader" {
     ]
   })
 }
+
+# ---- On-demand host refresh via SSM (no SSH, no schedule) -----------------------------------
+# The GitHub workflow can ask the bastion to run ONE fixed script (refresh_host_data.sh) through
+# this SSM document. The role below may run only this document, and only on the instance tagged
+# Name=loanease-bastion-scanner, so it is not a general remote-shell grant.
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+resource "aws_ssm_document" "refresh_host_data" {
+  name            = "SurakshaRefreshHostData"
+  document_type   = "Command"
+  document_format = "JSON"
+
+  content = jsonencode({
+    schemaVersion = "2.2"
+    description   = "Re-export Wazuh and Greenbone data to S3 inputs/ (runs /opt/suraksha/refresh_host_data.sh)."
+    mainSteps = [{
+      action = "aws:runShellScript"
+      name   = "refreshHostData"
+      inputs = { runCommand = ["/opt/suraksha/refresh_host_data.sh"] }
+    }]
+  })
+}
+
+# Lets the SSM agent on the bastion register and receive commands.
+resource "aws_iam_role_policy_attachment" "bastion_ssm_core" {
+  role       = aws_iam_role.bastion_exporter.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_role_policy" "gha_refresh_bastion" {
+  name = "run-refresh-host-data-only"
+  role = aws_iam_role.gha_ingest.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ssm:SendCommand"]
+        Resource = aws_ssm_document.refresh_host_data.arn
+      },
+      {
+        Effect    = "Allow"
+        Action    = ["ssm:SendCommand"]
+        Resource  = "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:instance/*"
+        Condition = { StringEquals = { "ssm:resourceTag/Name" = "loanease-bastion-scanner" } }
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["ssm:GetCommandInvocation"]
+        Resource = "*"
+      },
+    ]
+  })
+}
