@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { Card } from "@/components/Card";
+import { InfoTip } from "@/components/InfoTip";
 import { Unavailable } from "@/components/Unavailable";
 import { fetchAssets } from "@/lib/api";
 import {
   daysBetween,
+  formatCount,
   formatDate,
   formatDecimal,
   formatInr,
   formatPercent,
-  humanize,
 } from "@/lib/format";
-import type { AssetFinding, AssetView, PertEstimate, ScenarioParameters } from "@/lib/types";
+import { assetName, backupLabel, controlLabel, findingTitle, phrase, scannerLabel } from "@/lib/labels";
+import type { AssetFinding, AssetView, ScenarioParameters } from "@/lib/types";
 
 /** Display order only — which of an asset's service tiers to name first. */
 const CRITICALITY_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
@@ -21,65 +23,82 @@ function highestCriticality(asset: AssetView): string {
   return tiers.reduce((a, b) => ((CRITICALITY_RANK[b] ?? 0) > (CRITICALITY_RANK[a] ?? 0) ? b : a));
 }
 
-type ChipState = "on" | "off" | "na";
+function exposure(asset: AssetView): string {
+  const internet = asset.network?.internet_facing;
+  return internet === true ? "Internet-facing" : internet === false ? "Internal" : "Exposure unknown";
+}
 
-function mfaChip(asset: AssetView): [ChipState, string] {
+function plural(count: number, one: string, many = `${one}s`): string {
+  return `${formatCount(count)} ${count === 1 ? one : many}`;
+}
+
+type Posture = { state: "on" | "off" | "na"; label: string; detail: string };
+
+/** Observed posture, spelled out. An unrecorded posture is "?", never read as protected. */
+function posture(asset: AssetView): Posture[] {
   const mfa = asset.identity_access?.mfa_enforced;
-  if (mfa === true) return ["on", "MFA enforced"];
-  if (mfa === false) return ["off", "MFA not enforced"];
-  return ["na", "MFA posture not recorded (unknown, not assumed)"];
-}
-
-function edrChip(asset: AssetView): [ChipState, string] {
   const edr = asset.edr;
-  if (!edr) return ["na", "EDR posture not recorded"];
-  if (!edr.agent_installed) return ["off", "No EDR agent installed"];
-  if (edr.agent_healthy === true) return ["on", "EDR agent installed and healthy"];
-  if (edr.agent_healthy === false) return ["off", "EDR agent installed but unhealthy"];
-  return ["na", "EDR agent installed, health unknown"];
-}
-
-function backupChip(asset: AssetView): [ChipState, string] {
-  if (asset.services.length === 0) return ["na", "No related service, so no backup posture"];
-  if (asset.services.some((s) => !s.backup.exists)) return ["off", "A related service has no backup"];
-  if (asset.services.some((s) => s.backup.last_tested_at === null))
-    return ["off", "A related service's backup has never been tested"];
-  return ["on", "Every related service has a tested backup"];
-}
-
-function Chips({ asset }: { asset: AssetView }) {
-  const chips: [string, [ChipState, string]][] = [
-    ["MFA", mfaChip(asset)],
-    ["EDR", edrChip(asset)],
-    ["BKP", backupChip(asset)],
+  const backup: Posture =
+    asset.services.length === 0
+      ? { state: "na", label: "Backup", detail: "No related service, so no backup posture" }
+      : asset.services.some((s) => !s.backup.exists)
+        ? { state: "off", label: "Backup", detail: "A related service has no backup" }
+        : asset.services.some((s) => s.backup.last_tested_at === null)
+          ? { state: "off", label: "Backup", detail: "A related service's backup has never been tested" }
+          : { state: "on", label: "Backup", detail: "Every related service has a tested backup" };
+  return [
+    mfa === true
+      ? { state: "on", label: "MFA", detail: "MFA enforced" }
+      : mfa === false
+        ? { state: "off", label: "MFA", detail: "MFA not enforced" }
+        : { state: "na", label: "MFA", detail: "MFA posture not recorded (unknown, not assumed)" },
+    !edr
+      ? { state: "na", label: "EDR", detail: "EDR posture not recorded" }
+      : !edr.agent_installed
+        ? { state: "off", label: "EDR", detail: "No EDR agent installed" }
+        : edr.agent_healthy === true
+          ? { state: "on", label: "EDR", detail: "EDR agent installed and healthy" }
+          : edr.agent_healthy === false
+            ? { state: "off", label: "EDR", detail: "EDR agent installed but unhealthy" }
+            : { state: "na", label: "EDR", detail: "EDR agent installed, health unknown" },
+    backup,
   ];
+}
+
+const POSTURE_ICON = { on: "✓", off: "✕", na: "?" } as const;
+
+function PostureChips({ asset }: { asset: AssetView }) {
   return (
-    <span className="ctl">
-      {chips.map(([label, [state, title]]) => (
-        <i key={label} className={state} title={title}>
-          {label}
-          {state === "na" ? "?" : ""}
-        </i>
+    <span className="posture">
+      {posture(asset).map((p) => (
+        <span key={p.label} className={`pc ${p.state}`} title={p.detail}>
+          <span aria-hidden="true">{POSTURE_ICON[p.state]}</span> {p.label}
+          <span className="sr-only">: {p.detail}</span>
+        </span>
       ))}
     </span>
   );
 }
 
-function pert(estimate: PertEstimate, format: (value: number) => string) {
-  return `${format(estimate.min)} / ${format(estimate.most_likely)} / ${format(estimate.max)}`;
-}
-
 function exploitSource(finding: AssetFinding, scenario: ScenarioParameters): string {
   const base = finding.epss_score;
   if (finding.kev_listed && (base === null || scenario.exploit_probability > base))
-    return "KEV-listed floor";
-  if (base === null) return "baseline for an unscored finding";
-  return "EPSS score";
+    return "the KEV-listed floor";
+  if (base === null) return "the baseline for unscored findings";
+  return "its EPSS score";
+}
+
+function assetHref(assetId: string, findingId?: string): string {
+  const base = `/assets?asset=${encodeURIComponent(assetId)}`;
+  if (!findingId) return base;
+  const id = encodeURIComponent(findingId);
+  return `${base}&finding=${id}#finding-${id}`;
 }
 
 export default async function AssetsPage(props: PageProps<"/assets">) {
   const params = await props.searchParams;
   const requested = Array.isArray(params.asset) ? params.asset[0] : params.asset;
+  const highlighted = Array.isArray(params.finding) ? params.finding[0] : params.finding;
   const result = await fetchAssets();
 
   if (result.state !== "ok") {
@@ -87,6 +106,14 @@ export default async function AssetsPage(props: PageProps<"/assets">) {
   }
 
   const { assets, observed_at: observedAt } = result.data;
+  if (assets.length === 0) {
+    return (
+      <Card title="Assets">
+        <p className="small muted">The current snapshot contains no assets.</p>
+      </Card>
+    );
+  }
+
   const rows = [...assets].sort(
     (a, b) => (b.expected_annual_loss_inr ?? -1) - (a.expected_annual_loss_inr ?? -1),
   );
@@ -99,305 +126,419 @@ export default async function AssetsPage(props: PageProps<"/assets">) {
     )
     .sort((a, b) => b.scenario.expected_annual_loss_inr - a.scenario.expected_annual_loss_inr);
 
-  if (rows.length === 0) {
-    return (
-      <Card title="Assets">
-        <p className="small muted">The current snapshot contains no assets.</p>
-      </Card>
-    );
-  }
-
   return (
     <div className="grid">
-      <div className="grid g-2">
-        <Card
-          title="Assets"
-          subtitle="Select an asset to see the Open FAIR parameters behind its figure. Criticality comes from each asset's related services, as recorded — never inferred."
-        >
-          <div className="tbl">
-            <table>
-              <thead>
-                <tr>
-                  <th>Asset</th>
-                  <th>Criticality</th>
-                  <th>Controls</th>
-                  <th className="r">Open</th>
-                  <th className="r">Expected annual loss</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((asset) => {
-                  const open = asset.findings.filter((f) => f.scenario !== null).length;
-                  const criticality = highestCriticality(asset);
-                  const internet = asset.network?.internet_facing;
-                  return (
-                    <tr key={asset.asset_id} className={asset === selected ? "sel" : undefined}>
-                      <td>
-                        <Link
-                          className="rowlink mono"
-                          href={`/assets?asset=${encodeURIComponent(asset.asset_id)}`}
-                          aria-current={asset === selected ? "true" : undefined}
-                          scroll={false}
-                        >
-                          {asset.asset_id}
-                        </Link>
-                        <div className="sub">
-                          {asset.services.map((s) => s.name).join(", ") || "no related service"} ·{" "}
-                          {internet === true
-                            ? "internet-facing"
-                            : internet === false
-                              ? "internal"
-                              : "exposure unknown"}
-                        </div>
-                      </td>
-                      <td className={`crit-${criticality}`} style={{ fontWeight: 600 }}>
-                        {criticality}
-                      </td>
-                      <td>
-                        <Chips asset={asset} />
-                      </td>
-                      <td className="r mono">{open}</td>
-                      <td className="r mono nowrap">
-                        {asset.expected_annual_loss_inr === null ? (
-                          <span className="muted" title="No open finding, so no scenario is modelled on this asset">
-                            not modelled
-                          </span>
-                        ) : (
-                          formatInr(asset.expected_annual_loss_inr)
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <p className="small muted" style={{ marginTop: 10 }}>
-            Chips: green is observed active, red is observed absent, grey “?” is not recorded — an
-            unknown posture is never read as protected.
-          </p>
-        </Card>
-
-        <section className="card">
-          <AssetDetail asset={selected} observedAt={observedAt} />
-        </section>
-      </div>
-
-      <Card
-        title="Remediation backlog"
-        subtitle="Every open finding, ordered by the expected annual loss the engine attributes to it. Each traces to the connector and raw record that produced it."
-      >
-        {backlog.length === 0 ? (
-          <p className="small muted">No open findings in the current snapshot.</p>
-        ) : (
-          <div className="tbl">
-            <table>
-              <thead>
-                <tr>
-                  <th>Finding</th>
-                  <th>Asset</th>
-                  <th>Signals</th>
-                  <th className="r">Open for</th>
-                  <th>Source</th>
-                  <th className="r">Expected annual loss</th>
-                </tr>
-              </thead>
-              <tbody>
-                {backlog.map(({ asset, finding, scenario }) => {
-                  const days = daysBetween(finding.first_seen_at, observedAt);
-                  return (
-                    <tr key={scenario.scenario_id}>
-                      <td>
-                        <b>{finding.cve_id ?? humanize(finding.type)}</b>
-                        <div className="sub mono">
-                          {finding.finding_id} · {humanize(finding.type)} · criticality{" "}
-                          {finding.criticality ?? "not evaluated"}
-                        </div>
-                      </td>
-                      <td className="mono small">{asset.asset_id}</td>
-                      <td>
-                        <span className="ctl">
-                          {finding.epss_score !== null ? (
-                            <span className="mini">EPSS {formatDecimal(finding.epss_score, 2)}</span>
-                          ) : (
-                            <span className="mini">unscored</span>
-                          )}
-                          {finding.kev_listed ? <span className="mini kev">KEV</span> : null}
-                        </span>
-                      </td>
-                      <td className="r mono nowrap">{days === null ? "unknown" : `${days} d`}</td>
-                      <td className="mono small">
-                        {finding.provenance.connector}
-                        <div className="sub">{finding.provenance.raw_source_id}</div>
-                      </td>
-                      <td className="r mono nowrap">{formatInr(scenario.expected_annual_loss_inr)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <p className="small muted" style={{ marginTop: 10 }}>
-          “Open for” is measured from first detection to when this snapshot was observed (
-          {formatDate(observedAt)}), not to today.
-        </p>
-      </Card>
+      <AssetList
+        rows={rows}
+        selected={selected}
+        totalInr={result.data.expected_annual_loss_inr}
+      />
+      <AssetDetail
+        asset={selected}
+        observedAt={observedAt}
+        highlighted={highlighted}
+        iterations={result.data.monte_carlo_iterations}
+      />
+      <Backlog backlog={backlog} observedAt={observedAt} />
     </div>
   );
 }
 
-function AssetDetail({ asset, observedAt }: { asset: AssetView; observedAt: string }) {
-  const open = asset.findings.filter((f) => f.scenario !== null);
-  const remediated = asset.findings.filter((f) => f.remediated_at != null);
-  const criticality = highestCriticality(asset);
+/**
+ * Every asset, largest expected annual loss first, each with its share of the
+ * modelled loss. Shares compare the engine's own per-asset figures; no rupee
+ * amount is derived here.
+ */
+function AssetList({
+  rows,
+  selected,
+  totalInr,
+}: {
+  rows: AssetView[];
+  selected: AssetView;
+  totalInr: number;
+}) {
+  const modelled = rows.reduce((sum, a) => sum + (a.expected_annual_loss_inr ?? 0), 0);
+  const share = (a: AssetView) =>
+    modelled > 0 && a.expected_annual_loss_inr !== null ? a.expected_annual_loss_inr / modelled : null;
+  const top = rows[0];
+  const topShare = share(top);
+
   return (
-    <div className="detail">
-      <div>
-        <div className="eyebrow mono">{asset.asset_id}</div>
-        <h2 style={{ marginTop: 4 }}>
-          {asset.services.map((s) => s.name).join(", ") || "No related service"}
-        </h2>
-        <p className="small muted" style={{ marginTop: 4 }}>
-          <span className={`crit-${criticality}`}>{criticality}</span> ·{" "}
-          {asset.network?.internet_facing === true
-            ? "internet-facing"
-            : asset.network?.internet_facing === false
-              ? "internal"
-              : "exposure unknown"}
-          {asset.network?.open_ports?.length ? ` · open ports ${asset.network.open_ports.join(", ")}` : ""}
-          {asset.identity_access?.privileged_accounts_count != null
-            ? ` · ${asset.identity_access.privileged_accounts_count} privileged account${asset.identity_access.privileged_accounts_count === 1 ? "" : "s"}`
-            : ""}
-        </p>
-        {asset.unresolved_service_ids.length > 0 ? (
-          <p className="notice" style={{ marginTop: 8 }}>
-            Related service{asset.unresolved_service_ids.length === 1 ? "" : "s"}{" "}
-            {asset.unresolved_service_ids.join(", ")} not found in the snapshot, so the engine
-            leaves {asset.unresolved_service_ids.length === 1 ? "it" : "them"} out: this asset&apos;s
-            criticality and backup posture come only from the services that did resolve (or fall
-            back to unknown criticality and no backup if none did).
-          </p>
-        ) : null}
-      </div>
-
-      <div className="kv">
-        <div>
-          <div className="k">Asset expected annual loss</div>
-          <div className="x">
-            {asset.expected_annual_loss_inr === null ? "not modelled" : formatInr(asset.expected_annual_loss_inr)}
-          </div>
-        </div>
-        <div>
-          <div className="k">Open findings</div>
-          <div className="x">{open.length}</div>
-        </div>
-        <div>
-          <div className="k">Remediated findings</div>
-          <div className="x">{remediated.length}</div>
-        </div>
-      </div>
-
-      <div>
-        <h3 style={{ marginBottom: 8 }}>Open findings and their FAIR parameters</h3>
-        {open.length === 0 ? (
-          <p className="small muted">
-            No open finding on this asset, so the engine models no loss scenario here. Threat paths
-            that do not start from a discrete finding are not modelled yet — this is not a
-            statement that the asset carries no risk.
-          </p>
+    <Card
+      title="Assets"
+      subtitle="Largest expected annual loss first. Select one to see how its figure is built."
+      actions={
+        <InfoTip id="assets-basis" label="How to read this list">
+          Criticality comes from each asset&apos;s related services, as recorded — never inferred.
+          Posture shows what was observed: ✓ active, ✕ absent, ? not recorded. An unrecorded
+          posture is never read as protected.
+        </InfoTip>
+      }
+    >
+      <div className="concentration">
+        {topShare === null ? (
+          <p className="headline">No asset has an open finding, so no loss is modelled yet.</p>
         ) : (
-          <div className="grid" style={{ gap: 10 }}>
-            {open.map((finding) => {
-              const scenario = finding.scenario!;
-              const controls = Object.entries(scenario.active_control_resistances);
-              return (
-                <div className="scenario" key={finding.finding_id}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                    <div>
-                      <b>{finding.cve_id ?? humanize(finding.type)}</b>{" "}
-                      {finding.kev_listed ? <span className="mini kev">KEV</span> : null}
-                      <div className="sub mono">
-                        {finding.finding_id} · via {finding.provenance.connector} · first seen{" "}
-                        {formatDate(finding.first_seen_at)}
-                        {(() => {
-                          const days = daysBetween(finding.first_seen_at, observedAt);
-                          return days === null ? "" : ` (${days} d before this snapshot)`;
-                        })()}
-                      </div>
-                    </div>
-                    <div className="mono" style={{ fontWeight: 600 }}>
-                      {formatInr(scenario.expected_annual_loss_inr)} / yr
-                    </div>
-                  </div>
-                  <div className="kv">
-                    <div>
-                      <div className="k">Threat events / yr (min / likely / max)</div>
-                      <div className="x">{pert(scenario.threat_event_frequency, (v) => formatDecimal(v, 2))}</div>
-                      <div className="e">{humanize(scenario.exposure_profile)}</div>
-                    </div>
-                    <div>
-                      <div className="k">Exploit probability</div>
-                      <div className="x">{formatDecimal(scenario.exploit_probability)}</div>
-                      <div className="e">{exploitSource(finding, scenario)}</div>
-                    </div>
-                    <div>
-                      <div className="k">Controls credited</div>
-                      <div className="x">
-                        {controls.length === 0
-                          ? "none"
-                          : controls.map(([name, r]) => `${humanize(name)} ${formatPercent(r)}`).join(", ")}
-                      </div>
-                      <div className="e">resistance, varied per simulated year</div>
-                    </div>
-                    <div>
-                      <div className="k">Vulnerability</div>
-                      <div className="x">{formatPercent(scenario.vulnerability, 1)}</div>
-                      <div className="e">exploit probability net of controls</div>
-                    </div>
-                    <div>
-                      <div className="k">Loss events / yr (min / likely / max)</div>
-                      <div className="x">{pert(scenario.loss_event_frequency, (v) => formatDecimal(v))}</div>
-                    </div>
-                    <div>
-                      <div className="k">Loss per event (min / likely / max)</div>
-                      <div className="x" style={{ fontSize: 12 }}>
-                        {pert(scenario.loss_magnitude, formatInr)}
-                      </div>
-                      <div className="e">
-                        {scenario.criticality_tier}-tier impact · {humanize(scenario.backup_posture)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <>
+            <p className="headline">
+              {assetName(top)} carries {formatPercent(topShare, 1)} of the modelled loss
+            </p>
+            <p className="small muted">
+              {formatInr(totalInr)} expected annual loss across {plural(rows.length, "asset")}
+            </p>
+          </>
         )}
       </div>
 
-      {remediated.length > 0 ? (
-        <div>
-          <h3 style={{ marginBottom: 6 }}>Remediated</h3>
-          <div className="rank">
-            {remediated.map((finding) => (
-              <div className="it two" key={finding.finding_id}>
-                <span className="nm">{finding.cve_id ?? humanize(finding.type)}</span>
-                <span className="pill good">✓ Remediated {formatDate(finding.remediated_at!)}</span>
-                <span className="meta mono">
-                  {finding.finding_id} · via {finding.provenance.connector}
+      <ul className="alist">
+        {rows.map((asset) => {
+          const tier = highestCriticality(asset);
+          const open = asset.findings.filter((f) => f.scenario !== null).length;
+          const s = share(asset);
+          const current = asset === selected;
+          return (
+            <li key={asset.asset_id}>
+              <Link
+                className="arow"
+                href={assetHref(asset.asset_id)}
+                aria-current={current ? "true" : undefined}
+                scroll={false}
+              >
+                <span className="who">
+                  <b>{assetName(asset)}</b>
+                  <span className="meta">
+                    <span className="mono">{asset.asset_id}</span>
+                    <span>{exposure(asset)}</span>
+                    <span>{open === 0 ? "No open findings" : plural(open, "open finding")}</span>
+                  </span>
                 </span>
-              </div>
-            ))}
-          </div>
-        </div>
+                <span className={`tier crit-${tier}`}>{phrase(tier)}</span>
+                <PostureChips asset={asset} />
+                <span className="loss">
+                  {asset.expected_annual_loss_inr === null ? (
+                    <span className="muted" title="No open finding, so no scenario is modelled">
+                      Not modelled
+                    </span>
+                  ) : (
+                    <>
+                      <span className="amt">{formatInr(asset.expected_annual_loss_inr)}</span>
+                      <span className="share">
+                        <span className="track" aria-hidden="true">
+                          <i style={{ width: `${Math.max((s ?? 0) * 100, 1)}%` }} />
+                        </span>
+                        <span className="pct">{s === null ? "" : formatPercent(s, 1)}</span>
+                      </span>
+                    </>
+                  )}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
+
+/**
+ * The selected asset and, for each open finding, the Open FAIR chain that
+ * produces its figure. `highlighted` is a finding_id to mark — set when
+ * another page (the compliance evidence list) links to one finding.
+ */
+function AssetDetail({
+  asset,
+  observedAt,
+  highlighted,
+  iterations,
+}: {
+  asset: AssetView;
+  observedAt: string;
+  highlighted?: string;
+  iterations: number;
+}) {
+  const open = asset.findings.filter((f) => f.scenario !== null);
+  const remediated = asset.findings.filter((f) => f.remediated_at != null);
+  const tier = highestCriticality(asset);
+  const ports = asset.network?.open_ports;
+  const privileged = asset.identity_access?.privileged_accounts_count;
+
+  return (
+    <Card
+      title={assetName(asset)}
+      subtitle={
+        <span className="assetfacts">
+          <span className="mono">{asset.asset_id}</span>
+          <span>{exposure(asset)}</span>
+          {ports?.length ? <span>Open ports {ports.join(", ")}</span> : null}
+          {privileged != null ? <span>{plural(privileged, "privileged account")}</span> : null}
+        </span>
+      }
+      actions={
+        <span className="fwmeta">
+          <span className={`tier crit-${tier}`}>{phrase(tier)}</span>
+          <InfoTip id="fair-basis" label="How the figure is built">
+            Threat events a year × the chance an attempt succeeds gives loss events a year; each
+            loss event&apos;s cost is drawn from its range. The expected annual loss is the mean of
+            {` ${formatCount(iterations)} `}simulated years — not the product of the likely values
+            shown.
+          </InfoTip>
+        </span>
+      }
+    >
+      {asset.unresolved_service_ids.length > 0 ? (
+        <p className="notice" style={{ marginBottom: 14 }}>
+          Related service{asset.unresolved_service_ids.length === 1 ? "" : "s"}{" "}
+          {asset.unresolved_service_ids.join(", ")} not found in the snapshot, so the engine leaves{" "}
+          {asset.unresolved_service_ids.length === 1 ? "it" : "them"} out: this asset&apos;s
+          criticality and backup posture come only from the services that did resolve (or fall back
+          to unknown criticality and no backup if none did).
+        </p>
       ) : null}
 
-      <p className="small muted">
-        Threat events per year × vulnerability = loss events per year; each event&apos;s cost is
-        drawn from the loss-per-event range. The expected annual loss comes from simulating those
-        distributions, not from multiplying the likely values above.
-      </p>
-    </div>
+      {open.length === 0 ? (
+        <p className="small muted">
+          No open finding on this asset, so the engine models no loss scenario here. Threat paths
+          that do not start from a discrete finding are not modelled yet — this is not a statement
+          that the asset carries no risk.
+        </p>
+      ) : (
+        <div className="scenarios">
+          {open.map((finding) => (
+            <FairChain
+              key={finding.finding_id}
+              finding={finding}
+              scenario={finding.scenario!}
+              observedAt={observedAt}
+              highlighted={finding.finding_id === highlighted}
+              iterations={iterations}
+            />
+          ))}
+        </div>
+      )}
+
+      {remediated.length > 0 ? (
+        <div className="fixed">
+          <h3>Remediated</h3>
+          <ul>
+            {remediated.map((finding) => (
+              <li
+                key={finding.finding_id}
+                id={`finding-${finding.finding_id}`}
+                className={finding.finding_id === highlighted ? "hl" : undefined}
+              >
+                <span className="ok" aria-hidden="true">
+                  ✓
+                </span>
+                <b>{findingTitle(finding)}</b>
+                <span className="muted small">
+                  fixed {formatDate(finding.remediated_at!)}, found by{" "}
+                  {scannerLabel(finding.provenance.connector).name}
+                </span>
+                <span className="mono sub" title={finding.finding_id}>
+                  {finding.provenance.raw_source_id}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+/**
+ * One finding's figure as the Open FAIR equation it comes from:
+ * threat events × chance of success = loss events, × cost per event,
+ * simulated into an expected annual loss. Values are the engine's scenario
+ * parameters exactly as returned.
+ */
+function FairChain({
+  finding,
+  scenario,
+  observedAt,
+  highlighted,
+  iterations,
+}: {
+  finding: AssetFinding;
+  scenario: ScenarioParameters;
+  observedAt: string;
+  highlighted: boolean;
+  iterations: number;
+}) {
+  const days = daysBetween(finding.first_seen_at, observedAt);
+  const controls = Object.entries(scenario.active_control_resistances);
+  const tef = scenario.threat_event_frequency;
+  const lef = scenario.loss_event_frequency;
+  const lm = scenario.loss_magnitude;
+
+  return (
+    <article className={`scenario${highlighted ? " hl" : ""}`} id={`finding-${finding.finding_id}`}>
+      <header className="sc-h">
+        <div>
+          <h3>
+            {findingTitle(finding)}
+            {finding.kev_listed ? <span className="mini kev">KEV</span> : null}
+          </h3>
+          <p className="assetfacts">
+            <span className="mono">{finding.provenance.raw_source_id}</span>
+            <span>Found by {scannerLabel(finding.provenance.connector).name}</span>
+            <span>
+              First seen {formatDate(finding.first_seen_at)}
+              {days === null ? "" : `, ${days} d before this snapshot`}
+            </span>
+            <span className="mono">{finding.finding_id}</span>
+          </p>
+        </div>
+      </header>
+
+      <div className="chain">
+        <div className="step">
+          <span className="lbl">Threat events a year</span>
+          <span className="val">{formatDecimal(tef.most_likely, 2)}</span>
+          <span className="rng">
+            {formatDecimal(tef.min, 2)} – {formatDecimal(tef.max, 2)}
+          </span>
+          <span className="why">{phrase(scenario.exposure_profile)}</span>
+        </div>
+        <span className="op" aria-hidden="true">
+          ×
+        </span>
+        <div className="step">
+          <span className="lbl">Chance an attempt succeeds</span>
+          <span className="val">{formatPercent(scenario.vulnerability, 1)}</span>
+          <span className="rng">
+            {formatPercent(scenario.exploit_probability, 1)} exploit chance, from{" "}
+            {exploitSource(finding, scenario)}
+          </span>
+          <span className="why">
+            {controls.length === 0
+              ? "No controls credited"
+              : `Reduced by ${controls.map(([k, r]) => `${controlLabel(k)} ${formatPercent(r)}`).join(", ")}`}
+          </span>
+        </div>
+        <span className="op" aria-hidden="true">
+          =
+        </span>
+        <div className="step">
+          <span className="lbl">Loss events a year</span>
+          <span className="val">{formatDecimal(lef.most_likely)}</span>
+          <span className="rng">
+            {formatDecimal(lef.min)} – {formatDecimal(lef.max)}
+          </span>
+        </div>
+        <span className="op" aria-hidden="true">
+          ×
+        </span>
+        <div className="step">
+          <span className="lbl">Cost per loss event</span>
+          <span className="val">{formatInr(lm.most_likely)}</span>
+          <span className="rng">
+            {formatInr(lm.min)} – {formatInr(lm.max)}
+          </span>
+          <span className="why">
+            {phrase(scenario.criticality_tier)} tier, {backupLabel(scenario.backup_posture)}
+          </span>
+        </div>
+        <span className="op sim" aria-hidden="true">
+          <span>simulated</span>→
+        </span>
+        <div className="step out">
+          <span className="lbl">Expected annual loss</span>
+          <span className="val">{formatInr(scenario.expected_annual_loss_inr)}</span>
+          <span className="rng">mean of {formatCount(iterations)} years</span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+/** Every open finding across the estate, ranked by the loss the engine attributes to it. */
+function Backlog({
+  backlog,
+  observedAt,
+}: {
+  backlog: { asset: AssetView; finding: AssetFinding; scenario: ScenarioParameters }[];
+  observedAt: string;
+}) {
+  return (
+    <Card
+      title="Remediation backlog"
+      subtitle="Open findings across every asset, ranked by expected annual loss."
+      actions={
+        <InfoTip id="backlog-basis" label="How the backlog is ordered">
+          Each finding is ranked by the expected annual loss the engine attributes to it, and traces
+          to the scanner and raw record that produced it. &ldquo;Open for&rdquo; runs from first
+          detection to when this snapshot was observed ({formatDate(observedAt)}), not to today.
+        </InfoTip>
+      }
+    >
+      {backlog.length === 0 ? (
+        <p className="small muted">No open findings in the current snapshot.</p>
+      ) : (
+        <div className="tbl">
+          <table className="backlog">
+            <thead>
+              <tr>
+                <th scope="col" className="rk">
+                  <span className="sr-only">Rank</span>
+                </th>
+                <th scope="col">Finding</th>
+                <th scope="col">Asset</th>
+                <th scope="col">Signals</th>
+                <th scope="col" className="r">
+                  Open for
+                </th>
+                <th scope="col" className="r">
+                  Expected annual loss
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {backlog.map(({ asset, finding, scenario }, i) => {
+                const days = daysBetween(finding.first_seen_at, observedAt);
+                return (
+                  <tr key={scenario.scenario_id}>
+                    <td className="rk">{i + 1}</td>
+                    <td>
+                      <Link className="rowlink" href={assetHref(asset.asset_id, finding.finding_id)} scroll={false}>
+                        {findingTitle(finding)}
+                      </Link>
+                      <div className="sub">
+                        <span className="mono">{finding.provenance.raw_source_id}</span>, found by{" "}
+                        {scannerLabel(finding.provenance.connector).name}
+                      </div>
+                    </td>
+                    <td>
+                      {assetName(asset)}
+                      <div className="sub mono">{asset.asset_id}</div>
+                    </td>
+                    <td>
+                      <span className="ctl">
+                        {finding.epss_score !== null ? (
+                          <span className="mini">EPSS {formatDecimal(finding.epss_score, 2)}</span>
+                        ) : (
+                          <span className="mini">Unscored</span>
+                        )}
+                        {finding.kev_listed ? <span className="mini kev">KEV</span> : null}
+                        {finding.criticality ? (
+                          <span className={`mini crit-${finding.criticality}`}>
+                            {phrase(finding.criticality)}
+                          </span>
+                        ) : null}
+                      </span>
+                    </td>
+                    <td className="r mono nowrap">{days === null ? "unknown" : `${days} d`}</td>
+                    <td className="r mono nowrap amtcell">
+                      {formatInr(scenario.expected_annual_loss_inr)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   );
 }
