@@ -43,10 +43,26 @@ SCOUTSUITE_LEVEL_TO_CRITICALITY: dict[str, str] = {
     "warning": "medium",
 }
 
-#: Matches ScoutSuite's ``scoutsuite_results = {...};`` JS-variable wrapper
-#: around its JSON report body. Operational parsing detail, not a
-#: modelling constant.
-_JS_WRAPPER_RE = re.compile(r"^\s*scoutsuite_results\s*=\s*(?P<body>.*);\s*$", re.DOTALL)
+#: Matches ScoutSuite's ``scoutsuite_results =`` JS-variable wrapper around its
+#: JSON report body. The trailing ``;`` is optional: a real ScoutSuite 5.14.0 report
+#: (``scoutsuite_results =`` then the JSON on the next line) has none. Operational
+#: parsing detail, not a modelling constant.
+_JS_WRAPPER_RE = re.compile(r"^\s*scoutsuite_results\s*=\s*(?P<body>.*?);?\s*$", re.DOTALL)
+
+#: ASSUMPTION (a modelling judgement local to this connector): ScoutSuite's findings are
+#: corroborating evidence, not separate loss events, so they are emitted with
+#: ``counts_toward_loss: false``. They stay in the snapshot (visible, usable as compliance
+#: evidence) but the engine does not turn them into scenarios.
+#: JUSTIFICATION: PLACEHOLDER. ScoutSuite and Prowler are both AWS cloud-posture scanners and
+#: largely flag the same underlying issues; the engine counts each finding as its own loss
+#: event, so counting both would double-count. Measured on the LoanEase sandbox this added
+#: about INR 32M (130.6M -> 162.4M) to the expected annual loss for issues Prowler already
+#: reports. Kept here rather than in ``core/assumptions.py`` because ``infra/`` must never
+#: import ``core/``; recorded in ``docs/ASSUMPTIONS.md``.
+#: CALIBRATION: a cross-scanner mapping of equivalent checks (for example via shared
+#: benchmark control ids, which only about 10 of 24 flagged ScoutSuite findings carry) would
+#: let overlapping findings be de-duplicated and ScoutSuite-only findings count again.
+SCOUTSUITE_COUNTS_TOWARD_LOSS: bool = False
 
 #: ScoutSuite's own timestamp format for ``last_run.time``, e.g.
 #: ``"2026-09-19 00:00:00+0000"``. Operational parsing detail.
@@ -155,8 +171,16 @@ class ScoutSuiteConnector(Connector):
         "first observed" field), so every finding's ``first_seen_at`` is
         this scan run's own ``last_run.time`` — the actual time this run
         observed the finding, never a fabricated value. One fragment is
-        emitted per affected item, since each item is independently
-        resolved to an asset.
+        emitted per affected item.
+
+        Every finding is attached to the single account-level asset
+        (``cloud:aws-account:<account_id>``, the same scheme
+        ``iam_connector.py`` uses), not to one asset per item. ScoutSuite's
+        items are its own dotted paths (``ec2.regions.<r>.vpcs.<vpc>.
+        security_groups.<sg>.rules...``), not ARNs, so they can never match
+        the ARN-keyed assets Prowler produces; treating each as an asset would
+        add dozens of unmatched assets and trip the asset-count quality gate.
+        The item path stays in ``finding_id`` for traceability.
 
         Args:
             raw: Exactly what :meth:`fetch` returned.
@@ -187,6 +211,13 @@ class ScoutSuiteConnector(Connector):
             raise ScoutSuiteConnectorError(
                 f"{self.name}: report has no last_run.time; refusing to fabricate first_seen_at"
             )
+
+        account_id = raw.get("account_id")
+        if not account_id:
+            raise ScoutSuiteConnectorError(
+                f"{self.name}: report has no account_id; cannot attach findings to an account asset"
+            )
+        account_asset = f"{raw.get('provider_code') or 'aws'}-account:{account_id}"
 
         services = raw.get("services")
         if not isinstance(services, dict):
@@ -240,26 +271,27 @@ class ScoutSuiteConnector(Connector):
                                     },
                                     "first_seen_at": first_seen_at,
                                     "remediated_at": None,
+                                    "counts_toward_loss": SCOUTSUITE_COUNTS_TOWARD_LOSS,
                                 }
                             ],
                             "_identity_hint": {
-                                "kind": "cloud_resource",
-                                "value": item.lower(),
+                                "kind": "cloud_account",
+                                "value": account_asset,
                             },
                         }
                     )
         return fragments
 
     def resolve_asset_id(self, normalized_fragment: dict[str, Any]) -> str:
-        """Resolve a cloud resource path/UID to a stable asset_id.
+        """Resolve a ScoutSuite fragment to its account-level asset_id.
 
         Args:
             normalized_fragment: One normalized finding fragment.
 
         Returns:
-            ``f"cloud:{value}"``, using the ``_identity_hint`` value set by
-            :meth:`normalize` — a placeholder identity scheme pending a
-            real ``cmdb_connector.py`` implementation.
+            ``f"cloud:{value}"`` (``cloud:aws-account:<id>``), using the
+            ``_identity_hint`` value set by :meth:`normalize` — a placeholder
+            identity scheme pending real CMDB-based resolution.
         """
         value: str = normalized_fragment["_identity_hint"]["value"]
         return f"cloud:{value}"

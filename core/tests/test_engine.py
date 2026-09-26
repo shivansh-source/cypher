@@ -66,6 +66,25 @@ def test_build_loss_event_scenarios_excludes_remediated_findings() -> None:
     assert scenario_ids == {"asset-hr-db-01::finding-0002"}
 
 
+def test_corroborating_findings_stay_in_the_snapshot_but_are_not_scenarios() -> None:
+    """counts_toward_loss: false keeps a finding as evidence without counting it as a loss event.
+
+    Only an explicit false skips; absent or true counts. The figure must drop accordingly, and
+    the finding itself must still be there (it is not a remediation claim).
+    """
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    snapshot["assets"][0]["findings"][0]["counts_toward_loss"] = False
+    snapshot["assets"][1]["findings"][0]["counts_toward_loss"] = True
+
+    scenarios = build_loss_event_scenarios(snapshot)
+
+    assert {s["scenario_id"] for s in scenarios} == {"asset-hr-db-01::finding-0002"}
+    assert len(snapshot["assets"][0]["findings"]) == 1  # still evidence in the snapshot
+    full = compute_risk_figure(copy.deepcopy(SAMPLE_SNAPSHOT), seed=1)
+    partial = compute_risk_figure(snapshot, seed=1)
+    assert partial.expected_annual_loss_inr < full.expected_annual_loss_inr
+
+
 def test_build_loss_event_scenarios_empty_for_no_findings() -> None:
     """An asset population with no findings at all must yield no scenarios, not an error."""
     snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)

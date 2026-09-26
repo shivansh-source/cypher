@@ -1,4 +1,5 @@
-scoutsuite_results = {
+scoutsuite_results =
+{
   "account_id": "123456789012",
   "provider_code": "aws",
   "provider_name": "Amazon Web Services",
@@ -34,4 +35,4 @@ scoutsuite_results = {
       }
     }
   }
-};
+}

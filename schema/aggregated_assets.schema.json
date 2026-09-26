@@ -138,7 +138,8 @@
                   }
                 },
                 "first_seen_at": { "type": "string", "format": "date-time" },
-                "remediated_at": { "type": ["string", "null"], "format": "date-time", "description": "Null while open. Distinguishing 'remediated' from 'scanner stopped reporting it because the scanner went dark' is exactly what scan_scope is for — this field alone is not sufficient evidence of remediation if the relevant scanner is in unreachable_scanners." }
+                "remediated_at": { "type": ["string", "null"], "format": "date-time", "description": "Null while open. Distinguishing 'remediated' from 'scanner stopped reporting it because the scanner went dark' is exactly what scan_scope is for — this field alone is not sufficient evidence of remediation if the relevant scanner is in unreachable_scanners." },
+                "counts_toward_loss": { "type": "boolean", "description": "Optional; absent means true. false marks a finding as corroborating evidence only: it stays in the snapshot (visible, and usable as compliance evidence) but is NOT turned into a separate loss-event scenario by the engine. Use it when a source overlaps another scanner's coverage, so the same underlying issue is not counted twice. It is not a remediation claim and must never be used to hide a finding." }
               }
             }
           },

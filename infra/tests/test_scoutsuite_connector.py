@@ -57,14 +57,15 @@ def test_run_skips_good_level_and_produces_schema_valid_snapshot(
 
     # danger (1 item) + warning (2 items) = 3 fragments; the "good" finding is skipped.
     assert len(fragments) == 3
-    assert all(f["asset_id"].startswith("cloud:") for f in fragments)
+    # Every finding lands on the one account-level asset, not one asset per ScoutSuite path.
+    assert {f["asset_id"] for f in fragments} == {"cloud:aws-account:123456789012"}
     assert all(not any(key.startswith("_") for key in f) for f in fragments)
+    # ScoutSuite overlaps Prowler, so its findings are evidence only, not extra loss events.
+    assert all(f["findings"][0]["counts_toward_loss"] is False for f in fragments)
 
-    danger_fragment = next(
-        f
-        for f in fragments
-        if f["asset_id"] == "cloud:s3.buckets.example-bucket"
-        and f["findings"][0]["criticality"] == "high"
+    danger_fragment = next(f for f in fragments if f["findings"][0]["criticality"] == "high")
+    assert danger_fragment["findings"][0]["finding_id"] == (
+        "scoutsuite-s3-bucket-no-mfa-delete-s3.buckets.example-bucket"
     )
     assert danger_fragment["findings"][0]["type"] == "misconfiguration"
     assert danger_fragment["findings"][0]["provenance"]["connector"] == "scoutsuite_connector"
@@ -75,3 +76,23 @@ def test_run_skips_good_level_and_produces_schema_valid_snapshot(
     with open(_SCHEMA_PATH, encoding="utf-8") as handle:
         schema = json.load(handle)
     jsonschema.validate(instance=snapshot, schema=schema)
+
+
+@patch("infra.connectors.scoutsuite_connector._object_store.read_latest_text")
+def test_fetch_accepts_wrapper_with_or_without_trailing_semicolon(
+    mock_read_latest_text: object,
+) -> None:
+    body = '{"account_id": "1", "last_run": {"time": "2026-01-01 00:00:00+0000"}, "services": {}}'
+    wrappers = ("scoutsuite_results =\n" + body + "\n", "scoutsuite_results = " + body + ";\n")
+    for text in wrappers:
+        mock_read_latest_text.return_value = text  # type: ignore[attr-defined]
+        assert ScoutSuiteConnector().fetch()["account_id"] == "1"
+
+
+def test_normalize_requires_an_account_id() -> None:
+    raw = {"last_run": {"time": "2026-01-01 00:00:00+0000"}, "services": {}}
+    try:
+        ScoutSuiteConnector().normalize(raw)
+        raise AssertionError("expected ScoutSuiteConnectorError")
+    except ScoutSuiteConnectorError as exc:
+        assert "account_id" in str(exc)
