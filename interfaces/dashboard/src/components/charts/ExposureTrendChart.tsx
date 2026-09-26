@@ -9,10 +9,10 @@ import {
   formatInrCompact,
   formatPercent,
   parseIsoMs,
-  scenarioLabel,
   shortSnapshotId,
 } from "@/lib/format";
-import type { ExposureHistoryEntry } from "@/lib/types";
+import { contributionLabel } from "@/lib/labels";
+import type { AssetView, ExposureHistoryEntry } from "@/lib/types";
 import {
   ChartTooltip,
   Legend,
@@ -49,7 +49,14 @@ interface Row {
  * Expected Annual Loss for that snapshot — so the top of the stack is always
  * the engine's figure, never a total summed here.
  */
-export function ExposureTrendChart({ snapshots }: { snapshots: ExposureHistoryEntry[] }) {
+export function ExposureTrendChart({
+  snapshots,
+  assets,
+}: {
+  snapshots: ExposureHistoryEntry[];
+  /** The latest snapshot's asset inventory, for real names — see `contributionLabel`. */
+  assets: AssetView[] | null;
+}) {
   const [mode, setMode] = useState<"scenario" | "tail">("scenario");
   const [setNode, width] = useElementWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
@@ -143,9 +150,9 @@ export function ExposureTrendChart({ snapshots }: { snapshots: ExposureHistoryEn
     mode === "scenario"
       ? [
           ...named.map((c, k) => ({
-            label: scenarioLabel(c),
+            label: contributionLabel(c, assets).title,
             colour: SERIES_COLOURS[k],
-            title: c.description,
+            title: `${c.description} — ${contributionLabel(c, assets).where}`,
           })),
           { label: "All other scenarios", colour: "var(--other)" },
         ]
@@ -172,7 +179,7 @@ export function ExposureTrendChart({ snapshots }: { snapshots: ExposureHistoryEn
                   <TipRow
                     key={c.scenario_id}
                     colour={SERIES_COLOURS[k]}
-                    label={scenarioLabel(c)}
+                    label={contributionLabel(c, assets).title}
                     value={value === undefined ? "not in snapshot" : formatInr(value)}
                   />
                 );

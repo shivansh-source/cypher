@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 
 /*
- * Ask Suraksha's docked-panel state: open/closed and width, each persisted
+ * Ask Cypher's docked-panel state: open/closed and width, each persisted
  * per browser (a per-viewer convenience only — see AppShell's sidebar
  * collapse state, which this mirrors). Lives outside the component tree so
  * the trigger button in Topbar and the panel itself in AppShell can both

@@ -126,7 +126,7 @@ async function request<T>(
     return {
       state: "error",
       transport: true,
-      reason: `Could not reach the Su₹aksha API at ${API_BASE_URL}${path} (${
+      reason: `Could not reach the Cypher API at ${API_BASE_URL}${path} (${
         cause instanceof Error ? cause.message : "unknown transport error"
       }).`,
     };
@@ -296,7 +296,7 @@ export async function sendChat(
   message: string,
   sessionId: string | null,
 ): Promise<ApiResult<ChatResponse>> {
-  if (DEMO_MODE) return demoUnavailable("the Ask Suraksha assistant");
+  if (DEMO_MODE) return demoUnavailable("the Ask Cypher assistant");
   return request<ChatResponse>(
     "/chat",
     { method: "POST", body: { message, session_id: sessionId } },
@@ -331,7 +331,7 @@ export async function streamChat(
   sessionId: string | null,
   handlers: ChatStreamHandlers = {},
 ): Promise<ApiResult<ChatStreamFinal>> {
-  if (DEMO_MODE) return demoUnavailable("the Ask Suraksha assistant");
+  if (DEMO_MODE) return demoUnavailable("the Ask Cypher assistant");
   const path = "/chat/stream";
   let response: Response;
   try {
@@ -345,7 +345,7 @@ export async function streamChat(
     return {
       state: "error",
       transport: true,
-      reason: `Could not reach the Su₹aksha API at ${API_BASE_URL}${path} (${
+      reason: `Could not reach the Cypher API at ${API_BASE_URL}${path} (${
         cause instanceof Error ? cause.message : "unknown transport error"
       }).`,
     };
@@ -423,7 +423,7 @@ export async function streamChat(
 export async function deleteChatSession(
   sessionId: string,
 ): Promise<ApiResult<{ session_id: string; deleted: boolean }>> {
-  if (DEMO_MODE) return demoUnavailable("the Ask Suraksha assistant");
+  if (DEMO_MODE) return demoUnavailable("the Ask Cypher assistant");
   return request<{ session_id: string; deleted: boolean }>(
     `/chat/sessions/${encodeURIComponent(sessionId)}`,
     { method: "DELETE" },

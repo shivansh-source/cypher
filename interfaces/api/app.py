@@ -317,7 +317,7 @@ def create_app() -> Any:
     configure_from_env()
 
     app = FastAPI(
-        title="Su₹aksha API",
+        title="Cypher API",
         description=(
             "Rupee-denominated cyber risk quantification. Every figure comes from "
             "the deterministic engine in core/; the chat assistant routes to it and "
