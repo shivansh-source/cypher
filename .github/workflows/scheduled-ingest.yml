@@ -97,6 +97,22 @@ jobs:
           python -c "import json,sys; d=json.load(open(sys.argv[1])); assert 'findings' in d and 'account' in d" pmapper.json
           aws s3 cp pmapper.json "s3://${RAW_FINDINGS_BUCKET}/inputs/pmapper.json" --only-show-errors
 
+      # ScoutSuite overlaps Prowler (both are AWS cloud-posture scanners), so a failure here must
+      # not block the rest of the scan or the ingest: the step may fail, and the connector then
+      # treats its S3 object as stale after 24h (scanner shows as not reporting).
+      # Own venv: ScoutSuite's dependency pins differ from Prowler's.
+      - name: ScoutSuite -> S3 latest/scoutsuite_connector.json
+        continue-on-error: true
+        run: |
+          python -m venv scout-venv
+          scout-venv/bin/pip install --quiet "scoutsuite==5.14.0"
+          # Read-only API calls; uses the OIDC credentials already in the environment.
+          scout-venv/bin/scout aws --regions "${AWS_REGION}" --no-browser --report-dir scout-out
+          file=$(ls scout-out/scoutsuite-results/scoutsuite_results_*.js | head -n1)
+          # Never upload an unreadable report: the connector would read it as "no findings".
+          python -c "import json,re,sys; t=open(sys.argv[1]).read(); d=json.loads(re.sub(r'^\s*scoutsuite_results\s*=\s*','',t).rstrip().rstrip(';')); assert d['account_id'] and d['services']" "${file}"
+          aws s3 cp "${file}" "s3://${RAW_FINDINGS_BUCKET}/latest/scoutsuite_connector.json" --only-show-errors
+
   ingest:
     name: Ingest + publish snapshot
     needs: scan

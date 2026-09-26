@@ -252,6 +252,13 @@ indirectly).
   than varying by evidence strength. `MERGE_CONFIDENCE_THRESHOLD`'s own
   module docstring block covers full CALIBRATION requirements.
 
+### Corroborating-only findings (`infra.connectors.scoutsuite_connector.SCOUTSUITE_COUNTS_TOWARD_LOSS`, schema field `counts_toward_loss`)
+
+- **Assumption:** ScoutSuite's findings are emitted with `counts_toward_loss: false`. They stay in the snapshot as evidence but the engine does not turn them into loss-event scenarios.
+- **Justification:** PLACEHOLDER. ScoutSuite and Prowler are both AWS cloud-posture scanners with heavy overlap, and the engine counts each finding as a separate loss event, so counting both double-counts. On the LoanEase sandbox, counting ScoutSuite added about INR 32M (130.6M to 162.4M) to expected annual loss for issues Prowler already reports.
+- **Effect on the figure:** ScoutSuite-only issues (ones Prowler does not cover) are also not counted, so this can under-count as well as prevent over-counting.
+- **Calibration needed:** a cross-scanner mapping of equivalent checks (shared benchmark control ids cover only about 10 of 24 flagged ScoutSuite findings) so overlapping findings can be de-duplicated and unique ones counted.
+
 ## Known limitations of the model overall
 
 - No organization-specific loss history has been used to calibrate any

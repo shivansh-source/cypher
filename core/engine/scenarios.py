@@ -16,6 +16,13 @@ def build_loss_event_scenarios(snapshot: dict[str, Any]) -> list[dict[str, Any]]
     found" from "found and fixed," and only the latter applies here — a
     fixed finding is not a live loss-event path.
 
+    A finding with ``counts_toward_loss: false`` also produces no scenario. It
+    is corroborating evidence (typically a second scanner covering ground
+    another already covers): it stays in the snapshot but is not counted as
+    a separate loss event, so the same underlying issue is not counted twice.
+    That is a statement about counting, not about remediation, and the engine
+    reads only this schema field, never which connector set it.
+
     This is a deliberate scope limitation, not an oversight: threat paths
     that don't originate from a discrete finding (e.g. credential-stuffing
     risk implied purely by weak IAM posture with no associated finding, or
@@ -51,6 +58,8 @@ def build_loss_event_scenarios(snapshot: dict[str, Any]) -> list[dict[str, Any]]
     for asset in snapshot["assets"]:
         for finding in asset["findings"]:
             if finding.get("remediated_at") is not None:
+                continue
+            if finding.get("counts_toward_loss") is False:
                 continue
             scenarios.append(
                 {
