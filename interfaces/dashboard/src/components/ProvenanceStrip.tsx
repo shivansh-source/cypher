@@ -1,5 +1,7 @@
+import Link from "next/link";
+import { InfoTip } from "@/components/InfoTip";
 import type { ApiResult } from "@/lib/api";
-import { formatAge, formatCount, formatTimestamp, hoursSince, shortSnapshotId } from "@/lib/format";
+import { formatAge, formatDate, hoursSince, shortSnapshotId } from "@/lib/format";
 import type { SnapshotProvenance } from "@/lib/types";
 
 /**
@@ -11,26 +13,18 @@ import type { SnapshotProvenance } from "@/lib/types";
 const STALE_AFTER_HOURS = 36;
 
 /**
- * The provenance line that qualifies every figure on the page.
+ * The one-line identity of the snapshot every figure on the page derives
+ * from: which one, when, and whether it's stale or missing coverage.
  *
  * A rupee figure without the snapshot it came from is not defensible, so this
- * strip sits directly beneath the figures rather than on a separate page. When
- * a scanner was unreachable for the snapshot, that is surfaced here as a
- * coverage caveat: absence of a finding from a scanner that never ran is not
- * evidence of remediation, and a reader of the headline number needs to know
- * which part of the estate the number is blind to.
+ * sits directly beneath the headline figures. It states the identity and the
+ * worst caveat up front; the fuller breakdown (asset/service/finding counts,
+ * per-scanner coverage) lives on Data quality & coverage, linked from here
+ * rather than repeated.
  */
-export function ProvenanceStrip({
-  result,
-}: {
-  result: ApiResult<SnapshotProvenance>;
-}) {
+export function ProvenanceStrip({ result }: { result: ApiResult<SnapshotProvenance> }) {
   if (result.state !== "ok") {
-    return (
-      <p className="notice info">
-        Snapshot provenance unavailable — {result.reason}
-      </p>
-    );
+    return <p className="notice info">Snapshot provenance unavailable — {result.reason}</p>;
   }
 
   const snapshot = result.data;
@@ -38,63 +32,33 @@ export function ProvenanceStrip({
   const age = formatAge(snapshot.observed_at);
   const ageHours = hoursSince(snapshot.observed_at);
   const isStale = ageHours !== null && ageHours > STALE_AFTER_HOURS;
+  const caveat = isStale
+    ? `stale — observed ${age}, no newer snapshot has passed the quality gates since`
+    : unreachable.length > 0
+      ? `${unreachable.length} scanner${unreachable.length === 1 ? "" : "s"} not reporting`
+      : null;
 
   return (
-    <div className="card provstrip">
-      <dl>
-        <Item label="Snapshot">
-          <span className="mono" title={snapshot.snapshot_id}>
-            {shortSnapshotId(snapshot.snapshot_id)}
-          </span>
-        </Item>
-        <Item label="Observed">
-          <span className="mono">{formatTimestamp(snapshot.observed_at)}</span>
-          {age ? <span> ({age})</span> : null}
-        </Item>
-        <Item label="Status">{snapshot.valid_to === null ? "Current" : "Superseded"}</Item>
-        <Item label="Assets">
-          <span className="mono">{formatCount(snapshot.asset_count)}</span>
-        </Item>
-        <Item label="Services">
-          <span className="mono">{formatCount(snapshot.service_count)}</span>
-        </Item>
-        <Item label="Open findings">
-          <span className="mono">
-            {formatCount(snapshot.open_finding_count)} of {formatCount(snapshot.finding_count)}
-          </span>
-        </Item>
-        <Item label="Scanners reporting">
-          <span className="mono">
-            {snapshot.scan_scope.reachable_scanners.length} of{" "}
-            {snapshot.scan_scope.reachable_scanners.length + unreachable.length}
-          </span>
-        </Item>
-      </dl>
-
-      {isStale ? (
-        <p className="notice" style={{ marginTop: 12 }}>
-          <strong>Stale snapshot:</strong> this snapshot was observed {age}. The scheduled refresh
-          has not produced a newer one, so these figures describe the estate as it was then.
-        </p>
+    <p className={`provline${caveat ? " warn" : ""}`}>
+      <span className={`dot${caveat ? " warn" : ""}`} aria-hidden="true" />
+      <span>
+        {snapshot.valid_to === null ? "Current snapshot" : "Superseded snapshot"}, observed{" "}
+        {formatDate(snapshot.observed_at)}
+        {age ? ` (${age})` : ""}
+      </span>
+      {caveat ? (
+        <InfoTip id="provline-caveat" label="Why this snapshot needs a caveat">
+          {isStale
+            ? `This snapshot was observed ${age}. The scheduled refresh has not produced a newer one, so every figure on this page describes the estate as it was then, not as it is today.`
+            : `${unreachable.join(", ")} did not report for this snapshot. Anything these scanners would have found is missing from the figures — absence of a finding here is not evidence of remediation.`}
+        </InfoTip>
       ) : null}
-
-      {unreachable.length > 0 ? (
-        <p className="notice" style={{ marginTop: 12 }}>
-          <strong>Coverage caveat:</strong> {unreachable.join(", ")} did not
-          report for this snapshot. Anything these scanners would have found is
-          missing from the figures — absence of a finding here is not evidence
-          of remediation.
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function Item({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
+      <span className="provid mono" title={snapshot.snapshot_id}>
+        {shortSnapshotId(snapshot.snapshot_id)}
+      </span>
+      <Link className="provlink" href="/data-quality">
+        Full coverage detail
+      </Link>
+    </p>
   );
 }

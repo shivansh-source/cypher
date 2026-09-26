@@ -1,5 +1,5 @@
 import { humanize } from "./format";
-import type { AssetFinding, AssetView, ControlGap } from "./types";
+import type { AssetFinding, AssetView, ControlGap, LossEventContribution } from "./types";
 
 /**
  * Display names for identifiers the API returns. Presentation only — nothing
@@ -62,6 +62,16 @@ export function assetName(asset: AssetView): string {
   return asset.services.map((s) => s.name).join(", ") || asset.asset_id;
 }
 
+/** Display order only — which of an asset's service tiers ranks highest. */
+const CRITICALITY_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+
+/** The highest-ranked criticality tier among an asset's related services, or "unknown" if none. */
+export function assetCriticality(asset: AssetView): string {
+  const tiers = asset.services.map((s) => s.criticality);
+  if (tiers.length === 0) return "unknown";
+  return tiers.reduce((a, b) => ((CRITICALITY_RANK[b] ?? 0) > (CRITICALITY_RANK[a] ?? 0) ? b : a));
+}
+
 /** A finding's name: its CVE when it has one, otherwise its type. */
 export function findingTitle(finding: Pick<AssetFinding, "cve_id" | "type">): string {
   return finding.cve_id ?? phrase(finding.type);
@@ -121,4 +131,28 @@ export function describeChanges(
     }
   }
   return labels;
+}
+
+/**
+ * A loss-event contribution's title and place, from the asset inventory when
+ * one is available.
+ *
+ * `scenario_id` is always `"{asset_id}::{finding_id}"` (see
+ * `core.engine.scenarios.build_loss_event_scenarios`), so the finding_id is
+ * recovered from it rather than parsed out of the engine's free-text
+ * `description` — the same asset/finding lookup `describeChanges` above
+ * uses, not a second, fragile way of naming the same thing.
+ */
+export function contributionLabel(
+  contribution: Pick<LossEventContribution, "scenario_id" | "asset_id" | "description">,
+  assets: AssetView[] | null,
+): { title: string; where: string } {
+  const findingId = contribution.scenario_id.slice(contribution.asset_id.length + 2);
+  const asset = (assets ?? []).find((a) => a.asset_id === contribution.asset_id);
+  const finding = asset?.findings.find((f) => f.finding_id === findingId);
+  const fallback = contribution.description.replace(/\s*\([^)]*\)\s*$/, "");
+  return {
+    title: finding ? findingTitle(finding) : fallback,
+    where: asset ? assetName(asset) : contribution.asset_id,
+  };
 }

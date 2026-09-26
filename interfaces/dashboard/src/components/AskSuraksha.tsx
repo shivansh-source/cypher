@@ -95,7 +95,7 @@ function settledSteps(calls: ChatToolCall[], live: ToolStep[]): ToolStep[] {
 }
 
 /**
- * The trigger that opens the docked Ask Suraksha panel — lives in the
+ * The trigger that opens the docked Ask Cypher panel — lives in the
  * topbar, separate from the panel itself (in `AppShell`) so the panel can
  * stay mounted (and its conversation alive) while the trigger toggles its
  * visibility from anywhere in the page chrome.
@@ -114,13 +114,13 @@ export function AskSurakshaTrigger() {
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 3l1.8 4.9L19 9.7l-4.2 3.2 1.4 5.1L12 15.2 7.8 18l1.4-5.1L5 9.7l5.2-1.8z" />
       </svg>
-      Ask Suraksha
+      Ask Cypher
     </button>
   );
 }
 
 /**
- * Ask Suraksha: the natural-language front door to the engine tools,
+ * Ask Cypher: the natural-language front door to the engine tools,
  * docked to the right edge of the shell and compressing the main column
  * while open — the same shape as an editor's agent sidebar, not a modal
  * laid over the page. Always mounted (see `AppShell`), so opening and
@@ -278,7 +278,7 @@ export function AskSurakshaPanel() {
       className={`agentpanel${open ? " is-open" : ""}${dragging ? " is-resizing" : ""}`}
       style={{ width: open ? width : 0, minWidth: open ? width : 0 }}
       role="complementary"
-      aria-label="Ask Suraksha"
+      aria-label="Ask Cypher"
       aria-hidden={!open}
       inert={!open}
       ref={panelRef}
@@ -289,7 +289,7 @@ export function AskSurakshaPanel() {
         onPointerDown={startResize}
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize Ask Suraksha panel"
+        aria-label="Resize Ask Cypher panel"
         aria-valuenow={width}
         aria-valuemin={AGENT_PANEL_MIN_WIDTH}
         aria-valuemax={AGENT_PANEL_MAX_WIDTH}
@@ -307,7 +307,7 @@ export function AskSurakshaPanel() {
             </svg>
           </div>
           <div className="agentpanel-title">
-            <h2>Ask Suraksha</h2>
+            <h2>Ask Cypher</h2>
             <p>Picks the engine tool, narrates what it returned, never calculates a figure.</p>
           </div>
           <div className="ctrls">
@@ -329,7 +329,7 @@ export function AskSurakshaPanel() {
             <button
               className="iconbtn"
               type="button"
-              aria-label="Close Ask Suraksha"
+              aria-label="Close Ask Cypher"
               onClick={closeAgentPanel}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
