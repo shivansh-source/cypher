@@ -8,17 +8,18 @@ workflow to follow when adding a new one.
 
 ## Connectors in this repo
 
-| Connector | Source tool | Schema sections populated |
-|---|---|---|
-| `nessus_connector.py` | Tenable Nessus | `assets[].findings` (CVEs) |
-| `greenbone_connector.py` | Greenbone (OpenVAS/GVM) via GMP, or a GSA XML report export (`GREENBONE_EXPORT_PATH`) | `assets[].findings` (CVEs) |
-| `prowler_connector.py` | Prowler (CSPM) | `assets[].findings` (misconfigurations) |
-| `scoutsuite_connector.py` | ScoutSuite (CSPM) | `assets[].findings` (misconfigurations) |
-| `wazuh_connector.py` | Wazuh (EDR/SIEM) via manager API + indexer, or a bundle file (`WAZUH_EXPORT_PATH`, built by `infra/inventory/build_wazuh_bundle.py`) | `assets[].edr`, optionally `assets[].findings` |
-| `iam_connector.py` | AWS IAM via PMapper (`IAM_PMAPPER_OUTPUT_PATH`, a `pmapper analysis --output-type json` file) | `assets[].findings`, attached to the account-level asset |
-| `cmdb_connector.py` | CMDB REST API, or a JSON inventory file (`CMDB_EXPORT_PATH`, e.g. from `infra/inventory/export_ec2_inventory.py`) | `endpoints[]`, canonical asset identity |
-| `nmap_connector.py` | nmap | `assets[].network`, `endpoints[]` |
-| `threat_intel_connector.py` | EPSS + CISA KEV | enrichment of existing `findings[].epss_score` / `.kev_listed` |
+| Connector | Source tool | Schema sections populated | Status |
+|---|---|---|---|
+| `wazuh_connector.py` | Wazuh (EDR/SIEM) via manager API + indexer, or a bundle file (`WAZUH_EXPORT_PATH`, built by `infra/inventory/build_wazuh_bundle.py`) | `assets[].edr`, optionally `assets[].findings` | Implemented, in `cypher ingest` |
+| `greenbone_connector.py` | Greenbone (OpenVAS/GVM) via GMP, or a GSA XML report export (`GREENBONE_EXPORT_PATH`) | `assets[].findings` (CVEs) | Implemented, in `cypher ingest` |
+| `prowler_connector.py` | Prowler (CSPM) | `assets[].findings` (misconfigurations) | Implemented, in `cypher ingest` |
+| `scoutsuite_connector.py` | ScoutSuite (CSPM) | `assets[].findings` (misconfigurations, `counts_toward_loss: false` — corroborating evidence only, see `docs/ASSUMPTIONS.md`) | Implemented, in `cypher ingest` |
+| `iam_connector.py` | AWS IAM via PMapper (`IAM_PMAPPER_OUTPUT_PATH`, a `pmapper analysis --output-type json` file) | `assets[].findings`, attached to the account-level asset | Implemented, in `cypher ingest` |
+| `cmdb_connector.py` | CMDB REST API, or a JSON inventory file (`CMDB_EXPORT_PATH`, e.g. from `infra/inventory/export_ec2_inventory.py`) | `endpoints[]`, canonical asset identity | Implemented, in `cypher ingest` |
+| `nessus_connector.py` | Tenable Nessus | `assets[].findings` (CVEs) | Stub |
+| `nmap_connector.py` | nmap | `assets[].network`, `endpoints[]` | Stub |
+| `threat_intel_connector.py` | EPSS + CISA KEV | enrichment of existing `findings[].epss_score` / `.kev_listed` | Stub |
+| `terraform_plan.py` | `terraform show -json` plan output | schema-shaped *changes* to the committed snapshot (not a scanner; see below) | Implemented, in `cypher plan` |
 
 `cmdb_connector.py` is special: it is the canonical source of asset
 identity, and (as of its implementation) the target every other

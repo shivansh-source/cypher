@@ -1,6 +1,6 @@
 name: CI / Tests
 
-# Scoped from DroneAcharaya's ci-tests.yml. Su₹aksha has no ML dependency
+# Scoped from DroneAcharaya's ci-tests.yml. Cypher has no ML dependency
 # footprint (no torch etc.) and no separate backend/requirements.txt — the
 # project installs from pyproject.toml, and pytest.ini_options already
 # points at core/tests, governance/tests, ai/tests.

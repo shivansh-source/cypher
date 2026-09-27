@@ -1,6 +1,6 @@
 name: CI / Lint
 
-# Scoped from DroneAcharaya's ci-lint.yml. Su₹aksha's Python side is one
+# Scoped from DroneAcharaya's ci-lint.yml. Cypher's Python side is one
 # package rooted at the repo root (no backend/ subdirectory), configured
 # entirely in pyproject.toml — no separate ruff.toml/mypy.ini.
 

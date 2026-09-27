@@ -1,16 +1,19 @@
-# Su₹aksha — project instructions
+# Cypher — project instructions
 
 ## What this is
 
-Su₹aksha is a cyber risk quantification platform built for Smart India
+Cypher (originally named Su₹aksha — the Python package, AWS resources and a
+few other identifiers still say `suraksha`; leave those as they are) is a
+cyber risk quantification platform built for Smart India
 Hackathon 2026 (Problem Statement 26105). It converts technical security
 telemetry (vulnerability scans, EDR alerts, IAM posture, network exposure,
 threat intel, backup/DR posture) into rupee-denominated risk figures —
 Expected Annual Loss (EAL) and Value at Risk (VaR) — using the Open FAIR risk
 framework plus Monte Carlo simulation. From those figures it recommends where
-to spend a finite security budget, and it maps underlying findings to Indian
-regulatory frameworks (RBI Directions 2026, SEBI CSCRF/CCI, CIS Controls,
-NIST CSF, ISO 27001).
+to spend a finite security budget, prices a Terraform plan's effect on risk
+before it is applied (`cypher plan`), and it maps underlying findings to
+Indian regulatory frameworks (RBI Directions 2026, SEBI CSCRF/CCI, DPDP Act
+2023) and industry baselines (CIS Controls, NIST CSF, ISO 27001).
 
 The rupee number is the product. Everything else in this repo — connectors,
 schema, quality gates, the optimizer, the LLM layer — exists to get that
@@ -111,12 +114,14 @@ ruff check .
 ```
 
 Tests are colocated per top-level package: `core/tests/`, `governance/tests/`,
-`ai/tests/`. There are intentionally no tests under `infra/` or
-`interfaces/` yet — connectors and entry points should be integration-tested
-against a live or recorded fixture once implemented, not unit-tested against
-mocks that assert nothing about real tool output shapes. `interfaces/dashboard/`
-will get its own frontend test tooling (e.g. `npm test`) once it exists —
-that is separate from `pytest`/`mypy`/`ruff` above and never runs through them.
+`ai/tests/`, `infra/tests/` and `interfaces/tests/`. Connectors and entry
+points are integration-tested against recorded tool output
+(`infra/tests/fixtures/` — Greenbone, Prowler, ScoutSuite, PMapper, Wazuh
+and `terraform show -json` output), never unit-tested against mocks
+that assert nothing about real tool output shapes. `interfaces/dashboard/`
+has no frontend test suite yet (`npm run lint` and `npm run build` are its
+checks) — that tooling is separate from `pytest`/`mypy`/`ruff` above and
+never runs through them.
 
 ## Common mistakes (do not do these)
 

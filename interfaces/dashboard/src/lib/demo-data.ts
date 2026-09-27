@@ -4,7 +4,7 @@
  * Every figure in this file is invented for interface development and demos.
  * None of it was produced by `core/engine/`, none of it is calibrated
  * against anything, and none of it may be cited, screenshotted as a result,
- * or presented to a regulator, auditor, or evaluator as a Su₹aksha finding.
+ * or presented to a regulator, auditor, or evaluator as a Cypher finding.
  *
  * It is served only when `NEXT_PUBLIC_DEMO_MODE=1`. In that mode the UI
  * renders a persistent banner and tags every figure `SAMPLE`, so a reader can

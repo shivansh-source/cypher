@@ -1,6 +1,6 @@
 name: CI / Build
 
-# Scoped from DroneAcharaya's ci-build.yml. Su₹aksha's Python side has no
+# Scoped from DroneAcharaya's ci-build.yml. Cypher's Python side has no
 # analogous "build" step (nothing is compiled/bundled) — this workflow
 # exists only to prove the Next.js dashboard actually builds.
 

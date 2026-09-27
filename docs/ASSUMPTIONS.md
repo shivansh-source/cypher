@@ -1,6 +1,6 @@
 # Assumptions — the honesty artifact
 
-Every rupee figure Su₹aksha produces is only as credible as the assumptions
+Every rupee figure Cypher produces is only as credible as the assumptions
 behind it. This document exists so that no number leaves the system without
 a visible trail back to the judgement calls that produced it. It must be
 kept in lockstep with `core/assumptions.py` — every named constant there

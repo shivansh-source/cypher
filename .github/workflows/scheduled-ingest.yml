@@ -1,6 +1,6 @@
 name: Scheduled ingest
 
-# Daily (and on-demand) refresh of the Su₹aksha snapshot.
+# Daily (and on-demand) refresh of the Cypher snapshot.
 #
 #   scan   : Prowler + PMapper against the AWS account (read-only role), uploaded to S3.
 #   ingest : pulls every input from S3, runs `cypher ingest`, and syncs the snapshot store

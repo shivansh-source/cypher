@@ -1,6 +1,6 @@
 name: CI / Dependency Audit
 
-# Scoped from DroneAcharaya's ci-deps.yml (pip-audit + npm audit). Su₹aksha
+# Scoped from DroneAcharaya's ci-deps.yml (pip-audit + npm audit). Cypher
 # has no requirements.txt — dependencies are declared in pyproject.toml with
 # no lockfile, so pip-audit here scans the resolved environment after an
 # editable install rather than a requirements file.

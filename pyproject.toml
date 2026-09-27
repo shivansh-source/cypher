@@ -1,7 +1,7 @@
 [project]
 name = "suraksha"
 version = "0.1.0"
-description = "Su₹aksha — cyber risk quantification platform (SIH 2026, PS 26105). Converts security telemetry into rupee-denominated risk (EAL, VaR) via Open FAIR + Monte Carlo, recommends budget allocation, and maps findings to Indian regulatory frameworks."
+description = "Cypher — cyber risk quantification platform (SIH 2026, PS 26105). Converts security telemetry into rupee-denominated risk (EAL, VaR) via Open FAIR + Monte Carlo, recommends budget allocation, and maps findings to Indian regulatory frameworks."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
