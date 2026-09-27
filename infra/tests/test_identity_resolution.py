@@ -2,7 +2,7 @@
 
 Pure logic — no network, no httpx/Jev mocking needed here (that lives in
 ai/tests/test_jev_transport.py). ``decide_merge`` takes a confidence value
-directly, exactly as the real caller (interfaces/cli/riskctl.py) would pass
+directly, exactly as the real caller (interfaces/cli/cypher.py) would pass
 one derived from a real ai.jev_transport.TypedAnswer.
 """
 

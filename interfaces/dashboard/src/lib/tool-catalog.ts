@@ -3,8 +3,8 @@
  * for it today.
  *
  * "Available" means `infra/connectors/` has a normalizer for it *and*
- * `interfaces/cli/riskctl.py::ingest_command` actually calls it during
- * `riskctl ingest` — the two things that together decide whether selecting
+ * `interfaces/cli/cypher.py::ingest_command` actually calls it during
+ * `cypher ingest` — the two things that together decide whether selecting
  * a tool here does anything real yet. A tool marked "Not yet supported" may
  * still have a connector module started in the repo (e.g. Nessus, Nmap) —
  * that distinction is not exposed here, because from the ingest pipeline's
@@ -50,6 +50,50 @@ export const CATEGORY_ORDER: ToolCategory[] = [
   "Network exposure",
   "Asset inventory",
 ];
+
+/** How each category reaches the rupee figure, in the engine's own terms. */
+export const CATEGORY_INFO: Record<
+  ToolCategory,
+  {
+    /** A short name for the telemetry map's channel label. */
+    short: string;
+    /** What its findings feed in the model. */
+    feeds: string;
+    /** What the figures lack without any source for it. */
+    gap: string;
+  }
+> = {
+  "Vulnerability scanning": {
+    short: "Vulnerabilities",
+    feeds: "Feeds exploit likelihood for every host and service",
+    gap: "no host or network vulnerabilities",
+  },
+  "Cloud security posture": {
+    short: "Cloud posture",
+    feeds: "Feeds cloud misconfigurations, the most common cloud breach path",
+    gap: "no cloud misconfigurations",
+  },
+  "Endpoint detection & response": {
+    short: "Endpoints",
+    feeds: "Feeds how often an attack is caught before it becomes a loss",
+    gap: "no EDR credit on any asset",
+  },
+  "Identity & access": {
+    short: "Identity",
+    feeds: "Feeds MFA coverage and who holds privileged access",
+    gap: "no MFA or privilege posture",
+  },
+  "Network exposure": {
+    short: "Exposure",
+    feeds: "Feeds which assets an attacker can reach from the internet",
+    gap: "no open-port exposure",
+  },
+  "Asset inventory": {
+    short: "Inventory",
+    feeds: "Ties every finding to one real asset, so nothing is counted twice",
+    gap: "no canonical asset identity",
+  },
+};
 
 export const TOOL_CATALOG: ToolOption[] = [
   {

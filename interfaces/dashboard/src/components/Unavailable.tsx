@@ -29,7 +29,7 @@ export function Unavailable({
           ? "The API answered, but could not produce this. The reason above is its own; if a newer snapshot was committed since this page loaded, reload the page."
           : isError
           ? "Check that the FastAPI backend (interfaces/api) is running and reachable at the configured NEXT_PUBLIC_API_BASE_URL, and that its CORS_ALLOWED_ORIGINS includes this dashboard."
-          : "Nothing is estimated or filled in meanwhile. Figures appear once a snapshot has passed the five quality gates and been committed (riskctl ingest)."}
+          : "Nothing is estimated or filled in meanwhile. Figures appear once a snapshot has passed the five quality gates and been committed (cypher ingest)."}
       </p>
     </div>
   );

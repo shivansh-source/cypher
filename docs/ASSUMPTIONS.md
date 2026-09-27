@@ -331,7 +331,7 @@ indirectly).
   `wazuh_connector.py`/`greenbone_connector.py`/`prowler_connector.py`/
   `scoutsuite_connector.py` per `infra/README.md`'s `_identity_hint`
   convention) and a CMDB canonical asset id name the same real-world asset,
-  before `interfaces/cli/riskctl.py`'s `ingest_command` merges them. The
+  before `interfaces/cli/cypher.py`'s `ingest_command` merges them. The
   boundary is inclusive: confidence exactly `0.85` merges. Below it, the
   candidate is left unmerged and the decision is recorded (with its full
   evidence trail) via

@@ -99,7 +99,7 @@ ps105/
 │   └── tests/
 ├── interfaces/
 │   ├── api/app.py                # FastAPI app: /health, /exposure, /optimize, /chat*
-│   ├── cli/riskctl.py            # Typer CLI: ingest (implemented) + 4 stub commands
+│   ├── cli/cypher.py             # Typer CLI: ingest (implemented) + 4 stub commands
 │   └── dashboard/                # Separate Next.js 16 / React 19 app, own package.json
 │       └── src/{app,components,lib}
 ├── docs/
@@ -294,7 +294,7 @@ Fully specified via docstrings: `check_asset_count_delta`, `check_no_findings_fr
 
 ### Snapshot storage (`aggregated.json` equivalent)
 
-**No snapshot store exists in code at all.** `SNAPSHOT_STORE_PATH=./data/snapshots` is defined in `.env.example` but nothing reads or writes it. `interfaces/cli/riskctl.py::ingest_command` explicitly hardcodes `previous: dict[str, Any] | None = None` with a `# TODO: read the actual current snapshot once a snapshot store exists`. `commit_snapshot` (which would presumably persist it) is itself unimplemented. `schema/sample_aggregated.json` is a static fixture used only by the `.claude/commands/run-engine.md` slash command for manual exercising of the engine.
+**No snapshot store exists in code at all.** `SNAPSHOT_STORE_PATH=./data/snapshots` is defined in `.env.example` but nothing reads or writes it. `interfaces/cli/cypher.py::ingest_command` explicitly hardcodes `previous: dict[str, Any] | None = None` with a `# TODO: read the actual current snapshot once a snapshot store exists`. `commit_snapshot` (which would presumably persist it) is itself unimplemented. `schema/sample_aggregated.json` is a static fixture used only by the `.claude/commands/run-engine.md` slash command for manual exercising of the engine.
 
 ---
 
@@ -306,8 +306,8 @@ Fully specified via docstrings: `check_asset_count_delta`, `check_no_findings_fr
 | Normalization | `infra/connectors/*.py` (`normalize()`) | Same split as above — normalization lives inside each connector, never in `core/` |
 | Identity resolution | `infra/connectors/*.py` (`resolve_asset_id()`) via a private `_identity_hint` bridging convention | **Placeholder only** — `cmdb_connector.py`, the intended canonical identity source, is itself a stub. Implemented connectors mint `host:<value>` / `cloud:<value>` ids from their own `_identity_hint`, stripped of the `_` prefix before leaving `Connector.run()` |
 | Enrichment | `threat_intel_connector.py` (EPSS/KEV, matches on `cve_id`) | Stub (`NotImplementedError`) |
-| Aggregation/merge | `interfaces/cli/riskctl.py::_merge_connector_fragments` | **Implemented** — merges every reachable connector's fragments into full `assets[]` entries; findings are concatenated (never overwritten), other sections use "last write wins" |
-| Snapshot assembly | `interfaces/cli/riskctl.py::ingest_command` | Implemented up to the gate call |
+| Aggregation/merge | `interfaces/cli/cypher.py::_merge_connector_fragments` | **Implemented** — merges every reachable connector's fragments into full `assets[]` entries; findings are concatenated (never overwritten), other sections use "last write wins" |
+| Snapshot assembly | `interfaces/cli/cypher.py::ingest_command` | Implemented up to the gate call |
 | Gate | `core/snapshot.py::validate_snapshot` (5 gates) | **Stub** |
 | Commit | `core/snapshot.py::commit_snapshot` | **Stub** |
 | Persistence | none | **Does not exist** (no snapshot store) |
@@ -322,13 +322,13 @@ Fully specified via docstrings: `check_asset_count_delta`, `check_no_findings_fr
 
 `validate_snapshot` must run all 5 without short-circuiting and return every `GateResult`; `commit_snapshot` must never be called on a candidate that failed any gate (fail-safe: previous snapshot stays current).
 
-Note: `interfaces/cli/riskctl.py::ingest_command` already calls `validate_snapshot`/`commit_snapshot` and handles the fail path correctly (`typer.echo` per failed gate, then returns without committing) — it is written against the intended contract even though the functions it calls are stubs today.
+Note: `interfaces/cli/cypher.py::ingest_command` already calls `validate_snapshot`/`commit_snapshot` and handles the fail path correctly (`typer.echo` per failed gate, then returns without committing) — it is written against the intended contract even though the functions it calls are stubs today.
 
 ---
 
 ## 6. CLI / API surface
 
-### CLI — `interfaces/cli/riskctl.py` (Typer app, `build_cli()`)
+### CLI — `interfaces/cli/cypher.py` (Typer app, `build_cli()`)
 
 | Subcommand | Function | Status |
 |---|---|---|
@@ -456,9 +456,9 @@ Only names are listed above, not values — `.env` itself is gitignored; `.env.e
 Cross-referencing repo-root `CLAUDE.md`'s principles/design against actual code:
 
 1. **[Corrected 2026-09-26] `core/optimizer.py` is implemented**, not a stub — see the update note at the top of this document. `core/snapshot.py`'s status (all 5 gates, `validate_snapshot`, `commit_snapshot`) is unverified since 2026-09-22; a live snapshot store was observed under `data/snapshots/` during the 2026-09-26 work, which contradicts this bullet's premise for `core/snapshot.py` too, but that subsystem was not itself re-audited.
-2. **No snapshot store/persistence exists.** `SNAPSHOT_STORE_PATH` is defined in `.env.example` but nothing reads/writes it; `commit_snapshot` (which would persist) is itself a stub. `interfaces/cli/riskctl.py::ingest_command` hardcodes `previous = None` with an explicit `# TODO: read the actual current snapshot once a snapshot store exists`.
+2. **No snapshot store/persistence exists.** `SNAPSHOT_STORE_PATH` is defined in `.env.example` but nothing reads/writes it; `commit_snapshot` (which would persist) is itself a stub. `interfaces/cli/cypher.py::ingest_command` hardcodes `previous = None` with an explicit `# TODO: read the actual current snapshot once a snapshot store exists`.
 3. **All 6 `ai/tools/` wrappers are stubs** (`raise NotImplementedError`), because what they'd call (`core.engine`'s scoped entry points, `core.snapshot`, `core.optimizer`, `governance.mapper`) is partially or fully unimplemented. This means the chat assistant and `/exposure`, `/optimize` API routes currently answer every question with a structured "unavailable" result, never a number — which is the intended fail-safe behavior of `ai.tool_registry.execute_tool`, working as designed even though nothing is implemented yet.
-4. **5 of 9 connectors are unimplemented stubs**: `cmdb_connector.py` (the intended canonical asset-identity source), `iam_connector.py`, `nessus_connector.py`, `nmap_connector.py`, `threat_intel_connector.py`. Only Wazuh, Greenbone, Prowler, ScoutSuite are implemented and wired into `riskctl ingest`.
+4. **5 of 9 connectors are unimplemented stubs**: `cmdb_connector.py` (the intended canonical asset-identity source), `iam_connector.py`, `nessus_connector.py`, `nmap_connector.py`, `threat_intel_connector.py`. Only Wazuh, Greenbone, Prowler, ScoutSuite are implemented and wired into `cypher ingest`.
 5. **Asset identity resolution is a placeholder.** With no real CMDB connector, every implemented connector mints its own `host:`/`cloud:`-prefixed id from a private `_identity_hint` bridging key (documented explicitly in `infra/README.md` as temporary).
 6. **`schema/aggregated_assets.schema.json` has several open `TODO`s in field descriptions** that are explicitly "known open design questions, not implementation gaps" (per `schema/README.md`): `services[].criticality`'s allowed value enum is not yet fixed; `scan_scope.coverage`'s per-asset granularity is undecided; `assets[].edr.detection_rules_active`/`recent_alerts` shape is undefined; the endpoint↔asset relationship is unresolved.
 7. **`core/assumptions.py`'s `COST_PER_RECORD_INR` and `EXPECTED_REGULATORY_PENALTY_INR` are populated but not wired into `core.engine`** — the schema has no records-affected-count or regulatory-regime field to key them by yet (explicitly noted in both the constants' own comments and `parameterize_scenario`'s "Known gap" docstring section). Loss magnitude today is criticality-tier-driven only, not decomposed into FAIR's full primary/secondary loss forms.

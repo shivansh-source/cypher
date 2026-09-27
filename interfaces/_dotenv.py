@@ -1,8 +1,8 @@
 """Load the repo-root ``.env`` into the process environment at startup.
 
 Both entry points (``interfaces/api/app.py``'s ``create_app`` and
-``interfaces/cli/riskctl.py``'s ``build_cli``) call :func:`load_dotenv`, so
-``uvicorn --factory interfaces.api.app:create_app`` and ``riskctl`` pick up
+``interfaces/cli/cypher.py``'s ``build_cli``) call :func:`load_dotenv`, so
+``uvicorn --factory interfaces.api.app:create_app`` and ``cypher`` pick up
 ``GROQ_API_KEY``, ``SNAPSHOT_STORE_PATH`` and the rest of ``.env`` without
 the shell having to export them first. Every module that reads configuration
 keeps reading ``os.environ`` as before; this only fills it in.

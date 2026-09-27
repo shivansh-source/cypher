@@ -175,7 +175,9 @@ tool, and nothing should be taught to.
 On a hosted deployment the API has no shared disk with the ingest job, so it pulls the snapshot
 store the `scheduled-ingest` workflow publishes to S3 (`interfaces/api/snapshot_sync.py`): set
 `SNAPSHOT_S3_BUCKET` and the read-only `suraksha-api-reader` credentials, plus
-`CORS_ALLOWED_ORIGINS` (the dashboard's public origin). See `.env.example`. The dashboard, on
+`CORS_ALLOWED_ORIGINS` (the dashboard's public origin). See `.env.example`. The download
+itself lives in `interfaces/_snapshot_mirror.py`, which `cypher plan` also uses to refresh its
+baseline. The dashboard, on
 Vercel, points `NEXT_PUBLIC_API_BASE_URL` at this service.
 
 ### Signed snapshot links

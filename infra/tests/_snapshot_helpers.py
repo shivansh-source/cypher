@@ -1,7 +1,7 @@
 """Test-only helpers for building a minimal schema-shaped snapshot.
 
 Mirrors the asset-defaulting behavior of
-``interfaces/cli/riskctl.py``'s ``ingest_command`` (default any section no
+``interfaces/cli/cypher.py``'s ``ingest_command`` (default any section no
 connector contributed to ``[]``/``{}``/the "no agent" ``edr`` shape) so each
 connector test can validate its own output against
 ``schema/aggregated_assets.schema.json`` without depending on

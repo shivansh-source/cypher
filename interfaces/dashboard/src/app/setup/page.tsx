@@ -1,10 +1,24 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState, type CSSProperties } from "react";
+import { Suspense, useState } from "react";
+import { CypherMark } from "@/components/CypherMark";
 import { InfoTip } from "@/components/InfoTip";
-import { CATEGORY_ORDER, TOOL_CATALOG, type ToolCategory } from "@/lib/tool-catalog";
-import { saveToolSelection, useToolSelection } from "@/lib/tool-selection-state";
+import { OrgProfile } from "@/components/onboarding/OrgProfile";
+import { TelemetryMap } from "@/components/onboarding/TelemetryMap";
+import { groupId, ToolGroup } from "@/components/onboarding/ToolGroup";
+import { coverageByCategory } from "@/lib/coverage";
+import type { EntityType } from "@/lib/frameworks";
+import { saveOrgProfile, useOrgProfile } from "@/lib/org-profile-state";
+import { CATEGORY_INFO, CATEGORY_ORDER, TOOL_CATALOG, type ToolCategory } from "@/lib/tool-catalog";
+import {
+  CUSTOM_TOOL_PREFIX,
+  saveCustomTools,
+  saveToolSelection,
+  useCustomTools,
+  useToolSelection,
+  type CustomTool,
+} from "@/lib/tool-selection-state";
 
 const AVAILABLE_IDS = TOOL_CATALOG.filter((t) => t.available).map((t) => t.id);
 
@@ -14,16 +28,6 @@ const GROUPS = CATEGORY_ORDER.map((category) => ({
   tools: TOOL_CATALOG.filter((t) => t.category === category),
 }));
 
-/** What a gap in each category means for the figures, in the engine's own terms. */
-const GAP_MEANING: Record<ToolCategory, string> = {
-  "Vulnerability scanning": "no host or network vulnerabilities",
-  "Cloud security posture": "no cloud misconfigurations",
-  "Endpoint detection & response": "no EDR credit on any asset",
-  "Identity & access": "no MFA or privilege posture",
-  "Network exposure": "no open-port exposure",
-  "Asset inventory": "no canonical asset identity",
-};
-
 export default function SetupPage() {
   return (
     <Suspense fallback={null}>
@@ -32,36 +36,87 @@ export default function SetupPage() {
   );
 }
 
+function prefersReducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 /**
- * The tool selector: which security tools this org uses. A standalone page
- * (no app frame) and the first thing a browser with no saved selection sees.
- * Saved to this browser only — see `tool-selection-state.ts` for exactly what
- * that does and doesn't control today, which the page states plainly too.
+ * Onboarding: who the org is and which security tools it runs. A standalone
+ * page (no app frame) and the first thing a browser with no saved selection
+ * sees. Saved to this browser only — see `tool-selection-state.ts` for
+ * exactly what that does and doesn't control today, which the page states
+ * plainly too.
  */
 function SetupScreen() {
   const router = useRouter();
   const params = useSearchParams();
   const isFirstRun = params.get("first") === "1";
-  const saved = useToolSelection();
+  const savedTools = useToolSelection();
+  const savedCustom = useCustomTools();
+  const savedProfile = useOrgProfile();
+  const hydrated = savedTools !== null && savedCustom !== null && savedProfile !== null;
+  const hasSaved = Array.isArray(savedTools);
+
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [custom, setCustom] = useState<CustomTool[]>([]);
+  const [name, setName] = useState("");
+  const [entityType, setEntityType] = useState<EntityType | null>(null);
   const [touched, setTouched] = useState(false);
-  // `saved` starts as `null` (storage not read yet) and resolves after hydration. Seed the
-  // checkboxes from it once, on that transition — adjusting state during render rather than in
-  // an effect, so a later edit is never overwritten.
-  const [priorSaved, setPriorSaved] = useState<string[] | null | undefined>(null);
-  if (saved !== priorSaved) {
-    setPriorSaved(saved);
-    if (saved !== null && !touched) setSelected(new Set(saved ?? []));
+  const [seeded, setSeeded] = useState(false);
+  const [pulse, setPulse] = useState<{ category: ToolCategory; n: number } | null>(null);
+  const [freshId, setFreshId] = useState<string | null>(null);
+
+  // The stores resolve after hydration. Seed the form from them once, on that transition —
+  // adjusting state during render rather than in an effect, so a later edit is never overwritten.
+  if (hydrated && !seeded) {
+    setSeeded(true);
+    setSelected(new Set(savedTools ?? []));
+    setCustom(savedCustom ?? []);
+    setName(savedProfile?.name ?? "");
+    setEntityType(savedProfile?.entityType ?? null);
   }
-  const synced = priorSaved !== null;
-  const hasSaved = Array.isArray(saved);
+
+  function categoryOf(id: string): ToolCategory | undefined {
+    return (TOOL_CATALOG.find((t) => t.id === id) ?? custom.find((t) => t.id === id))?.category;
+  }
+
+  function signal(category: ToolCategory | undefined) {
+    if (category) setPulse((current) => ({ category, n: (current?.n ?? 0) + 1 }));
+  }
 
   function toggle(id: string) {
     setTouched(true);
+    const adding = !selected.has(id);
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+    if (adding) signal(categoryOf(id));
+  }
+
+  function addTool(category: ToolCategory, toolName: string) {
+    setTouched(true);
+    const key = toolName.toLowerCase();
+    const existing =
+      TOOL_CATALOG.find((t) => t.category === category && t.name.toLowerCase() === key) ??
+      custom.find((t) => t.category === category && t.name.toLowerCase() === key);
+    const id = existing?.id ?? `${CUSTOM_TOOL_PREFIX}${crypto.randomUUID()}`;
+    if (!existing) {
+      setCustom((current) => [...current, { id, name: toolName, category }]);
+      setFreshId(id);
+    }
+    setSelected((current) => new Set(current).add(id));
+    signal(category);
+  }
+
+  function removeTool(id: string) {
+    setTouched(true);
+    setCustom((current) => current.filter((t) => t.id !== id));
+    setSelected((current) => {
+      const next = new Set(current);
+      next.delete(id);
       return next;
     });
   }
@@ -71,26 +126,34 @@ function SetupScreen() {
     setSelected(new Set(AVAILABLE_IDS));
   }
 
+  function jump(category: ToolCategory) {
+    const section = document.getElementById(groupId(category));
+    section?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+    section?.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
+  }
+
   function save() {
-    saveToolSelection(Array.from(selected));
+    const customIds = new Set(custom.map((t) => t.id));
+    saveToolSelection(Array.from(selected).filter((id) => !id.startsWith(CUSTOM_TOOL_PREFIX) || customIds.has(id)));
+    saveCustomTools(custom);
+    const orgName = name.trim();
+    saveOrgProfile(orgName || entityType ? { name: orgName, entityType } : null);
     router.push("/");
   }
 
+  const coverage = coverageByCategory(selected, custom);
   const count = selected.size;
   const withConnector = Array.from(selected).filter((id) => AVAILABLE_IDS.includes(id)).length;
-  const covered = GROUPS.map(({ category, tools }) => ({
-    category,
-    picked: tools.filter((t) => selected.has(t.id)).length,
-  }));
-  const gaps = covered.filter((c) => c.picked === 0);
+  const gaps = coverage.filter((c) => c.state === "off");
+  const welcome = isFirstRun || !hasSaved;
 
   return (
-    <div className="onb">
-      <aside className="onb-rail">
-        <div className="onb-top">
+    <div className={`ob${seeded ? " ready" : ""}${touched ? " touched" : ""}`}>
+      <aside className="ob-rail">
+        <div className="ob-top">
           <div className="brand" aria-label="Cypher">
             <div className="mark" aria-hidden="true">
-              C
+              <CypherMark />
             </div>
             <div className="word">Cypher</div>
           </div>
@@ -101,112 +164,85 @@ function SetupScreen() {
           ) : null}
         </div>
 
-        <section className="onb-hero">
-          <h1>{isFirstRun || !hasSaved ? "Which tools does your org already run?" : "Your data sources"}</h1>
-          <p className="onb-lead">
-            Every rupee figure starts from findings a tool reported. Pick each scanner, endpoint
-            agent, identity source and inventory you have in place — Cypher only sees what these
-            tools see.
+        <section className="ob-hero">
+          <h1>{welcome ? "Set up Cypher for your organisation" : "Your data sources"}</h1>
+          <p className="ob-lead">
+            Cypher turns what your security tools report into risk in rupees. Tell it which tools
+            you run: it can only price what they see.
           </p>
-          <p className="onb-scope">
+        </section>
+
+        <TelemetryMap
+          coverage={coverage}
+          pulse={pulse}
+          intro={seeded && !hasSaved}
+          animate={touched}
+          onJump={jump}
+        />
+
+        <p className="ob-gaps" aria-live="polite">
+          {count === 0
+            ? "Pick at least one tool to continue."
+            : gaps.length === 0
+              ? "Every kind of telemetry the engine uses has a source."
+              : `Without ${gaps.map((g) => CATEGORY_INFO[g.category].short.toLowerCase()).join(", ")}, the figures will have ${gaps
+                  .map((g) => CATEGORY_INFO[g.category].gap)
+                  .join("; ")}.`}
+        </p>
+
+        <div className="ob-cta">
+          <div className="ob-summary">
+            <span>
+              <b>{count}</b> picked
+              {withConnector > 0 ? <span className="muted">, {withConnector} connect today</span> : null}
+            </span>
+            {!touched && seeded && !hasSaved ? (
+              <button type="button" className="linkbtn" onClick={useOurs}>
+                Pick the tools Cypher connects to today
+              </button>
+            ) : null}
+          </div>
+          <button type="button" className="btn ob-go" disabled={count === 0} onClick={save}>
+            {hasSaved ? "Save changes" : "Continue to the dashboard"}
+          </button>
+          <p className="ob-scope">
             Saved in this browser only, not yet connected to the ingest pipeline.
             <InfoTip id="setup-scope" label="What this does and doesn't do">
               This selection isn&apos;t sent anywhere. It doesn&apos;t yet change which connector code
-              runs: <code>riskctl ingest</code> always tries the same fixed set of connectors, and
+              runs: <code>cypher ingest</code> always tries the same fixed set of connectors, and
               each one runs only if its own environment variables are configured. Treat this as the
               record of what your org has in place, not a switch, until that wiring exists.
             </InfoTip>
           </p>
-        </section>
-
-        <section className="onb-coverage" aria-label="Coverage of your picks">
-          <h2>Coverage</h2>
-          <ol>
-            {covered.map((c) => (
-              <li key={c.category} className={c.picked ? "on" : undefined}>
-                <span className="lbl">{c.category}</span>
-                <span className="cnt">{c.picked ? `${c.picked} picked` : "Not covered"}</span>
-                <span className="cov-seg" aria-hidden="true" />
-              </li>
-            ))}
-          </ol>
-          <p className="onb-gaps">
-            {count === 0
-              ? "Pick at least one tool to continue."
-              : gaps.length === 0
-                ? "Every kind of telemetry the engine uses has a source."
-                : `Without a source for ${gaps
-                    .map((g) => g.category.toLowerCase())
-                    .join(", ")}, the figures will have ${gaps
-                    .map((g) => GAP_MEANING[g.category])
-                    .join("; ")}.`}
-          </p>
-        </section>
-
-        <div className="onb-cta">
-          <div className="onb-summary">
-            <span>
-              <b>{count}</b> selected
-              {withConnector > 0 ? (
-                <span className="muted">, {withConnector} with a connector today</span>
-              ) : null}
-            </span>
-            {!touched && synced && !hasSaved ? (
-              <button type="button" className="linkbtn" onClick={useOurs}>
-                Select the tools already configured
-              </button>
-            ) : null}
-          </div>
-          <button type="button" className="btn" disabled={count === 0} onClick={save}>
-            {hasSaved ? "Save changes" : "Continue to the dashboard"}
-          </button>
         </div>
       </aside>
 
-      <div className="onb-main">
+      <div className="ob-main">
+        <OrgProfile
+          name={name}
+          entityType={entityType}
+          onName={(value) => {
+            setTouched(true);
+            setName(value);
+          }}
+          onEntityType={(value) => {
+            setTouched(true);
+            setEntityType(value);
+          }}
+        />
         {GROUPS.map(({ category, tools }) => (
-          <section key={category} className="onb-group" aria-labelledby={`grp-${category}`}>
-            <h2 id={`grp-${category}`}>{category}</h2>
-            <div className="onb-cards">
-              {tools.map((tool) => {
-                const on = selected.has(tool.id);
-                return (
-                  <label
-                    key={tool.id}
-                    className={`tool${on ? " on" : ""}${tool.available ? "" : " soon"}`}
-                    style={{ "--tone": `var(--s${tool.tone})` } as CSSProperties}
-                  >
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={on}
-                      onChange={() => toggle(tool.id)}
-                      aria-describedby={`${tool.id}-status`}
-                    />
-                    <span className="tool-check" aria-hidden="true">
-                      <svg viewBox="0 0 16 16">
-                        <path d="M3.5 8.5l3 3 6-7" />
-                      </svg>
-                    </span>
-                    <span className={`tool-icon${tool.logo ? " has-logo" : ""}`} aria-hidden="true">
-                      {tool.logo ? (
-                        // Local, small, fixed-size logos: next/image's resizing buys nothing here.
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={tool.logo} alt="" width={52} height={52} loading="lazy" />
-                      ) : (
-                        tool.mark
-                      )}
-                    </span>
-                    <b className="tool-name">{tool.name}</b>
-                    <span className="tool-blurb">{tool.blurb}</span>
-                    <span id={`${tool.id}-status`} className="tool-status">
-                      {tool.available ? "Connector available" : "No connector yet"}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </section>
+          <ToolGroup
+            key={category}
+            category={category}
+            tools={tools}
+            customTools={custom.filter((t) => t.category === category)}
+            state={coverage.find((c) => c.category === category)?.state ?? "off"}
+            selected={selected}
+            onToggle={toggle}
+            onAdd={addTool}
+            onRemove={removeTool}
+            freshId={freshId}
+          />
         ))}
       </div>
     </div>

@@ -1,6 +1,6 @@
 """Export an EC2 asset inventory in the shape ``cmdb_connector.py`` reads.
 
-Run by an operator, not by ``riskctl``::
+Run by an operator, not by ``cypher``::
 
     python -m infra.inventory.export_ec2_inventory --region ap-south-1 > inventory.json
 

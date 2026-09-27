@@ -18,15 +18,15 @@ Open FAIR + Monte Carlo engine, the Bayesian attack graph that models
 multi-step "stepping-stone" attacks, and the joint-simulation optimizer), four of
 `infra/connectors/` (`wazuh_connector.py`, `greenbone_connector.py`,
 `prowler_connector.py`, `scoutsuite_connector.py`) and the `ingest` command in
-`interfaces/cli/riskctl.py` are real. Still signatures and docstrings only:
+`interfaces/cli/cypher.py` are real. Still signatures and docstrings only:
 the `threat_intel`, `iam`, `nessus` and `nmap` connectors, the
-`optimize_investment` tool in `ai/tools/`, and `riskctl`'s `optimize`
+`optimize_investment` tool in `ai/tools/`, and `cypher`'s `optimize`
 command — see `CLAUDE.md` for the design principles that govern how the
 remaining bodies must be implemented, and `docs/ASSUMPTIONS.md` for every
 modelling constant `core/engine/` reads from and how far each is from being
 calibrated to a real organization.
 
-Once a snapshot has been committed (`riskctl ingest`), the API, the
+Once a snapshot has been committed (`cypher ingest`), the API, the
 dashboard and the chat assistant all report real figures from the engine.
 The one exception is `optimize_investment`: nothing in the system supplies
 candidate-control costs, so the assistant reports it as unavailable, and the
@@ -141,6 +141,44 @@ turn as Server-Sent Events. `interfaces/api/README.md` has the full
 contract, including why a streamed `text_delta` must never be displayed as
 the final answer.
 
+### Pre-apply risk of a Terraform change (`cypher plan`)
+
+`cypher plan` answers "what does this Terraform change do to cyber risk, in
+rupees?" before `terraform apply`:
+
+```
+terraform plan -out tf.plan && terraform show -json tf.plan > tf_plan.json
+cypher plan tf_plan.json                          # report only (exit 0)
+cypher plan tf_plan.json --fail-on-eal-increase 0 # exit 2 if Expected Annual Loss rises
+cypher plan --dir infra/terraform/environments/dev --json   # runs terraform for you
+```
+
+The baseline is the current committed snapshot, found automatically: with
+`SNAPSHOT_S3_BUCKET` set (see `.env.example`), the store the daily
+`scheduled-ingest` workflow publishes to S3 is mirrored into
+`SNAPSHOT_STORE_PATH` (`./data/snapshots`) first, so the report is priced
+against the latest ingest; without it, the local store is used as it is. If S3
+cannot be reached the report says so and falls back to the local copy (the
+header shows its source and age). `--offline` skips S3, and `--snapshot FILE`
+uses a specific snapshot instead (e.g. a test fixture). The mirror replaces
+the local `current.json` with the published one and only ever adds history.
+
+`infra/connectors/terraform_plan.py` translates the plan into
+schema-shaped changes (security-group internet exposure and internal
+reachability, `AdministratorAccess`/console-without-MFA findings, DLM backup
+coverage, deletions). The CLI overlays them on a copy of the current
+committed snapshot and re-simulates both jointly on the same random draws
+(`core.optimizer.compare_snapshots`). The report gives baseline, proposed
+and change for EAL and VaR, the loss scenarios that moved and the Terraform
+address behind each, and the baseline snapshot id and age.
+
+Limits, stated in the report rather than hidden: a created resource has no
+scan findings, so it is listed as unscanned with unknown risk, never as
+₹0; values known only after apply, resources the baseline cannot be
+matched to, and resource types with no rule are listed as not modelled.
+With no committed snapshot the command exits 1 rather than estimate a
+figure. The figures are only as fresh as the last `cypher ingest`.
+
 ### Do I need a venv per package?
 
 No. `core/`, `governance/`, `ai/`, `infra/`, `interfaces/api/`, and
@@ -152,7 +190,7 @@ is a different language runtime entirely (Node.js) and is never part of
 that venv; it manages its own dependencies via `package.json`/`node_modules`
 and is isolated by that mechanism instead.
 
-`riskctl ingest` (see `infra/README.md`) is runnable today against real
+`cypher ingest` (see `infra/README.md`) is runnable today against real
 Wazuh/Greenbone/Prowler/ScoutSuite output, and `core.engine.compute_risk_figure`
 is runnable today against a hand-authored snapshot (see
 `schema/sample_aggregated.json`) — but the two aren't connected yet: the

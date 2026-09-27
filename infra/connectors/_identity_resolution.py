@@ -12,7 +12,7 @@ evidence for each — never decide a merge itself.
 
 This module never imports from ``ai/`` (repo-root ``CLAUDE.md``: ``infra/``
 must never import from ``ai/``). The actual Jev call and the
-merge/no-merge decision happen in ``interfaces/cli/riskctl.py``, which is
+merge/no-merge decision happen in ``interfaces/cli/cypher.py``, which is
 allowed to see both ``infra/`` and ``ai/`` — the same bridging pattern
 ``ingest_command`` already uses for ``core.snapshot`` (see its own
 docstring: "core.snapshot is imported here rather than in infra/ because
@@ -215,7 +215,7 @@ def find_candidate_merges(
             candidate snapshot's ``assets[]``, mapped to the connector name
             that produced it (from that asset's findings' own
             ``provenance.connector`` — the caller resolves this; see
-            ``interfaces/cli/riskctl.py``). Ids that don't parse as a
+            ``interfaces/cli/cypher.py``). Ids that don't parse as a
             ``host:``/``cloud:`` placeholder (e.g. an id already resolved
             to ``cmdb:...``) are skipped.
         cmdb_records: Every CMDB-known asset and its identifiers.
