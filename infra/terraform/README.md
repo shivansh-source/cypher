@@ -1,6 +1,6 @@
 # `infra/terraform/` — LoanEase sandbox
 
-Terraform for the deliberately vulnerable AWS sandbox whose telemetry Su₹aksha
+Terraform for the deliberately vulnerable AWS sandbox whose telemetry Cypher
 ingests. It exists to generate real, verifiable findings (Prowler, PMapper,
 Wazuh, Greenbone) for the connectors in `infra/connectors/`; it is not part of
 the risk engine. `manifest.yaml` is the ground truth of what was planted (V-01

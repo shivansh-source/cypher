@@ -1,4 +1,4 @@
-# Su₹aksha API (interfaces/api). Build from the repo root:
+# Cypher API (interfaces/api). Build from the repo root:
 #   docker build -f infra/Dockerfile.api -t suraksha-api .
 #
 # Runtime configuration is environment-only; nothing secret is baked in. On a hosted API

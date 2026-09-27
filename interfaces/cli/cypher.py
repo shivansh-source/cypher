@@ -1,4 +1,4 @@
-"""`cypher` — command-line interface for Su₹aksha.
+"""`cypher` — command-line interface for Cypher.
 
 Every command here is a thin adapter over ``core/``, ``governance/``, and
 ``ai/`` — no command may contain risk-computation, compliance-mapping, or
@@ -1239,7 +1239,7 @@ def build_cli() -> Any:
     load_dotenv()
     app = typer.Typer(
         name="cypher",
-        help="Su₹aksha: security telemetry to rupee-denominated cyber risk (Open FAIR + Monte Carlo).",
+        help="Cypher: security telemetry to rupee-denominated cyber risk (Open FAIR + Monte Carlo).",
         no_args_is_help=True,
     )
     app.command("validate-snapshot")(validate_snapshot_command)

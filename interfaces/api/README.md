@@ -78,6 +78,7 @@ or put a shared store behind `ai.sessions.InMemorySessionStore`'s interface.
 | `GET` | `/frameworks/{framework}/status` | Control-by-control status and weighted score (via `ai.tools.get_framework_status`) |
 | `POST` | `/simulate` | What-if: joint re-simulation of hypothetical controls (via `ai.tools.simulate_scenario`) |
 | `GET` | `/optimize/candidates` | Control gaps the optimizer can close — no cost, no benefit |
+| `GET` | `/optimize/plan` | Cost-free priority plan: every gap ordered by how much it cuts EAL given the ones before it, each step a joint re-simulation (`core.optimizer.prioritize_controls`); cached per snapshot |
 | `POST` | `/optimize` | `PortfolioRecommendation` over candidates whose costs the caller declares |
 | `GET` | `/optimize?budget_inr=` | `optimize_investment` tool — 501: no candidate-cost catalogue exists |
 | `GET` | `/assumptions` | Every constant in `core/assumptions.py`, live, with its documented rationale |

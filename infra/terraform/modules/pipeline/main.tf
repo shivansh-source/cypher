@@ -1,4 +1,4 @@
-# Su₹aksha's daily-ingest pipeline permissions. Deliberately separate from modules/iam,
+# Cypher's daily-ingest pipeline permissions. Deliberately separate from modules/iam,
 # which holds the planted (vulnerable) IAM items; everything here is least-privilege.
 #
 # S3 layout in the existing raw-findings bucket (created outside Terraform):

@@ -1,6 +1,6 @@
 """The chat assistant: a tool-calling loop over ``ai/tools/``.
 
-This is the conversational front door to Su₹aksha. The model does exactly
+This is the conversational front door to Cypher. The model does exactly
 two things here, both at the edges (repo-root ``CLAUDE.md`` principle 2):
 it decides which ``ai/tools/`` wrapper answers the user's question, and it
 narrates what that tool returned. Every figure in a reply came from
