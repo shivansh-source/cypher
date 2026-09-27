@@ -10,7 +10,7 @@ rather than a direct rename.
 In this deployment, Greenbone plays the role Nessus plays in
 ``nessus_connector.py`` elsewhere in the codebase (both populate
 ``assets[].findings`` with ``type: "cve"``) — only one of the two is
-actually wired into ``interfaces/cli/riskctl.py``'s ``ingest_command`` for
+actually wired into ``interfaces/cli/cypher.py``'s ``ingest_command`` for
 now (see ``infra/README.md``).
 """
 

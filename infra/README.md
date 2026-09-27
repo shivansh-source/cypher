@@ -39,9 +39,17 @@ scan of its own.
 elsewhere (both populate CVE findings from a vulnerability scanner) — this
 deployment's actual tool stack runs Greenbone, not Nessus. Both connector
 files exist in this repo, but only `greenbone_connector.py` is currently
-wired into `interfaces/cli/riskctl.py`'s `ingest_command`; `nessus_connector.py`
+wired into `interfaces/cli/cypher.py`'s `ingest_command`; `nessus_connector.py`
 remains an unimplemented stub, kept for reference/future deployments that
 do run Nessus instead.
+
+`terraform_plan.py` is not a scanner connector and is not part of
+`cypher ingest`. It translates a `terraform show -json` plan into
+schema-shaped *changes* against the committed snapshot, for `cypher plan`
+(see the repo-root `README.md`). It is the only module that knows the
+Terraform plan format; everything it cannot model (created resources,
+values known only after apply, unmatched resources, resource types without
+a rule) is returned as such, never as zero risk.
 
 ## Raw findings object store (`_object_store.py`)
 
@@ -86,7 +94,7 @@ identity scheme directly — connectors must never import `ai/` (see
 repo-root `CLAUDE.md`'s module ownership map), and reconciling a
 placeholder id against CMDB now requires a Jev call (see below), so that
 reconciliation cannot happen inside `resolve_asset_id` itself. Instead,
-`interfaces/cli/riskctl.py`'s `ingest_command` reconciles placeholder ids
+`interfaces/cli/cypher.py`'s `ingest_command` reconciles placeholder ids
 against CMDB's canonical ids as a step *after* every connector has run.
 An asset whose placeholder id cannot be matched to a CMDB record with
 sufficient confidence keeps its placeholder id — this remains a
@@ -109,7 +117,7 @@ see the module's own docstring. `infra/connectors/_identity_resolution.py`
    shared cloud instance id — strong) from cross-kind evidence (e.g. a
    hostname-shaped placeholder matching a CMDB IP record — weak).
 
-`interfaces/cli/riskctl.py`'s `ingest_command` is the only place that
+`interfaces/cli/cypher.py`'s `ingest_command` is the only place that
 actually calls Jev (`ai.jev_transport.JevTransport`, TypeSafe AI's "System
 One" model — see that module's docstring for why it's not chat-shaped):
 one `TypedQuestion` per candidate, asking whether the two ids name the same
@@ -155,7 +163,7 @@ persistence/scheduling (`db`, `connector-scheduler`). `dashboard` talks to
 - `infra/bastion/` — Wazuh + Greenbone exports that run on the bastion, triggered by the workflow through SSM (no bastion cron).
 - `infra/Dockerfile.api` — container image for the hosted API.
 - `.github/workflows/scheduled-ingest.yml` — the daily / on-demand pipeline: Prowler + PMapper,
-  then `riskctl ingest`, then publishes the snapshot store to S3.
+  then `cypher ingest`, then publishes the snapshot store to S3.
 
 ## Daily pipeline at a glance
 
@@ -166,7 +174,7 @@ every workflow run refreshes these via SSM (daily, or when refresh_host_data is 
 workflow (21:00 UTC / manual "Run workflow"):
     Prowler + PMapper     -> S3 latest/prowler_connector.json, inputs/pmapper.json
     EC2 inventory         -> built inside the ingest job
-    riskctl ingest        -> S3 snapshots/  (current.json + history/)
+    cypher ingest         -> S3 snapshots/  (current.json + history/)
 hosted API                -> syncs snapshots/ from S3 -> Vercel dashboard
 ```
 

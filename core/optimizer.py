@@ -929,6 +929,67 @@ def prioritize_controls(
 
 
 @dataclass(frozen=True)
+class SnapshotComparison:
+    """Two snapshots of the same estate, simulated on the same random draws.
+
+    Attributes:
+        baseline_risk_figure: The baseline snapshot's figure, seeded from
+            the baseline (see :func:`_derive_comparison_seed`).
+        proposed_risk_figure: The proposed snapshot's figure, from one joint
+            simulation on the same seed — so the difference comes from what
+            differs between the snapshots, not from sampling noise.
+        expected_annual_loss_change_inr: proposed minus baseline Expected
+            Annual Loss; negative means the proposed state carries less.
+        value_at_risk_change_inr: proposed minus baseline Value at Risk, at
+            the percentile both figures carry.
+    """
+
+    baseline_risk_figure: RiskFigure
+    proposed_risk_figure: RiskFigure
+    expected_annual_loss_change_inr: float
+    value_at_risk_change_inr: float
+
+
+def compare_snapshots(baseline: dict[str, Any], proposed: dict[str, Any]) -> SnapshotComparison:
+    """Jointly re-simulate a proposed variant of a snapshot against the baseline's draws.
+
+    The proposed snapshot is any schema-shaped variant of the baseline: a
+    control portfolio applied (:func:`compare_hypothetical`), or a
+    Terraform plan overlaid (``cypher plan``). Both are run through
+    ``core.engine.compute_risk_figure`` with the seed derived from
+    ``baseline`` — common random numbers, as :func:`evaluate_portfolio`
+    does — so a scenario the proposal does not touch contributes exactly
+    the same loss to both figures, and comparing a snapshot with itself
+    gives a change of exactly zero.
+
+    Args:
+        baseline: The committed, schema-shaped snapshot being compared from.
+        proposed: A schema-shaped snapshot derived from ``baseline``. It must
+            already satisfy the same quality gates a committed snapshot
+            does; this function does not re-validate.
+
+    Returns:
+        A :class:`SnapshotComparison`.
+
+    Must never:
+        Derive the change by summing per-scenario or per-change deltas: the
+        proposed figure is one joint simulation of the whole proposed
+        snapshot, and the change is the difference of the two figures.
+    """
+    seed = _derive_comparison_seed(baseline)
+    baseline_figure = compute_risk_figure(baseline, seed=seed)
+    proposed_figure = compute_risk_figure(proposed, seed=seed)
+    return SnapshotComparison(
+        baseline_risk_figure=baseline_figure,
+        proposed_risk_figure=proposed_figure,
+        expected_annual_loss_change_inr=proposed_figure.expected_annual_loss_inr
+        - baseline_figure.expected_annual_loss_inr,
+        value_at_risk_change_inr=proposed_figure.value_at_risk_inr
+        - baseline_figure.value_at_risk_inr,
+    )
+
+
+@dataclass(frozen=True)
 class HypotheticalComparison:
     """A what-if: the snapshot as it stands versus with some controls applied.
 
@@ -994,14 +1055,11 @@ def compare_hypothetical(
                 f"snapshot: {', '.join(unknown)}"
             )
 
-    hypothetical_figure = evaluate_portfolio(snapshot, controls)
-    baseline_figure = evaluate_portfolio(snapshot, [])
+    comparison = compare_snapshots(snapshot, apply_controls_to_snapshot(snapshot, controls))
     return HypotheticalComparison(
         controls=list(controls),
-        baseline_risk_figure=baseline_figure,
-        hypothetical_risk_figure=hypothetical_figure,
-        expected_annual_loss_change_inr=hypothetical_figure.expected_annual_loss_inr
-        - baseline_figure.expected_annual_loss_inr,
-        value_at_risk_change_inr=hypothetical_figure.value_at_risk_inr
-        - baseline_figure.value_at_risk_inr,
+        baseline_risk_figure=comparison.baseline_risk_figure,
+        hypothetical_risk_figure=comparison.proposed_risk_figure,
+        expected_annual_loss_change_inr=comparison.expected_annual_loss_change_inr,
+        value_at_risk_change_inr=comparison.value_at_risk_change_inr,
     )

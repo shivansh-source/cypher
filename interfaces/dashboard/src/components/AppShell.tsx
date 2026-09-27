@@ -4,8 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useAgentPanelOpen, useAgentPanelWidth } from "@/lib/agent-panel-state";
+import { ENTITY_TYPES } from "@/lib/frameworks";
+import { useOrgProfile } from "@/lib/org-profile-state";
 import { useToolSelection } from "@/lib/tool-selection-state";
 import { AskSurakshaPanel } from "./AskSuraksha";
+import { CypherMark } from "./CypherMark";
 import { Nav } from "./Nav";
 import { SnapCard } from "./SnapCard";
 
@@ -85,6 +88,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const agentOpen = useAgentPanelOpen();
   const agentWidth = useAgentPanelWidth();
   const tools = useToolSelection();
+  const org = useOrgProfile();
+  const orgKind = ENTITY_TYPES.find((t) => t.id === org?.entityType)?.label;
 
   if (STANDALONE_ROUTES.some((route) => pathname.startsWith(route))) {
     return <div className="standalone">{children}</div>;
@@ -105,13 +110,20 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="brand-wrap">
           <Link href="/" className="brand" aria-label="Cypher — exposure overview">
             <div className="mark" aria-hidden="true">
-              C
+              <CypherMark />
             </div>
             <div className="brand-text">
               <div className="word">
                 Cypher
               </div>
-              <div className="tag">CYBER RISK, IN RUPEES</div>
+              {org?.name ? (
+                <div className="tag org" title={orgKind ? `${org.name} (${orgKind})` : org.name}>
+                  {org.name}
+                  {orgKind ? <span className="org-kind">{orgKind}</span> : null}
+                </div>
+              ) : (
+                <div className="tag">CYBER RISK, IN RUPEES</div>
+              )}
             </div>
           </Link>
           <button

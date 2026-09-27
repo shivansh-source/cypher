@@ -25,23 +25,7 @@ import type {
   Service,
   WeightedScoreResult,
 } from "@/lib/types";
-
-/** Display names for the framework keys under governance/control_library/. */
-const FRAMEWORK_LABELS: Record<string, string> = {
-  rbi_2026_directions: "RBI Directions 2026",
-  sebi_cscrf_cci: "SEBI CSCRF + CCI",
-  cis_controls: "CIS Controls",
-  nist_csf: "NIST CSF",
-  iso_27001: "ISO/IEC 27001",
-  dpdp_act_2023: "DPDP Act 2023",
-};
-
-/** The regulator-led frameworks first; any library not named here follows. */
-const FRAMEWORK_ORDER = Object.keys(FRAMEWORK_LABELS);
-
-function frameworkLabel(key: string): string {
-  return FRAMEWORK_LABELS[key] ?? key;
-}
+import { FRAMEWORK_ORDER, frameworkLabel } from "@/lib/frameworks";
 
 function plural(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`;

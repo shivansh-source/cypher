@@ -1,0 +1,368 @@
+{
+  "snapshot_id": "sha256:2697a557ddf94ffe1f2abd2dce0f76acc053efb1075ae6c13788d119918e940b",
+  "observed_at": "2026-09-25T03:30:00Z",
+  "valid_from": "2026-09-25T03:30:00Z",
+  "valid_to": null,
+  "scan_scope": {
+    "reachable_scanners": [
+      "greenbone_connector",
+      "prowler_connector",
+      "cmdb_connector"
+    ],
+    "unreachable_scanners": [],
+    "coverage": []
+  },
+  "services": [
+    {
+      "service_id": "svc-loan-portal",
+      "name": "LoanEase customer loan portal",
+      "criticality": "high",
+      "backup": {
+        "exists": false,
+        "last_tested_at": null,
+        "rpo_hours": null,
+        "rto_hours": null,
+        "immutable_copy": null
+      }
+    },
+    {
+      "service_id": "svc-loan-db",
+      "name": "LoanEase loan database",
+      "criticality": "critical",
+      "backup": {
+        "exists": true,
+        "last_tested_at": null,
+        "rpo_hours": 24,
+        "rto_hours": null,
+        "immutable_copy": null
+      }
+    },
+    {
+      "service_id": "svc-endpoint-sim",
+      "name": "LoanEase employee endpoint (simulated)",
+      "criticality": "medium",
+      "backup": {
+        "exists": false,
+        "last_tested_at": null,
+        "rpo_hours": null,
+        "rto_hours": null,
+        "immutable_copy": null
+      }
+    },
+    {
+      "service_id": "svc-scanner-ops",
+      "name": "Bastion / scanner / Wazuh manager",
+      "criticality": "low",
+      "backup": {
+        "exists": false,
+        "last_tested_at": null,
+        "rpo_hours": null,
+        "rto_hours": null,
+        "immutable_copy": null
+      }
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "cmdb:loanease-portal",
+      "findings": [
+        {
+          "finding_id": "greenbone-5b0c7a52-0001",
+          "type": "cve",
+          "cve_id": "CVE-2023-25577",
+          "epss_score": 0.02,
+          "kev_listed": false,
+          "criticality": "high",
+          "provenance": {
+            "connector": "greenbone_connector",
+            "raw_source_id": "1.3.6.1.4.1.25623.1.0.104551"
+          },
+          "first_seen_at": "2026-09-24T14:07:22Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": false,
+        "agent_healthy": null,
+        "detection_rules_active": null,
+        "recent_alerts": null
+      },
+      "identity_access": {},
+      "network": {},
+      "service_ids": [
+        "svc-loan-portal"
+      ]
+    },
+    {
+      "asset_id": "cmdb:loanease-bastion-scanner",
+      "findings": [
+        {
+          "finding_id": "greenbone-5b0c7a52-0002",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "high",
+          "provenance": {
+            "connector": "greenbone_connector",
+            "raw_source_id": "1.3.6.1.4.1.25623.1.0.100001"
+          },
+          "first_seen_at": "2026-09-24T14:07:22Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": false,
+        "agent_healthy": null,
+        "detection_rules_active": null,
+        "recent_alerts": null
+      },
+      "identity_access": {},
+      "network": {},
+      "service_ids": [
+        "svc-scanner-ops"
+      ]
+    },
+    {
+      "asset_id": "cmdb:loanease-db",
+      "findings": [
+        {
+          "finding_id": "greenbone-5b0c7a52-0003",
+          "type": "cve",
+          "cve_id": "CVE-2024-10979",
+          "epss_score": 0.01,
+          "kev_listed": false,
+          "criticality": "high",
+          "provenance": {
+            "connector": "greenbone_connector",
+            "raw_source_id": "1.3.6.1.4.1.25623.1.0.170893"
+          },
+          "first_seen_at": "2026-09-24T14:07:22Z",
+          "remediated_at": null
+        },
+        {
+          "finding_id": "prowler-ec2_instance_managed_by_ssm-arn:aws:ec2:ap-south-1:123456789012:instance/i-0a1b2c3d4e5f60003",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "medium",
+          "provenance": {
+            "connector": "prowler_connector",
+            "raw_source_id": "ec2_instance_managed_by_ssm"
+          },
+          "first_seen_at": "2026-09-24T14:07:22Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": false,
+        "agent_healthy": null,
+        "detection_rules_active": null,
+        "recent_alerts": null
+      },
+      "identity_access": {},
+      "network": {},
+      "service_ids": [
+        "svc-loan-db"
+      ]
+    },
+    {
+      "asset_id": "cmdb:loanease-endpoint-1",
+      "findings": [],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": false,
+        "agent_healthy": null,
+        "detection_rules_active": null,
+        "recent_alerts": null
+      },
+      "identity_access": {},
+      "network": {},
+      "service_ids": [
+        "svc-endpoint-sim"
+      ]
+    },
+    {
+      "asset_id": "cloud:arn:aws:iam::123456789012:role/loan-ops-analyst",
+      "findings": [
+        {
+          "finding_id": "prowler-iam_role_administratoraccess_policy-arn:aws:iam::123456789012:role/loan-ops-analyst",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "high",
+          "provenance": {
+            "connector": "prowler_connector",
+            "raw_source_id": "iam_role_administratoraccess_policy"
+          },
+          "first_seen_at": "2026-09-24T14:07:22Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": false,
+        "agent_healthy": null,
+        "detection_rules_active": null,
+        "recent_alerts": null
+      },
+      "identity_access": {},
+      "network": {}
+    },
+    {
+      "asset_id": "cloud:arn:aws:iam::123456789012:user/loan-ops-no-mfa",
+      "findings": [
+        {
+          "finding_id": "prowler-iam_user_mfa_enabled_console_access-arn:aws:iam::123456789012:user/loan-ops-no-mfa",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "high",
+          "provenance": {
+            "connector": "prowler_connector",
+            "raw_source_id": "iam_user_mfa_enabled_console_access"
+          },
+          "first_seen_at": "2026-09-24T14:07:22Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": false,
+        "agent_healthy": null,
+        "detection_rules_active": null,
+        "recent_alerts": null
+      },
+      "identity_access": {},
+      "network": {}
+    }
+  ],
+  "endpoints": [
+    {
+      "endpoint_id": "cmdb-loanease-portal-host-0",
+      "address_type": "hostname",
+      "address": "loanease-portal",
+      "resolved_asset_id": "cmdb:loanease-portal"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-portal-ip-0",
+      "address_type": "ipv4",
+      "address": "10.20.1.97",
+      "resolved_asset_id": "cmdb:loanease-portal"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-portal-cloud-0",
+      "address_type": "cloud_instance_id",
+      "address": "i-0a1b2c3d4e5f60001",
+      "resolved_asset_id": "cmdb:loanease-portal"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-portal-cloud-1",
+      "address_type": "cloud_instance_id",
+      "address": "arn:aws:ec2:ap-south-1:123456789012:instance/i-0a1b2c3d4e5f60001",
+      "resolved_asset_id": "cmdb:loanease-portal"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-portal-cloud-2",
+      "address_type": "cloud_instance_id",
+      "address": "arn:aws:ec2:ap-south-1:123456789012:volume/vol-0a1b2c3d4e5f60001",
+      "resolved_asset_id": "cmdb:loanease-portal"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-bastion-scanner-host-0",
+      "address_type": "hostname",
+      "address": "loanease-bastion-scanner",
+      "resolved_asset_id": "cmdb:loanease-bastion-scanner"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-bastion-scanner-ip-0",
+      "address_type": "ipv4",
+      "address": "10.20.1.56",
+      "resolved_asset_id": "cmdb:loanease-bastion-scanner"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-bastion-scanner-cloud-0",
+      "address_type": "cloud_instance_id",
+      "address": "i-0a1b2c3d4e5f60002",
+      "resolved_asset_id": "cmdb:loanease-bastion-scanner"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-bastion-scanner-cloud-1",
+      "address_type": "cloud_instance_id",
+      "address": "arn:aws:ec2:ap-south-1:123456789012:instance/i-0a1b2c3d4e5f60002",
+      "resolved_asset_id": "cmdb:loanease-bastion-scanner"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-bastion-scanner-cloud-2",
+      "address_type": "cloud_instance_id",
+      "address": "arn:aws:ec2:ap-south-1:123456789012:volume/vol-0a1b2c3d4e5f60002",
+      "resolved_asset_id": "cmdb:loanease-bastion-scanner"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-db-host-0",
+      "address_type": "hostname",
+      "address": "loanease-db",
+      "resolved_asset_id": "cmdb:loanease-db"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-db-ip-0",
+      "address_type": "ipv4",
+      "address": "10.20.1.129",
+      "resolved_asset_id": "cmdb:loanease-db"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-db-cloud-0",
+      "address_type": "cloud_instance_id",
+      "address": "i-0a1b2c3d4e5f60003",
+      "resolved_asset_id": "cmdb:loanease-db"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-db-cloud-1",
+      "address_type": "cloud_instance_id",
+      "address": "arn:aws:ec2:ap-south-1:123456789012:instance/i-0a1b2c3d4e5f60003",
+      "resolved_asset_id": "cmdb:loanease-db"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-db-cloud-2",
+      "address_type": "cloud_instance_id",
+      "address": "arn:aws:ec2:ap-south-1:123456789012:volume/vol-0a1b2c3d4e5f60003",
+      "resolved_asset_id": "cmdb:loanease-db"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-endpoint-1-host-0",
+      "address_type": "hostname",
+      "address": "loanease-endpoint-1",
+      "resolved_asset_id": "cmdb:loanease-endpoint-1"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-endpoint-1-ip-0",
+      "address_type": "ipv4",
+      "address": "10.20.1.53",
+      "resolved_asset_id": "cmdb:loanease-endpoint-1"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-endpoint-1-cloud-0",
+      "address_type": "cloud_instance_id",
+      "address": "i-0a1b2c3d4e5f60004",
+      "resolved_asset_id": "cmdb:loanease-endpoint-1"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-endpoint-1-cloud-1",
+      "address_type": "cloud_instance_id",
+      "address": "arn:aws:ec2:ap-south-1:123456789012:instance/i-0a1b2c3d4e5f60004",
+      "resolved_asset_id": "cmdb:loanease-endpoint-1"
+    },
+    {
+      "endpoint_id": "cmdb-loanease-endpoint-1-cloud-2",
+      "address_type": "cloud_instance_id",
+      "address": "arn:aws:ec2:ap-south-1:123456789012:volume/vol-0a1b2c3d4e5f60004",
+      "resolved_asset_id": "cmdb:loanease-endpoint-1"
+    }
+  ]
+}

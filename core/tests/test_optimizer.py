@@ -24,6 +24,7 @@ from core.optimizer import (
     _Search,
     apply_controls_to_snapshot,
     compare_hypothetical,
+    compare_snapshots,
     evaluate_portfolio,
     find_control_gaps,
     prioritize_controls,
@@ -305,6 +306,55 @@ def test_compare_hypothetical_uses_common_random_numbers_baseline() -> None:
         - comparison.baseline_risk_figure.value_at_risk_inr
     )
     assert comparison.expected_annual_loss_change_inr < 0
+
+
+def test_compare_snapshots_of_a_snapshot_with_itself_is_exactly_zero() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+
+    comparison = compare_snapshots(snapshot, copy.deepcopy(snapshot))
+
+    assert comparison.expected_annual_loss_change_inr == 0.0
+    assert comparison.value_at_risk_change_inr == 0.0
+    assert comparison.proposed_risk_figure == comparison.baseline_risk_figure
+
+
+def test_compare_snapshots_uses_the_baselines_seed_for_both_runs() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    proposed = copy.deepcopy(snapshot)
+    proposed["assets"][1]["network"]["internet_facing"] = True
+    seed = _derive_comparison_seed(snapshot)
+
+    comparison = compare_snapshots(snapshot, proposed)
+
+    assert comparison.baseline_risk_figure == compute_risk_figure(snapshot, seed=seed)
+    assert comparison.proposed_risk_figure == compute_risk_figure(proposed, seed=seed)
+    assert comparison.expected_annual_loss_change_inr == (
+        comparison.proposed_risk_figure.expected_annual_loss_inr
+        - comparison.baseline_risk_figure.expected_annual_loss_inr
+    )
+    # Common random numbers: a scenario the change does not touch keeps its exact draws.
+    untouched = {
+        c.scenario_id: c.expected_annual_loss_inr
+        for c in comparison.baseline_risk_figure.top_contributors
+        if c.asset_id != "asset-hr-db-01"
+    }
+    assert untouched
+    for contribution in comparison.proposed_risk_figure.top_contributors:
+        if contribution.scenario_id in untouched:
+            assert contribution.expected_annual_loss_inr == untouched[contribution.scenario_id]
+
+
+def test_compare_hypothetical_is_compare_snapshots_on_the_applied_portfolio() -> None:
+    snapshot = copy.deepcopy(SAMPLE_SNAPSHOT)
+    controls = [_mfa_control("asset-hr-db-01"), _edr_control("asset-hr-db-01")]
+
+    hypothetical = compare_hypothetical(snapshot, controls)
+    direct = compare_snapshots(snapshot, apply_controls_to_snapshot(snapshot, controls))
+
+    assert hypothetical.baseline_risk_figure == direct.baseline_risk_figure
+    assert hypothetical.hypothetical_risk_figure == direct.proposed_risk_figure
+    assert hypothetical.expected_annual_loss_change_inr == direct.expected_annual_loss_change_inr
+    assert hypothetical.value_at_risk_change_inr == direct.value_at_risk_change_inr
 
 
 @pytest.mark.parametrize(
