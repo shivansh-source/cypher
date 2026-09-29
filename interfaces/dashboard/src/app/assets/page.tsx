@@ -11,17 +11,8 @@ import {
   formatInr,
   formatPercent,
 } from "@/lib/format";
-import { assetName, backupLabel, controlLabel, findingTitle, phrase, scannerLabel } from "@/lib/labels";
+import { assetCriticality, assetName, backupLabel, controlLabel, findingTitle, phrase, scannerLabel } from "@/lib/labels";
 import type { AssetFinding, AssetView, ScenarioParameters } from "@/lib/types";
-
-/** Display order only — which of an asset's service tiers to name first. */
-const CRITICALITY_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
-
-function highestCriticality(asset: AssetView): string {
-  const tiers = asset.services.map((s) => s.criticality);
-  if (tiers.length === 0) return "unknown";
-  return tiers.reduce((a, b) => ((CRITICALITY_RANK[b] ?? 0) > (CRITICALITY_RANK[a] ?? 0) ? b : a));
-}
 
 function exposure(asset: AssetView): string {
   const internet = asset.network?.internet_facing;
@@ -193,7 +184,7 @@ function AssetList({
 
       <ul className="alist">
         {rows.map((asset) => {
-          const tier = highestCriticality(asset);
+          const tier = assetCriticality(asset);
           const open = asset.findings.filter((f) => f.scenario !== null).length;
           const s = share(asset);
           const current = asset === selected;
@@ -259,7 +250,7 @@ function AssetDetail({
 }) {
   const open = asset.findings.filter((f) => f.scenario !== null);
   const remediated = asset.findings.filter((f) => f.remediated_at != null);
-  const tier = highestCriticality(asset);
+  const tier = assetCriticality(asset);
   const ports = asset.network?.open_ports;
   const privileged = asset.identity_access?.privileged_accounts_count;
 

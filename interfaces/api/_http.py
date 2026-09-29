@@ -20,7 +20,7 @@ _DEFAULT_SNAPSHOT_STORE_PATH = "./data/snapshots"
 
 #: The ``detail`` of every 404 raised because nothing has been committed.
 NO_SNAPSHOT_DETAIL = (
-    "No snapshot has been committed yet. Run `riskctl ingest` so a candidate "
+    "No snapshot has been committed yet. Run `cypher ingest` so a candidate "
     "snapshot can pass the five quality gates and become current."
 )
 

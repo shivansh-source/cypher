@@ -2,7 +2,7 @@
 
 ## Problem statement
 
-Su₹aksha is built for Smart India Hackathon 2026, Problem Statement 26105.
+Cypher is built for Smart India Hackathon 2026, Problem Statement 26105.
 The problem statement asks for a system that quantifies cyber risk in
 financial terms for Indian organizations and helps them prioritize security
 spend, while accounting for applicable Indian regulatory frameworks.
@@ -15,7 +15,7 @@ decisions can be checked against it directly rather than from memory.
 
 Most "cyber risk scoring" tools produce a unitless score (e.g. 0-100) that
 cannot be compared to a budget, a insurance premium, or a regulatory fine.
-Su₹aksha's premise is that the only number worth acting on is one
+Cypher's premise is that the only number worth acting on is one
 denominated in rupees, derived transparently enough to defend to a CISO, a
 board, or a regulator. That requirement drives every design principle in
 the repo-root `CLAUDE.md` — most directly, principle 1 (the rupee figure
@@ -30,6 +30,9 @@ comes from a deterministic engine, never an ML model or LLM) and principle
 - **SEBI** — Cybersecurity and Cyber Resilience Framework (CSCRF) and Cyber
   Capability Index (CCI), for regulated market infrastructure and
   intermediaries.
+- **DPDP Act, 2023** — the Digital Personal Data Protection Act's penalty
+  schedule (`governance/control_library/dpdp_act_2023.yaml`); its penalty
+  provisions are not in force until Section 33 commences on 2027-05-13.
 - **CIS Controls / NIST CSF / ISO 27001** — used as general-purpose control
   baselines alongside the India-specific frameworks above.
 

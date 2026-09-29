@@ -1,7 +1,7 @@
 [project]
 name = "suraksha"
 version = "0.1.0"
-description = "Su₹aksha — cyber risk quantification platform (SIH 2026, PS 26105). Converts security telemetry into rupee-denominated risk (EAL, VaR) via Open FAIR + Monte Carlo, recommends budget allocation, and maps findings to Indian regulatory frameworks."
+description = "Cypher — cyber risk quantification platform (SIH 2026, PS 26105). Converts security telemetry into rupee-denominated risk (EAL, VaR) via Open FAIR + Monte Carlo, recommends budget allocation, and maps findings to Indian regulatory frameworks."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
@@ -17,6 +17,9 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "typer",
+    # interfaces/cli/cypher.py styles its reports with rich directly (typer
+    # already depends on it; declared here because we import it ourselves).
+    "rich",
     # httpx also backs ai/jev_transport.py's calls to TypeSafe AI's Jev —
     # no separate typesafe-sdk dependency; see that module's docstring for why.
     "httpx",
@@ -26,7 +29,7 @@ dependencies = [
 ]
 
 [project.scripts]
-riskctl = "interfaces.cli.riskctl:main"
+cypher = "interfaces.cli.cypher:main"
 
 [project.optional-dependencies]
 dev = [

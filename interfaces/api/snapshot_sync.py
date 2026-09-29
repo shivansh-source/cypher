@@ -5,11 +5,9 @@ The daily ``scheduled-ingest`` workflow commits snapshots and publishes the snap
 pulls that prefix into ``SNAPSHOT_STORE_PATH`` at start-up and then periodically. Everything
 else (``core.snapshot_store``'s readers) keeps reading a plain local directory unchanged.
 
-Inactive unless ``SNAPSHOT_S3_BUCKET`` is set, so local development is unaffected.
-
-Download-only by design: this module never uploads or deletes anything, and never rewrites a
-history file that already exists locally (history is immutable, repo-root ``CLAUDE.md``
-principle 5).
+Inactive unless ``SNAPSHOT_S3_BUCKET`` is set, so local development is unaffected. The
+download itself (:func:`sync_once`, download-only, history never rewritten) lives in
+``interfaces/_snapshot_mirror.py``, shared with ``cypher plan``.
 """
 
 from __future__ import annotations
@@ -22,22 +20,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import boto3
-
+from interfaces._snapshot_mirror import DEFAULT_PREFIX, s3_source_from_env, sync_once
 from interfaces.api._http import snapshot_store_path
 
-_BUCKET_ENV = "SNAPSHOT_S3_BUCKET"
-_PREFIX_ENV = "SNAPSHOT_S3_PREFIX"
-_INTERVAL_ENV = "SNAPSHOT_SYNC_INTERVAL_SECONDS"
+# Re-exported: callers and tests use snapshot_sync.sync_once / DEFAULT_PREFIX.
+__all__ = ["DEFAULT_PREFIX", "configure_from_env", "sync_once", "sync_status"]
 
-#: Key prefix the workflow publishes the snapshot store under.
-DEFAULT_PREFIX = "snapshots/"
+_INTERVAL_ENV = "SNAPSHOT_SYNC_INTERVAL_SECONDS"
 
 #: How often the background thread re-checks S3. An operational polling interval (snapshots
 #: change about once a day), not a modelling constant.
 DEFAULT_INTERVAL_SECONDS = 300
-
-_CURRENT_FILENAME = "current.json"
 
 _logger = logging.getLogger(__name__)
 _status: dict[str, Any] = {"enabled": False, "last_success_at": None, "last_error": None}
@@ -46,48 +39,6 @@ _status: dict[str, Any] = {"enabled": False, "last_success_at": None, "last_erro
 def sync_status() -> dict[str, Any]:
     """The last sync outcome, for a health/diagnostics route (a copy, safe to mutate)."""
     return dict(_status)
-
-
-def sync_once(bucket: str, prefix: str, dest: Path, client: Any | None = None) -> int:
-    """Download new snapshot-store objects from ``s3://bucket/prefix`` into ``dest``.
-
-    Args:
-        bucket: Source bucket.
-        prefix: Key prefix of the published snapshot store (e.g. ``"snapshots/"``).
-        dest: Local snapshot store root.
-        client: An S3 client (defaults to ``boto3.client("s3")``); injectable for tests.
-
-    Returns:
-        How many objects were downloaded.
-
-    Must never:
-        Overwrite an existing ``history/`` file (immutable), write outside ``dest``, or leave
-        a half-written file in place (each download lands in a temp file, then is renamed).
-        ``current.json`` is downloaded last, so it can never reference a history entry that
-        has not arrived yet.
-    """
-    s3 = client if client is not None else boto3.client("s3")
-    root = dest.resolve()
-
-    keys: list[str] = []
-    for page in s3.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix):
-        keys.extend(obj["Key"] for obj in page.get("Contents", []))
-    relative = [key[len(prefix) :] for key in keys if key[len(prefix) :] and not key.endswith("/")]
-    relative.sort(key=lambda rel: rel == _CURRENT_FILENAME)  # current.json last
-
-    downloaded = 0
-    for rel in relative:
-        target = (root / rel).resolve()
-        if root not in target.parents:
-            raise ValueError(f"refusing to write outside the snapshot store: {rel!r}")
-        if target.exists() and rel != _CURRENT_FILENAME:
-            continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        partial = target.with_name(target.name + ".part")
-        s3.download_file(bucket, prefix + rel, str(partial))
-        os.replace(partial, target)
-        downloaded += 1
-    return downloaded
 
 
 def _run(bucket: str, prefix: str, dest: Path, interval_seconds: int) -> None:
@@ -114,12 +65,10 @@ def configure_from_env() -> bool:
     Returns:
         Whether syncing was enabled.
     """
-    bucket = os.environ.get(_BUCKET_ENV)
-    if not bucket:
+    source = s3_source_from_env()
+    if source is None:
         return False
-    prefix = os.environ.get(_PREFIX_ENV, DEFAULT_PREFIX)
-    if not prefix.endswith("/"):
-        prefix += "/"
+    bucket, prefix = source
     interval = int(os.environ.get(_INTERVAL_ENV, DEFAULT_INTERVAL_SECONDS))
     dest = snapshot_store_path()
 

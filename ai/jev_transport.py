@@ -44,7 +44,7 @@ JEV_API_URL: str = "https://api.typesafe.ai/v1/systemone"
 
 #: Default Jev model route. Overridable with TYPESAFE_MODEL. "jev-latest"
 #: is TypeSafe AI's own early-access alias for their current System One
-#: model, per docs.typesafe.ai — not a Su₹aksha-side default we chose
+#: model, per docs.typesafe.ai — not a Cypher-side default we chose
 #: independently.
 DEFAULT_JEV_MODEL: str = "jev-latest"
 

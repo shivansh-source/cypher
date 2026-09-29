@@ -13,9 +13,11 @@ const VIEWS: { prefix: string; eyebrow: string; title: string }[] = [
 
 const OVERVIEW = { eyebrow: "Executive view", title: "Exposure overview" };
 
-/** Page eyebrow and title for the current route, and the Ask Suraksha entry point. */
+/** Page eyebrow and title for the current route, and the Ask Cypher entry point. */
 export function Topbar() {
   const pathname = usePathname();
+  // The tool selector is a standalone page with its own header (see AppShell's STANDALONE_ROUTES).
+  if (pathname.startsWith("/setup")) return null;
   const view = VIEWS.find((v) => pathname.startsWith(v.prefix)) ?? OVERVIEW;
   return (
     <header className="topbar">

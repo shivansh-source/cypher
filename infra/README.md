@@ -8,17 +8,18 @@ workflow to follow when adding a new one.
 
 ## Connectors in this repo
 
-| Connector | Source tool | Schema sections populated |
-|---|---|---|
-| `nessus_connector.py` | Tenable Nessus | `assets[].findings` (CVEs) |
-| `greenbone_connector.py` | Greenbone (OpenVAS/GVM) via GMP, or a GSA XML report export (`GREENBONE_EXPORT_PATH`) | `assets[].findings` (CVEs) |
-| `prowler_connector.py` | Prowler (CSPM) | `assets[].findings` (misconfigurations) |
-| `scoutsuite_connector.py` | ScoutSuite (CSPM) | `assets[].findings` (misconfigurations) |
-| `wazuh_connector.py` | Wazuh (EDR/SIEM) via manager API + indexer, or a bundle file (`WAZUH_EXPORT_PATH`, built by `infra/inventory/build_wazuh_bundle.py`) | `assets[].edr`, optionally `assets[].findings` |
-| `iam_connector.py` | AWS IAM via PMapper (`IAM_PMAPPER_OUTPUT_PATH`, a `pmapper analysis --output-type json` file) | `assets[].findings`, attached to the account-level asset |
-| `cmdb_connector.py` | CMDB REST API, or a JSON inventory file (`CMDB_EXPORT_PATH`, e.g. from `infra/inventory/export_ec2_inventory.py`) | `endpoints[]`, canonical asset identity |
-| `nmap_connector.py` | nmap | `assets[].network`, `endpoints[]` |
-| `threat_intel_connector.py` | EPSS + CISA KEV | enrichment of existing `findings[].epss_score` / `.kev_listed` |
+| Connector | Source tool | Schema sections populated | Status |
+|---|---|---|---|
+| `wazuh_connector.py` | Wazuh (EDR/SIEM) via manager API + indexer, or a bundle file (`WAZUH_EXPORT_PATH`, built by `infra/inventory/build_wazuh_bundle.py`) | `assets[].edr`, optionally `assets[].findings` | Implemented, in `cypher ingest` |
+| `greenbone_connector.py` | Greenbone (OpenVAS/GVM) via GMP, or a GSA XML report export (`GREENBONE_EXPORT_PATH`) | `assets[].findings` (CVEs) | Implemented, in `cypher ingest` |
+| `prowler_connector.py` | Prowler (CSPM) | `assets[].findings` (misconfigurations) | Implemented, in `cypher ingest` |
+| `scoutsuite_connector.py` | ScoutSuite (CSPM) | `assets[].findings` (misconfigurations, `counts_toward_loss: false` — corroborating evidence only, see `docs/ASSUMPTIONS.md`) | Implemented, in `cypher ingest` |
+| `iam_connector.py` | AWS IAM via PMapper (`IAM_PMAPPER_OUTPUT_PATH`, a `pmapper analysis --output-type json` file) | `assets[].findings`, attached to the account-level asset | Implemented, in `cypher ingest` |
+| `cmdb_connector.py` | CMDB REST API, or a JSON inventory file (`CMDB_EXPORT_PATH`, e.g. from `infra/inventory/export_ec2_inventory.py`) | `endpoints[]`, canonical asset identity | Implemented, in `cypher ingest` |
+| `nessus_connector.py` | Tenable Nessus | `assets[].findings` (CVEs) | Stub |
+| `nmap_connector.py` | nmap | `assets[].network`, `endpoints[]` | Stub |
+| `threat_intel_connector.py` | EPSS + CISA KEV | enrichment of existing `findings[].epss_score` / `.kev_listed` | Stub |
+| `terraform_plan.py` | `terraform show -json` plan output | schema-shaped *changes* to the committed snapshot (not a scanner; see below) | Implemented, in `cypher plan` |
 
 `cmdb_connector.py` is special: it is the canonical source of asset
 identity, and (as of its implementation) the target every other
@@ -39,9 +40,17 @@ scan of its own.
 elsewhere (both populate CVE findings from a vulnerability scanner) — this
 deployment's actual tool stack runs Greenbone, not Nessus. Both connector
 files exist in this repo, but only `greenbone_connector.py` is currently
-wired into `interfaces/cli/riskctl.py`'s `ingest_command`; `nessus_connector.py`
+wired into `interfaces/cli/cypher.py`'s `ingest_command`; `nessus_connector.py`
 remains an unimplemented stub, kept for reference/future deployments that
 do run Nessus instead.
+
+`terraform_plan.py` is not a scanner connector and is not part of
+`cypher ingest`. It translates a `terraform show -json` plan into
+schema-shaped *changes* against the committed snapshot, for `cypher plan`
+(see the repo-root `README.md`). It is the only module that knows the
+Terraform plan format; everything it cannot model (created resources,
+values known only after apply, unmatched resources, resource types without
+a rule) is returned as such, never as zero risk.
 
 ## Raw findings object store (`_object_store.py`)
 
@@ -86,7 +95,7 @@ identity scheme directly — connectors must never import `ai/` (see
 repo-root `CLAUDE.md`'s module ownership map), and reconciling a
 placeholder id against CMDB now requires a Jev call (see below), so that
 reconciliation cannot happen inside `resolve_asset_id` itself. Instead,
-`interfaces/cli/riskctl.py`'s `ingest_command` reconciles placeholder ids
+`interfaces/cli/cypher.py`'s `ingest_command` reconciles placeholder ids
 against CMDB's canonical ids as a step *after* every connector has run.
 An asset whose placeholder id cannot be matched to a CMDB record with
 sufficient confidence keeps its placeholder id — this remains a
@@ -109,7 +118,7 @@ see the module's own docstring. `infra/connectors/_identity_resolution.py`
    shared cloud instance id — strong) from cross-kind evidence (e.g. a
    hostname-shaped placeholder matching a CMDB IP record — weak).
 
-`interfaces/cli/riskctl.py`'s `ingest_command` is the only place that
+`interfaces/cli/cypher.py`'s `ingest_command` is the only place that
 actually calls Jev (`ai.jev_transport.JevTransport`, TypeSafe AI's "System
 One" model — see that module's docstring for why it's not chat-shaped):
 one `TypedQuestion` per candidate, asking whether the two ids name the same
@@ -155,7 +164,7 @@ persistence/scheduling (`db`, `connector-scheduler`). `dashboard` talks to
 - `infra/bastion/` — Wazuh + Greenbone exports that run on the bastion, triggered by the workflow through SSM (no bastion cron).
 - `infra/Dockerfile.api` — container image for the hosted API.
 - `.github/workflows/scheduled-ingest.yml` — the daily / on-demand pipeline: Prowler + PMapper,
-  then `riskctl ingest`, then publishes the snapshot store to S3.
+  then `cypher ingest`, then publishes the snapshot store to S3.
 
 ## Daily pipeline at a glance
 
@@ -166,7 +175,7 @@ every workflow run refreshes these via SSM (daily, or when refresh_host_data is 
 workflow (21:00 UTC / manual "Run workflow"):
     Prowler + PMapper     -> S3 latest/prowler_connector.json, inputs/pmapper.json
     EC2 inventory         -> built inside the ingest job
-    riskctl ingest        -> S3 snapshots/  (current.json + history/)
+    cypher ingest         -> S3 snapshots/  (current.json + history/)
 hosted API                -> syncs snapshots/ from S3 -> Vercel dashboard
 ```
 

@@ -3,6 +3,7 @@ import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { DemoBanner } from "@/components/DemoBanner";
+import { FirstRunGate } from "@/components/FirstRunGate";
 import { Topbar } from "@/components/Topbar";
 
 const poppins = Poppins({
@@ -18,7 +19,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Su₹aksha — Cyber Risk Quantification",
+  title: "Cypher",
   description:
     "Rupee-denominated cyber risk (Expected Annual Loss, Value at Risk) derived from security telemetry via Open FAIR and Monte Carlo simulation.",
 };
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${poppins.variable} ${inter.variable}`}>
       <body>
+        <FirstRunGate />
         <DemoBanner />
         <AppShell>
           <main>

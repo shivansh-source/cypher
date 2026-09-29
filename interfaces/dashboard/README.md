@@ -1,9 +1,9 @@
 # `interfaces/dashboard/`
 
-The Su₹aksha frontend: a Next.js 16 App Router app (TypeScript, plain CSS)
+The Cypher frontend: a Next.js 16 App Router app (TypeScript, plain CSS)
 that renders the rupee figures produced by `core/` and the compliance status
 produced by `governance/`. Its design — shell, tokens, cards, charts, the Ask
-Suraksha modal — is ported from an earlier standalone HTML/JS prototype (removed; it lives
+Cypher panel — is ported from an earlier standalone HTML/JS prototype (removed; it lives
 on in git history as `interfaces/prototype/` at commit `55ef517`), with one
 fundamental difference: the prototype runs
 its own engine in the browser on sample data, and this app never computes a
@@ -35,14 +35,16 @@ needed to challenge it:
 
 | Route | Answers | Sourced from |
 |---|---|---|
+| `/setup` | Which security tools does this org run, which kinds of telemetry do they cover, and what kind of regulated entity is it? Shown first to a new browser. | none (saved in this browser only) |
 | `/` | What does a year of cyber risk cost, what does a bad year look like, how has it moved, what drives it, and what if we changed a control? | `/exposure`, `/exposure/history`, `/exposure/exceedance`, `/assets`, `/simulate` |
 | `/assets` | Which assets and findings carry the loss, and what FAIR parameters produced each figure? | `/assets` |
-| `/investment` | Where does a finite budget buy the most risk reduction? | `/optimize/candidates`, `POST /optimize` |
+| `/attack-paths` | How can an attacker get from the internet to each asset, and how likely is each route? `?target=<asset_id>` opens one asset. | `/attack-graph`, `/attack-graph/targets/{asset_id}`, `/assets` |
+| `/investment` | Which changes cut the most loss, in order, and where does a finite budget buy the most risk reduction? | `/optimize/candidates`, `/optimize/plan`, `POST /optimize` |
 | `/compliance` | Control-by-control status against each framework, and the statutory penalty ceilings behind it | `/frameworks`, `/frameworks/{framework}/status` |
 | `/data-quality` | Do the figures rest on data worth trusting, what is the data blind to, and which assumptions are they built on? | `/snapshot`, `/snapshot/gates`, `/assumptions` |
 
 The sidebar's snapshot card (`/snapshot`, `/snapshot/gates`) and the Ask
-Suraksha assistant (`POST /chat`) are on every page.
+Cypher assistant (`POST /chat`) are on every page.
 
 Design rules the UI enforces, each tracing to a principle in the repo-root
 `CLAUDE.md`:
@@ -80,7 +82,7 @@ Design rules the UI enforces, each tracing to a principle in the repo-root
   `expired_attestation` get their own non-green treatments. A weighted score is
   shown only with its coverage and low-confidence share (principle 6).
   Penalty ceilings are labelled as statutory maxima, never expected losses.
-- **The assistant never shows unverified text.** Ask Suraksha uses the
+- **The assistant never shows unverified text.** Ask Cypher uses the
   non-streaming `POST /chat`, whose `text` has already been through
   `ai.numeric_guard`, renders it verbatim, and highlights every
   `[UNVERIFIED: …]` flag. The tools it called are one click away.
@@ -100,8 +102,8 @@ Setting `NEXT_PUBLIC_DEMO_MODE=1` (read at build time) serves the fixtures in
 `src/lib/demo-data.ts` so the interface can be developed and demonstrated
 offline. In that mode a persistent, non-dismissible `SAMPLE DATA` banner
 renders on every page and every panel and headline figure carries a `SAMPLE`
-tag. The what-if lab, the optimizer and the assistant are not faked: they
-report that they need the live backend. None of that data came from the
+tag. The what-if lab, the optimizer, the priority plan, the attack graph and
+the assistant are not faked: they report that they need the live backend. None of that data came from the
 engine and none of it may be cited as a result.
 
 ## Backend endpoint contract
@@ -117,9 +119,12 @@ in `interfaces/api/README.md`.
 | `GET` | `/snapshot` | `SnapshotProvenance` |
 | `GET` | `/snapshot/gates` | `GateReport` |
 | `GET` | `/assets` | `AssetsResponse` |
+| `GET` | `/attack-graph` | `AttackGraphResponse` |
+| `GET` | `/attack-graph/targets/{asset_id}` | `AttackGraphTarget` |
 | `GET` | `/frameworks` | `FrameworkSummary[]` |
 | `GET` | `/frameworks/{framework}/status` | `FrameworkStatus` |
 | `GET` | `/optimize/candidates` | `ControlCandidates` |
+| `GET` | `/optimize/plan` | `PriorityPlan` |
 | `POST` | `/optimize` | `PortfolioRecommendation` |
 | `POST` | `/simulate` | `HypotheticalComparison` |
 | `GET` | `/assumptions` | `AssumptionEntry[]` |
@@ -138,7 +143,8 @@ error, with the API's `detail`.
 - Pages are Server Components and fetch with `cache: "no-store"`, so every
   data route is rendered per request and a figure always tracks the current
   committed snapshot. Interactive panels (`WhatIf`, `InvestmentPlanner`,
-  `AskSuraksha`, the charts, the sidebar) are Client Components; a helper
+  `AskSuraksha` (the Ask Cypher panel), the charts, the sidebar, the setup
+  screen) are Client Components; a helper
   a Server Component needs belongs in `src/lib/`, never in a `"use client"`
   module.
 - Route props use the Next 16 generated `PageProps<'/route'>` / `LayoutProps`

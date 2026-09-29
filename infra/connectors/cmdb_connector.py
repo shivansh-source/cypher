@@ -9,7 +9,7 @@ carrying ``resolved_asset_id`` set to that asset's canonical
 imported from here — see its own docstring on why) later matches these
 ``endpoints[]`` entries against the placeholder ``host:``/``cloud:`` asset
 ids the other implemented connectors mint, as the evidence side of a
-Jev-assisted merge decision made in ``interfaces/cli/riskctl.py``.
+Jev-assisted merge decision made in ``interfaces/cli/cypher.py``.
 
 Unlike every other connector in this package, this one needs no
 ``_identity_hint`` bridging convention and no placeholder id scheme: CMDB
@@ -224,7 +224,7 @@ class CMDBConnector(Connector):
             other implemented connector, this is not a placeholder scheme
             awaiting later resolution; it is the final identity, because
             CMDB is the identity authority (see this module's docstring).
-            The caller (``interfaces/cli/riskctl.py``) reads
+            The caller (``interfaces/cli/cypher.py``) reads
             ``resolved_asset_id``/``address_type``/``address``/
             ``endpoint_id`` directly to build ``endpoints[]`` entries and
             does not use the ``asset_id`` key :meth:`Connector.run` also

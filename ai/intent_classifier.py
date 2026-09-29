@@ -27,7 +27,7 @@ from ai.tool_registry import tool_definitions, tool_names
 _ROUTER_TOOL_NAME = "route_request"
 
 _CLASSIFIER_SYSTEM_PROMPT = (
-    "You route a user's question to exactly one Su₹aksha tool. You do not "
+    "You route a user's question to exactly one Cypher tool. You do not "
     "answer the question, do not describe what the answer might be, and do "
     "not produce any number — you only choose the tool and fill in its "
     "arguments. If the question does not clearly match a tool, still choose "

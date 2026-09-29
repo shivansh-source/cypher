@@ -1,9 +1,9 @@
 name: Scheduled ingest
 
-# Daily (and on-demand) refresh of the Su₹aksha snapshot.
+# Daily (and on-demand) refresh of the Cypher snapshot.
 #
 #   scan   : Prowler + PMapper against the AWS account (read-only role), uploaded to S3.
-#   ingest : pulls every input from S3, runs `riskctl ingest`, and syncs the snapshot store
+#   ingest : pulls every input from S3, runs `cypher ingest`, and syncs the snapshot store
 #            back to S3 so the API host serves the new snapshot.
 #
 # Host-side inputs (Wazuh bundle, Greenbone report) are produced on the bastion by
@@ -173,7 +173,7 @@ jobs:
 
       - name: Ingest
         run: |
-          riskctl ingest 2>&1 | tee ingest.log
+          cypher ingest 2>&1 | tee ingest.log
           # ingest exits 0 even when a quality gate rejects the candidate; surface that as a failure.
           if grep -q "candidate snapshot not committed" ingest.log; then
             echo "::error::A quality gate rejected the candidate; the previous snapshot stays current."

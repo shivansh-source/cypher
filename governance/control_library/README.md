@@ -1,7 +1,7 @@
 # `governance/control_library/`
 
 Versioned, effective-dated, **sourced** definitions of controls for each
-regulatory/industry framework Su₹aksha maps findings against.
+regulatory/industry framework Cypher maps findings against.
 `governance/library_loader.py` reads these files; `core/` never reads them
 directly (compliance mapping is governance's job, not the engine's — see
 repo-root `CLAUDE.md` principle 6).

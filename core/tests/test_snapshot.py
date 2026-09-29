@@ -142,6 +142,6 @@ def test_failed_validation_leaves_previous_snapshot_current() -> None:
     results = validate_snapshot(candidate, None)
 
     assert not all(r.passed for r in results)
-    # A caller (e.g. interfaces/cli/riskctl.py's ingest_command) must check
+    # A caller (e.g. interfaces/cli/cypher.py's ingest_command) must check
     # this before ever calling commit_snapshot — this test documents the
     # contract, not commit_snapshot's own behavior (it never re-validates).

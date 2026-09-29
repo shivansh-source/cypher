@@ -4,7 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useAgentPanelOpen, useAgentPanelWidth } from "@/lib/agent-panel-state";
+import { ENTITY_TYPES } from "@/lib/frameworks";
+import { useOrgProfile } from "@/lib/org-profile-state";
+import { useToolSelection } from "@/lib/tool-selection-state";
 import { AskSurakshaPanel } from "./AskSuraksha";
+import { CypherMark } from "./CypherMark";
 import { Nav } from "./Nav";
 import { SnapCard } from "./SnapCard";
 
@@ -59,6 +63,13 @@ function subscribe(listener: () => void): () => void {
  */
 const CANVAS_ROUTES = ["/attack-paths"];
 
+/**
+ * Routes rendered on their own, outside the app frame: no sidebar, top bar or
+ * Ask Cypher panel. The tool selector is the first thing a new browser sees,
+ * before there is anything for that chrome to point at.
+ */
+const STANDALONE_ROUTES = ["/setup"];
+
 /** The app frame: collapsible sidebar (brand, nav, current snapshot) beside the page. */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -76,6 +87,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
   const agentOpen = useAgentPanelOpen();
   const agentWidth = useAgentPanelWidth();
+  const tools = useToolSelection();
+  const org = useOrgProfile();
+  const orgKind = ENTITY_TYPES.find((t) => t.id === org?.entityType)?.label;
+
+  if (STANDALONE_ROUTES.some((route) => pathname.startsWith(route))) {
+    return <div className="standalone">{children}</div>;
+  }
+  // No saved tool selection in this browser: FirstRunGate is sending it to /setup, so render
+  // nothing rather than flash a dashboard for tools nobody has picked yet. (`null` means
+  // storage hasn't been read yet — keep the server-rendered page until it has.)
+  if (tools === undefined) {
+    return <div className="standalone" aria-busy="true" />;
+  }
 
   return (
     <div
@@ -84,15 +108,22 @@ export function AppShell({ children }: { children: ReactNode }) {
     >
       <aside className="side">
         <div className="brand-wrap">
-          <Link href="/" className="brand" aria-label="Su₹aksha — exposure overview">
+          <Link href="/" className="brand" aria-label="Cypher — exposure overview">
             <div className="mark" aria-hidden="true">
-              ₹
+              <CypherMark />
             </div>
             <div className="brand-text">
               <div className="word">
-                Su<b>₹</b>aksha
+                Cypher
               </div>
-              <div className="tag">CYBER RISK, IN RUPEES</div>
+              {org?.name ? (
+                <div className="tag org" title={orgKind ? `${org.name} (${orgKind})` : org.name}>
+                  {org.name}
+                  {orgKind ? <span className="org-kind">{orgKind}</span> : null}
+                </div>
+              ) : (
+                <div className="tag">CYBER RISK, IN RUPEES</div>
+              )}
             </div>
           </Link>
           <button

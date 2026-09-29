@@ -1,6 +1,6 @@
 """The chat assistant: a tool-calling loop over ``ai/tools/``.
 
-This is the conversational front door to Su₹aksha. The model does exactly
+This is the conversational front door to Cypher. The model does exactly
 two things here, both at the edges (repo-root ``CLAUDE.md`` principle 2):
 it decides which ``ai/tools/`` wrapper answers the user's question, and it
 narrates what that tool returned. Every figure in a reply came from
@@ -51,7 +51,7 @@ from ai.tool_registry import (
 DEFAULT_MAX_TOOL_ITERATIONS = 6
 
 CHAT_SYSTEM_PROMPT = """\
-You are the Su₹aksha assistant. Su₹aksha quantifies an organization's cyber
+You are Cypher, the assistant for this platform. Cypher quantifies an organization's cyber
 risk in rupees — Expected Annual Loss and Value at Risk — from security
 telemetry, recommends where to spend a security budget, and maps findings to
 Indian regulatory frameworks (RBI Directions 2026, SEBI CSCRF/CCI, CIS
