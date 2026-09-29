@@ -3,7 +3,8 @@ import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { DemoBanner } from "@/components/DemoBanner";
-import { FirstRunGate } from "@/components/FirstRunGate";
+import { SessionHydrator } from "@/components/auth/SessionHydrator";
+import { loadOrgState } from "@/lib/org-repo";
 import { Topbar } from "@/components/Topbar";
 
 const poppins = Poppins({
@@ -24,11 +25,13 @@ export const metadata: Metadata = {
     "Rupee-denominated cyber risk (Expected Annual Loss, Value at Risk) derived from security telemetry via Open FAIR and Monte Carlo simulation.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const org = await loadOrgState();
   return (
-    <html lang="en" className={`${poppins.variable} ${inter.variable}`}>
-      <body>
-        <FirstRunGate />
+    <html lang="en" className={`${poppins.variable} ${inter.variable}`} suppressHydrationWarning>
+      {/* Extensions (Grammarly, password managers) add attributes to <body> before React loads. */}
+      <body suppressHydrationWarning>
+        <SessionHydrator state={org} />
         <DemoBanner />
         <AppShell>
           <main>

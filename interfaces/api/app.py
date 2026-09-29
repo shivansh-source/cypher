@@ -38,6 +38,8 @@ from ai.sessions import (
 from ai.tool_registry import execute_tool, tool_specs
 from interfaces._dotenv import load_dotenv
 from interfaces.api._http import execution_to_response
+from interfaces.api.accounts import register_account_routes
+from interfaces.api.auth import require_user
 from interfaces.api.dashboard_routes import register_dashboard_routes
 
 _store: InMemorySessionStore | None = None
@@ -303,7 +305,7 @@ def create_app() -> Any:
         calling into ``core.engine``, or that returns LLM narration
         without first passing it through ``ai.numeric_guard``.
     """
-    from fastapi import FastAPI
+    from fastapi import Depends, FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
     # Before anything reads configuration: fills os.environ from the
@@ -324,6 +326,8 @@ def create_app() -> Any:
             "narrates what it returned, and never produces a figure itself."
         ),
         version="0.1.0",
+        # Every route needs a signed-in user unless interfaces.api.auth exempts it.
+        dependencies=[Depends(require_user)],
     )
     origins = [
         origin.strip()
@@ -346,6 +350,7 @@ def create_app() -> Any:
     app.post("/chat/stream")(chat_stream_route())
     app.get("/chat/tools", response_model=list[ToolDescription])(chat_tools_route())
     app.delete("/chat/sessions/{session_id}")(delete_session_route())
+    register_account_routes(app)
     register_dashboard_routes(app)
 
     # Signed S3 download links for published snapshots; refuses unless

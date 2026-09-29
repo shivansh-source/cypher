@@ -18,6 +18,7 @@
  * its `CORS_ALLOWED_ORIGINS` must include the dashboard's origin.
  */
 
+import { getAccessToken } from "./auth-token";
 import { demoResult, demoUnavailable } from "./demo-data";
 import { parseSseFrames } from "./sse";
 import type {
@@ -109,6 +110,7 @@ async function request<T>(
   unavailableStatuses: ReadonlySet<number> = NO_FIGURE_STATUSES,
 ): Promise<ApiResult<T>> {
   let response: Response;
+  const token = await getAccessToken();
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: init.method ?? "GET",
@@ -118,6 +120,7 @@ async function request<T>(
       cache: "no-store",
       headers: {
         Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
       },
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
@@ -334,11 +337,16 @@ export async function streamChat(
   if (DEMO_MODE) return demoUnavailable("the Ask Cypher assistant");
   const path = "/chat/stream";
   let response: Response;
+  const token = await getAccessToken();
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: "POST",
       cache: "no-store",
-      headers: { Accept: "text/event-stream", "Content-Type": "application/json" },
+      headers: {
+        Accept: "text/event-stream",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ message, session_id: sessionId }),
     });
   } catch (cause) {

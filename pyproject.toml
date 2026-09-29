@@ -26,6 +26,10 @@ dependencies = [
     "requests",
     "boto3",
     "python-gvm",
+    # interfaces/api/auth.py + accounts*.py: session tokens, password hashing, Postgres accounts.
+    "PyJWT",
+    "argon2-cffi",
+    "psycopg[binary]",
 ]
 
 [project.scripts]
@@ -39,6 +43,8 @@ dev = [
     "ruff",
     "types-PyYAML",
     "types-jsonschema",
+    # Real (bundled) Postgres for interfaces/tests/test_accounts.py.
+    "pgserver",
     "lxml-stubs",
 ]
 

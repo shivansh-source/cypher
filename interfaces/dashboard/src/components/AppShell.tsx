@@ -5,8 +5,12 @@ import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useAgentPanelOpen, useAgentPanelWidth } from "@/lib/agent-panel-state";
 import { ENTITY_TYPES } from "@/lib/frameworks";
+import { isStandaloneRoute } from "@/lib/route-gate";
 import { useOrgProfile } from "@/lib/org-profile-state";
 import { useToolSelection } from "@/lib/tool-selection-state";
+import { LogoutButton } from "@/components/auth/LogoutButton";
+import { PageLoader } from "@/components/Loader";
+import { logout } from "@/app/(auth)/actions";
 import { AskSurakshaPanel } from "./AskSuraksha";
 import { CypherMark } from "./CypherMark";
 import { Nav } from "./Nav";
@@ -63,12 +67,6 @@ function subscribe(listener: () => void): () => void {
  */
 const CANVAS_ROUTES = ["/attack-paths"];
 
-/**
- * Routes rendered on their own, outside the app frame: no sidebar, top bar or
- * Ask Cypher panel. The tool selector is the first thing a new browser sees,
- * before there is anything for that chrome to point at.
- */
-const STANDALONE_ROUTES = ["/setup"];
 
 /** The app frame: collapsible sidebar (brand, nav, current snapshot) beside the page. */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -91,14 +89,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   const org = useOrgProfile();
   const orgKind = ENTITY_TYPES.find((t) => t.id === org?.entityType)?.label;
 
-  if (STANDALONE_ROUTES.some((route) => pathname.startsWith(route))) {
+  if (isStandaloneRoute(pathname)) {
     return <div className="standalone">{children}</div>;
   }
-  // No saved tool selection in this browser: FirstRunGate is sending it to /setup, so render
+  // No saved tool selection: the request gate (proxy.ts) is sending it to /setup, so render
   // nothing rather than flash a dashboard for tools nobody has picked yet. (`null` means
   // storage hasn't been read yet — keep the server-rendered page until it has.)
   if (tools === undefined) {
-    return <div className="standalone" aria-busy="true" />;
+    return (
+      <div className="standalone">
+        <PageLoader label="Loading your workspace…" fill />
+      </div>
+    );
   }
 
   return (
@@ -143,6 +145,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Nav />
         <div className="side-foot">
           <SnapCard />
+          <form action={logout}>
+            <LogoutButton />
+          </form>
         </div>
       </aside>
       {children}
