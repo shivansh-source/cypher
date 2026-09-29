@@ -1,0 +1,24 @@
+{
+  "vpc_id": "vpc-syn0000",
+  "vpc_cidr_block": "10.99.0.0/16",
+  "segments": [{"segment_id": "subnet-syn0000", "name": "synthetic-public"}],
+  "segment_reachability": [],
+  "instances": [
+    {
+      "instance_id": "i-syn0000",
+      "name": "synthetic-portal",
+      "private_ip": "10.99.1.20",
+      "segment_id": "subnet-syn0000",
+      "internet_facing": true,
+      "instance_arn": "arn:aws:ec2:ap-south-1:999999999999:instance/i-syn0000"
+    },
+    {
+      "instance_id": "i-syn0001",
+      "name": "synthetic-db",
+      "private_ip": "10.99.1.21",
+      "segment_id": "subnet-syn0000",
+      "internet_facing": false,
+      "instance_arn": "arn:aws:ec2:ap-south-1:999999999999:instance/i-syn0001"
+    }
+  ]
+}

@@ -30,6 +30,7 @@ account of what data each connector produces today. Status as of **2026-09-26**.
 | `wazuh_connector` | SIEM / EDR | **Live** (file mode) | `WAZUH_EXPORT_PATH` bundle from `infra/inventory/build_wazuh_bundle.py` (alerts file + `agent_control -l`), **or** the Wazuh manager API + indexer | `assets[].edr` per agent: installed, healthy, recent alerts (4 agents in the sandbox) | `host:<agent IP>`, or `host:<name>` if no usable IP |
 | `greenbone_connector` | Vulnerability scanner | **Live** (file mode) | `GREENBONE_EXPORT_PATH`: a GMP report XML (`infra/bastion/export_greenbone_report.sh`) or a GSA "CSV Results" export, **or** GMP over TLS | `cve`-typed findings incl. Log-severity detections (92 findings on 5 hosts) | `host:<IP>` |
 | `scoutsuite_connector` | CSPM (AWS) | **Ready** (becomes Live on the next full run) | S3 object `latest/scoutsuite_connector.json` = ScoutSuite 5.14.0 `scoutsuite_results_*.js` | 48 findings in the sandbox, all with `counts_toward_loss: false` (evidence only) | one account asset: `cloud:aws-account:<account id>` |
+| `network_topology_connector` | Network exposure / attack-graph topology | **Live** | `NETWORK_TOPOLOGY_EXPORT_PATH` JSON from `infra/inventory/export_network_topology.py` (read-only `ec2:Describe{Vpcs,Subnets,Instances,SecurityGroups}`) | `assets[].network` (`segment_id`, `internet_facing`) plus the top-level `network_topology` object; feeds `core/engine/attack_graph*.py`, which changes EAL/VaR | attaches to whichever of `host:<ip>` / `cloud:<instance ARN>` another connector already created (see "Identity" below) |
 | `threat_intel_connector` | EPSS + CISA KEV enrichment | **Planned** | none | none. Until built, `epss_score` and `kev_listed` are always null and exploit probability falls back to the baseline | n/a |
 | `nessus_connector` | Vulnerability scanner | **Planned** | none | none | n/a |
 | `nmap_connector` | Network exposure | **Planned** | none | none. No connector yet supplies `network_topology` or `segment_id` (the attack graph is therefore empty) | n/a |
@@ -123,6 +124,36 @@ into a loss-event scenario. ScoutSuite sets it because it overlaps Prowler and c
 expected annual loss by about ₹32M for issues Prowler already reports. This is a modelling judgement
 recorded in `docs/ASSUMPTIONS.md`. It is not a remediation claim, and it also excludes ScoutSuite-only
 issues.
+
+## Network topology: what `internet_facing` means, and why `segment_reachability` is empty
+
+`network_topology_connector.py` observes two real, non-guessed facts per EC2 instance:
+
+- **`segment_id` = the instance's actual VPC subnet id.** A subnet is a real, observable
+  boundary, not a judgement call. The sandbox has exactly one subnet, so all four instances
+  share one segment — which the engine reads as "mutually reachable within the segment",
+  matching the sandbox's real, deliberate lack of internal network segmentation.
+- **`internet_facing` = "this instance's security group has an ingress rule naming an address
+  outside the VPC's own CIDR block"** (checked with `ipaddress.subnet_of`, not a literal
+  `0.0.0.0/0` string match). In this sandbox every rule is scoped to the operator's single home
+  IP, none to `0.0.0.0/0` — but that IP is still genuinely outside the VPC, so traffic to reach
+  it still crosses the public internet. Under this definition the portal and bastion are
+  internet-facing (their security groups admit that external IP); the DB and endpoint are not
+  (their only inbound sources are the VPC's own CIDR or another security group, i.e. reachable
+  only by first pivoting through something already inside the VPC). A rule that only references
+  another security group is never counted as internet-facing by itself, for the same reason.
+
+`segment_reachability` (edges *between* different segments) is left empty here on purpose: real
+cross-subnet reachability needs route-table and NACL analysis this connector does not attempt,
+and the schema is explicit that an unlisted pair means "no assumed reachability" — an honest
+empty answer, not a gap to paper over with a guess.
+
+**Measured real effect** (current snapshot, common-random-numbers seed): merging this connector's
+real output turned the attack graph from 0 edges to 56 real same-segment edges, made the portal
+and bastion the graph's entry points, and made the DB and endpoint asset entries reachable
+through them — which raised Expected Annual Loss from about ₹14.49 Cr to ₹25.9 Cr and VaR (95th
+percentile) from about ₹26.4 Cr to ₹42.4 Cr. This is a large, real change driven entirely by
+observed AWS data (which hosts are reachable from where), not a new assumption.
 
 ## Adding a connector
 
