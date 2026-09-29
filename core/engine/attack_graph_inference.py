@@ -173,6 +173,74 @@ def extract_bounded_subgraph(
     )
 
 
+def _bfs_distance(graph: AttackGraph, start_asset_ids: set[str], *, reverse: bool) -> dict[str, int]:
+    """Fewest-hop distance from the nearest of ``start_asset_ids``, following edges forward
+    (or backward, if ``reverse``, i.e. distance *to* ``start_asset_ids``)."""
+    adjacency: dict[str, list[str]] = {}
+    for edge in graph.edges:
+        source, target = (
+            (edge.target_asset_id, edge.source_asset_id)
+            if reverse
+            else (edge.source_asset_id, edge.target_asset_id)
+        )
+        adjacency.setdefault(source, []).append(target)
+
+    distance = {asset_id: 0 for asset_id in start_asset_ids}
+    frontier = list(start_asset_ids)
+    while frontier:
+        next_frontier: list[str] = []
+        for current in frontier:
+            for neighbour in adjacency.get(current, []):
+                if neighbour not in distance:
+                    distance[neighbour] = distance[current] + 1
+                    next_frontier.append(neighbour)
+        frontier = next_frontier
+    return distance
+
+
+def shortest_path_edges(subgraph: BoundedAttackSubgraph) -> frozenset[str]:
+    """Directed edge keys (``"source_asset_id>target_asset_id"``) on some *shortest*
+    entry-to-target path — for display only.
+
+    ``included_asset_ids`` is every asset on *some* path to the target, which is right for
+    scoping the simulation, but wrong for deciding which lines to highlight: a real network
+    segment is usually a full mesh (every asset can reach every other in one hop), so almost
+    any edge between two included assets technically lies on *some* walk to the target.
+    Highlighting all of them floods a busy segment with colour instead of showing the route
+    that actually explains how the target is reached. This restricts to edges that lie on a
+    shortest path, which excludes the "sideways" mesh edges that don't make progress toward
+    the target.
+
+    Returns:
+        Empty when the target has no path from any entry point — nothing to highlight, which
+        is distinct from (and must not be confused with) a target reached in exactly one hop.
+
+    Must never:
+        Be used to narrow ``included_asset_ids`` itself or anything
+        :func:`compute_compromise_probabilities` reads — this is a cosmetic view over the
+        same subgraph, not a different, smaller one; narrowing the simulation's own node set
+        this way would silently change ``node_probabilities`` for display reasons.
+    """
+    graph = subgraph.graph
+    entry_points = set(entry_point_asset_ids(graph)) & subgraph.included_asset_ids
+    dist_from_entry = _bfs_distance(graph, entry_points, reverse=False)
+    target_distance = dist_from_entry.get(subgraph.crown_jewel_asset_id)
+    if target_distance is None:
+        return frozenset()
+    dist_to_target = _bfs_distance(graph, {subgraph.crown_jewel_asset_id}, reverse=True)
+
+    hot: set[str] = set()
+    for edge in graph.edges:
+        source, target = edge.source_asset_id, edge.target_asset_id
+        if source not in subgraph.included_asset_ids or target not in subgraph.included_asset_ids:
+            continue
+        du = dist_from_entry.get(source)
+        dv = dist_to_target.get(target)
+        if du is not None and dv is not None and du + 1 + dv == target_distance:
+            hot.add(f"{source}>{target}")
+    return frozenset(hot)
+
+
 @dataclass(frozen=True)
 class _Draws:
     """One set of sampled exploit outcomes for every open finding in a subgraph.

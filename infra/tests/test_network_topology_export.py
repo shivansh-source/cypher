@@ -60,9 +60,10 @@ def test_no_security_groups_is_not_internet_facing() -> None:
 _VPC = {"VpcId": "vpc-syn0000", "CidrBlock": _VPC_CIDR}
 _SUBNET = {
     "SubnetId": "subnet-syn0000",
+    "CidrBlock": "10.99.1.0/24",
     "Tags": [{"Key": "Name", "Value": "synthetic-public"}],
 }
-_SUBNET_NO_NAME = {"SubnetId": "subnet-syn0001", "Tags": []}
+_SUBNET_NO_NAME = {"SubnetId": "subnet-syn0001", "CidrBlock": "10.99.2.0/24", "Tags": []}
 _INSTANCE = {
     "InstanceId": "i-syn0000",
     "OwnerId": "999999999999",
@@ -90,7 +91,7 @@ def test_topology_from_aws_shapes_segments_and_instances() -> None:
         "subnet-syn0001": "subnet-syn0001",  # falls back to the subnet id when untagged
     }
 
-    [instance] = doc["instances"]
+    [instance] = [i for i in doc["instances"] if not i["instance_id"].startswith("gateway-")]
     assert instance["instance_id"] == "i-syn0000"
     assert instance["name"] == "synthetic-portal"
     assert instance["private_ip"] == "10.99.1.20"
@@ -111,3 +112,16 @@ def test_instance_referencing_an_unknown_security_group_id_is_not_internet_facin
     instance = {**_INSTANCE, "SecurityGroups": [{"GroupId": "sg-does-not-exist"}]}
     doc = topology_from_aws(_VPC, [_SUBNET], [instance], _SECURITY_GROUPS)
     assert doc["instances"][0]["internet_facing"] is False
+
+
+def test_topology_from_aws_adds_one_reserved_gateway_entry_per_subnet() -> None:
+    doc = topology_from_aws(_VPC, [_SUBNET, _SUBNET_NO_NAME], [], _SECURITY_GROUPS)
+
+    gateways = [i for i in doc["instances"] if i["instance_id"].startswith("gateway-")]
+    assert {
+        (g["instance_id"], g["private_ip"], g["segment_id"], g["instance_arn"]) for g in gateways
+    } == {
+        ("gateway-subnet-syn0000", "10.99.1.1", "subnet-syn0000", None),
+        ("gateway-subnet-syn0001", "10.99.2.1", "subnet-syn0001", None),
+    }
+    assert all(g["internet_facing"] is False for g in gateways)

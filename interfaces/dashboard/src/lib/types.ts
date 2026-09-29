@@ -420,6 +420,9 @@ export interface AttackGraphNode {
   open_finding_count: number;
   kev_finding_count: number;
   routes: AttackRoute[];
+  /** Never sent by the API — set client-side by `attack-map-illustrative.ts` for a node it
+   *  added to the display. Real nodes never carry this field. */
+  illustrative?: boolean;
 }
 
 export interface AttackGraphSegment {
@@ -428,6 +431,8 @@ export interface AttackGraphSegment {
   /** False when assets report this segment but `network_topology` does not declare it. */
   declared: boolean;
   asset_ids: string[];
+  /** Same client-side-only flag as `AttackGraphNode.illustrative`. */
+  illustrative?: boolean;
 }
 
 export interface AttackGraphEdge {
@@ -443,6 +448,10 @@ export interface AttackGraphResponse {
   observed_at: string;
   samples: number;
   topology_declared: boolean;
+  /** Assets with no known network position (e.g. an IAM role, an S3 bucket) — never drawn as
+   *  graph nodes, since a position for them would be fabricated; counted here so their absence
+   *  from the picture is never silent. */
+  omitted_no_network_position: number;
   segments: AttackGraphSegment[];
   segment_links: { from_segment_id: string; to_segment_id: string }[];
   edge_count: number;

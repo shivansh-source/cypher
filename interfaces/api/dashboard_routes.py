@@ -38,6 +38,7 @@ from core.engine.attack_graph_inference import (
     compute_compromise_probabilities,
     compute_graph_reachability,
     extract_bounded_subgraph,
+    shortest_path_edges,
 )
 from core.optimizer import (
     APPLICABLE_CONTROL_CATEGORIES,
@@ -505,10 +506,14 @@ def attack_graph_route() -> Any:
     ``compute_risk_figure`` uses, so they are the routes behind the current
     figures.
 
-    Each asset's ``role`` is ``entry`` (internet-facing), ``reachable`` (at
-    least one route in), ``unreachable`` (topology known, no route in) or
-    ``unknown`` (null ``segment_id``: omitted from the graph's inference,
-    never reported as unreachable).
+    Each returned asset's ``role`` is ``entry`` (internet-facing), ``reachable``
+    (at least one route in), or ``unreachable`` (topology known, no route
+    in). Assets with a null ``segment_id`` — no connector could place them on
+    a network (an IAM role, an S3 bucket: reached over the AWS API, not a
+    subnet path, so a position here would be fabricated) — are never drawn
+    as graph nodes at all; their count is reported separately in
+    ``omitted_no_network_position`` so their absence from the picture is
+    never silent.
     """
 
     def handler() -> dict[str, Any]:
@@ -526,14 +531,22 @@ def attack_graph_route() -> Any:
                 segment_names.setdefault(node.segment_id, node.segment_id)
 
         assets_by_id = {asset["asset_id"]: asset for asset in snapshot["assets"]}
+        omitted_no_network_position = 0
         nodes: list[dict[str, Any]] = []
         for asset_id, node in graph.nodes.items():
+            if node.segment_id is None:
+                omitted_no_network_position += 1
+                continue
             open_findings = [
                 f for f in assets_by_id[asset_id]["findings"] if f.get("remediated_at") is None
             ]
+            # compute_graph_reachability reports every asset with a known segment_id (its own
+            # contract), and node.segment_id is non-null here (the None case continued above),
+            # so `known` is never None in practice; the fallback keeps this route from ever
+            # 500-ing if that contract is ever violated instead.
             known = reachability.get(asset_id)
             if known is None:
-                role = "unknown"
+                role = "unreachable"
             elif known.is_entry_point:
                 role = "entry"
             else:
@@ -549,12 +562,23 @@ def attack_graph_route() -> Any:
                     "routes": [asdict(route) for route in known.routes] if known else [],
                 }
             )
+        placed_ids = {n["asset_id"] for n in nodes}
+        # Defensive, not expected to ever trim anything: build_attack_graph only derives an edge
+        # between two assets sharing a non-null segment_id, so no edge should reference one of
+        # the omitted assets above. Filtering anyway means this route can never return an edge
+        # pointing at a node it didn't also return.
+        edges = [
+            edge
+            for edge in graph.edges
+            if edge.source_asset_id in placed_ids and edge.target_asset_id in placed_ids
+        ]
 
         return {
             "snapshot_id": snapshot["snapshot_id"],
             "observed_at": snapshot["observed_at"],
             "samples": ATTACK_GRAPH_SAMPLES,
             "topology_declared": topology is not None,
+            "omitted_no_network_position": omitted_no_network_position,
             "segments": [
                 {
                     "segment_id": segment_id,
@@ -567,8 +591,8 @@ def attack_graph_route() -> Any:
                 for segment_id, name in segment_names.items()
             ],
             "segment_links": topology["segment_reachability"] if topology else [],
-            "edge_count": len(graph.edges),
-            "edges": [asdict(edge) for edge in graph.edges],
+            "edge_count": len(edges),
+            "edges": [asdict(edge) for edge in edges],
             "nodes": nodes,
         }
 
@@ -583,8 +607,12 @@ def attack_graph_target_route() -> Any:
     simulates every entry point attacked at once over it: the worst-case
     display view that function documents, not the per-route view the
     engine's figures use (that one is each node's ``routes`` in
-    ``/attack-graph``). Edges are the subgraph's own, each with the
-    ``reason`` that derived it.
+    ``/attack-graph``). Edges are ``shortest_path_edges``'s, not every edge
+    between two included assets — a same-segment mesh means almost any such
+    edge technically lies on *some* walk to the target, which would highlight
+    nearly the whole segment; shortest-path edges are the ones that actually
+    explain how the target is reached. ``included_asset_ids`` (and therefore
+    the probabilities) still cover every asset on any path, unrestricted.
 
     404 for an asset not in the snapshot. 409 for an asset whose segment is
     unknown: inference over it would report "unreachable" for what is
@@ -613,6 +641,7 @@ def attack_graph_target_route() -> Any:
         subgraph = extract_bounded_subgraph(graph, asset_id)
         result = compute_compromise_probabilities(snapshot, subgraph)
         included = subgraph.included_asset_ids
+        hot = shortest_path_edges(subgraph)
         return {
             "snapshot_id": snapshot["snapshot_id"],
             "asset_id": asset_id,
@@ -624,7 +653,7 @@ def attack_graph_target_route() -> Any:
             "edges": [
                 asdict(edge)
                 for edge in graph.edges
-                if edge.source_asset_id in included and edge.target_asset_id in included
+                if f"{edge.source_asset_id}>{edge.target_asset_id}" in hot
             ],
         }
 

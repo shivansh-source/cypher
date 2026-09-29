@@ -26,6 +26,7 @@ from core.engine.attack_graph_inference import (
     compute_compromise_probabilities,
     compute_graph_reachability,
     extract_bounded_subgraph,
+    shortest_path_edges,
 )
 from core.engine.parameterization import parameterize_scenario
 from core.engine.scenarios import build_loss_event_scenarios
@@ -125,6 +126,65 @@ def test_extract_bounded_subgraph_raises_for_unknown_asset() -> None:
 
     with pytest.raises(KeyError):
         extract_bounded_subgraph(graph, "asset-does-not-exist")
+
+
+# --- Shortest-path edges (display highlighting only) -------------------------
+
+
+def test_shortest_path_edges_excludes_sideways_mesh_edges_in_a_clique() -> None:
+    """A same-segment mesh puts an uninvolved sibling in included_asset_ids (it can reach,
+    and be reached from, the target in one hop each) even though no path needs it — the exact
+    situation that flooded the dashboard's highlight with the whole segment. Only the direct
+    entry->target edge should come back as a shortest-path edge."""
+    graph = AttackGraph(
+        nodes={
+            "entry": AttackGraphNode("entry", "seg1", internet_facing=True),
+            "target": AttackGraphNode("target", "seg1", internet_facing=False),
+            "sibling": AttackGraphNode("sibling", "seg1", internet_facing=False),
+        },
+        edges=[
+            AttackGraphEdge("entry", "target", "same_segment:seg1"),
+            AttackGraphEdge("target", "entry", "same_segment:seg1"),
+            AttackGraphEdge("entry", "sibling", "same_segment:seg1"),
+            AttackGraphEdge("sibling", "entry", "same_segment:seg1"),
+            AttackGraphEdge("target", "sibling", "same_segment:seg1"),
+            AttackGraphEdge("sibling", "target", "same_segment:seg1"),
+        ],
+    )
+    subgraph = extract_bounded_subgraph(graph, "target")
+    assert subgraph.included_asset_ids == frozenset({"entry", "target", "sibling"})
+
+    assert shortest_path_edges(subgraph) == frozenset({"entry>target"})
+
+
+def test_shortest_path_edges_includes_a_full_multi_hop_chain() -> None:
+    graph = AttackGraph(
+        nodes={
+            "entry": AttackGraphNode("entry", "seg1", internet_facing=True),
+            "mid": AttackGraphNode("mid", "seg2", internet_facing=False),
+            "target": AttackGraphNode("target", "seg3", internet_facing=False),
+        },
+        edges=[
+            AttackGraphEdge("entry", "mid", "segment_reachability:seg1->seg2"),
+            AttackGraphEdge("mid", "target", "segment_reachability:seg2->seg3"),
+        ],
+    )
+    subgraph = extract_bounded_subgraph(graph, "target")
+
+    assert shortest_path_edges(subgraph) == frozenset({"entry>mid", "mid>target"})
+
+
+def test_shortest_path_edges_empty_when_target_unreachable() -> None:
+    graph = AttackGraph(
+        nodes={
+            "entry": AttackGraphNode("entry", "seg1", internet_facing=True),
+            "isolated": AttackGraphNode("isolated", "seg2", internet_facing=False),
+        },
+        edges=[],
+    )
+    subgraph = extract_bounded_subgraph(graph, "isolated")
+
+    assert shortest_path_edges(subgraph) == frozenset()
 
 
 # --- Crown-jewel summary (every entry point attacked at once) ----------------

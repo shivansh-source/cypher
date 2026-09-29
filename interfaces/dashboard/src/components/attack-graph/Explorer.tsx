@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { fetchAttackGraphTarget } from "@/lib/api";
+import { ILLUSTRATIVE_NAMES, withIllustrativeExtension } from "@/lib/attack-map-illustrative";
 import {
   GROUP_HEAD,
   INTERNET_R,
+  MAX_NODES_PER_SEGMENT,
   NODE_R,
+  ROW_H,
   edgeKey,
   edgePath,
   layoutAttackGraph,
@@ -59,10 +62,18 @@ export function AttackGraphExplorer({
   initialSelectedId: string | null;
   initialTarget: TargetState | null;
 }) {
-  const layout = useMemo(() => layoutAttackGraph(graph), [graph]);
-  const nodesById = useMemo(() => new Map(graph.nodes.map((n) => [n.asset_id, n])), [graph]);
+  const [showIllustrative, setShowIllustrative] = useState(true);
+  // The real API response, optionally extended with a hand-authored, clearly-tagged
+  // continuation (see attack-map-illustrative.ts) — never sent anywhere, only laid out.
+  const displayGraph = useMemo(
+    () => (showIllustrative ? withIllustrativeExtension(graph) : graph),
+    [graph, showIllustrative],
+  );
+  const layout = useMemo(() => layoutAttackGraph(displayGraph), [displayGraph]);
+  const nodesById = useMemo(() => new Map(displayGraph.nodes.map((n) => [n.asset_id, n])), [displayGraph]);
   const assetsById = useMemo(() => new Map((inventory ?? []).map((a) => [a.asset_id, a])), [inventory]);
   const nameOf = useCallback((id: string) => {
+    if (ILLUSTRATIVE_NAMES[id]) return ILLUSTRATIVE_NAMES[id];
     const asset = assetsById.get(id);
     return asset ? assetName(asset) : id;
   }, [assetsById]);
@@ -70,9 +81,9 @@ export function AttackGraphExplorer({
   // label of its own, so a shared name falls back to the asset id.
   const labelOf = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const n of graph.nodes) counts.set(nameOf(n.asset_id), (counts.get(nameOf(n.asset_id)) ?? 0) + 1);
+    for (const n of displayGraph.nodes) counts.set(nameOf(n.asset_id), (counts.get(nameOf(n.asset_id)) ?? 0) + 1);
     return (id: string) => ((counts.get(nameOf(id)) ?? 0) > 1 ? id : nameOf(id));
-  }, [graph, nameOf]);
+  }, [displayGraph, nameOf]);
 
   const [panel, setPanel] = useState<Panel>(initialSelectedId ? { kind: "node", id: initialSelectedId } : null);
   const [tab, setTab] = useState<DrawerTab>("overview");
@@ -101,7 +112,8 @@ export function AttackGraphExplorer({
 
   const loadTarget = useCallback(
     (node: AttackGraphNode) => {
-      if (node.role === "unknown" || targets[node.asset_id]) return;
+      // Illustrative nodes were never scored by the engine; there is nothing to fetch.
+      if (node.role === "unknown" || node.illustrative || targets[node.asset_id]) return;
       setTargets((t) => ({ ...t, [node.asset_id]: { state: "loading" } }));
       void fetchAttackGraphTarget(node.asset_id).then((result) => {
         const checked: TargetState =
@@ -171,11 +183,12 @@ export function AttackGraphExplorer({
   const shareByEntry = new Map(selected?.routes.map((r) => [r.entry_asset_id, r]) ?? []);
   const focused = target !== null;
 
+  // Illustrative nodes never count toward these — they are a display addition, not part of
+  // the real posture summary these chips report.
   const counts = {
     entry: graph.nodes.filter((n) => n.role === "entry").length,
     reachable: graph.nodes.filter((n) => n.role === "reachable").length,
     unreachable: graph.nodes.filter((n) => n.role === "unreachable").length,
-    unknown: graph.nodes.filter((n) => n.role === "unknown").length,
   };
 
   return (
@@ -213,9 +226,6 @@ export function AttackGraphExplorer({
           }}
         >
           <g className="am-layers">
-            <text x={layout.internet.cx} y={20} textAnchor="middle">
-              Attacker
-            </text>
             {layout.layers.map((layer) => (
               <text key={layer.column} x={layer.cx} y={20} textAnchor="middle">
                 {layer.title}
@@ -228,13 +238,13 @@ export function AttackGraphExplorer({
               group.segmentId !== null ? (
                 <text
                   key={group.key}
-                  className={`am-caption${group.declared ? "" : " tentative"}`}
+                  className={`am-caption${group.illustrative ? " illustrative" : group.declared ? "" : " tentative"}`}
                   x={group.cx}
                   y={group.y + GROUP_HEAD - 12}
                   textAnchor="middle"
                 >
                   {group.name}
-                  {group.declared ? "" : " (undeclared)"}
+                  {group.illustrative ? " (illustrative)" : group.declared ? "" : " (undeclared)"}
                 </text>
               ) : null,
             )}
@@ -300,6 +310,7 @@ export function AttackGraphExplorer({
                 label={labelOf(p.node.asset_id)}
                 selected={p.node.asset_id === selectedId}
                 dimmed={focused && !included.has(p.node.asset_id)}
+                illustrative={p.node.illustrative ?? false}
                 compromise={target?.node_probabilities[p.node.asset_id]}
                 onSelect={() => {
                   if (!zp.wasDrag()) select(p.node.asset_id);
@@ -307,6 +318,20 @@ export function AttackGraphExplorer({
               />
             )),
           )}
+
+          <g className="am-more-g">
+            {layout.groups.map((group) =>
+              group.hidden > 0 ? (
+                <MoreMark
+                  key={`${group.key}-more`}
+                  cx={group.cx}
+                  cy={group.y + GROUP_HEAD + NODE_R + 4 + group.nodes.length * ROW_H}
+                  count={group.hidden}
+                  unknown={group.segmentId === null}
+                />
+              ) : null,
+            )}
+          </g>
         </g>
       </svg>
 
@@ -318,12 +343,34 @@ export function AttackGraphExplorer({
           {counts.unreachable > 0 ? (
             <span className="gx-chip"><i className="dot r-unreachable" />{formatCount(counts.unreachable)} no path in</span>
           ) : null}
-          {counts.unknown > 0 ? (
-            <span className="gx-chip warn"><i className="dot r-unknown" />{formatCount(counts.unknown)} segment unknown</span>
+          {graph.omitted_no_network_position > 0 ? (
+            <span
+              className="gx-chip warn"
+              title="These assets are reached over the AWS API, not a network path (an IAM role, an S3 bucket) — no connector could place them on this graph without fabricating a position, so they are not drawn here. They still appear on Assets and Compliance."
+            >
+              <i className="dot r-unknown" />
+              {formatCount(graph.omitted_no_network_position)} not shown (no network position)
+            </span>
+          ) : null}
+          {showIllustrative ? (
+            <span
+              className="gx-chip illustrative"
+              title="These two are not from any connector — added to show what a deeper attack path looks like once a segmented network exists beyond the estate's current single subnet. Turn off with the button on the right to see exactly what the API returned."
+            >
+              2 illustrative (not real)
+            </span>
           ) : null}
         </div>
         <div className="gx-tools">
-          <Search nodes={graph.nodes} nameOf={nameOf} onPick={select} />
+          <Search nodes={displayGraph.nodes} nameOf={nameOf} onPick={select} />
+          <button
+            type="button"
+            className={`gx-btn${showIllustrative ? " on" : ""}`}
+            onClick={() => setShowIllustrative((v) => !v)}
+            title="Toggle the illustrative analytics/vault extension"
+          >
+            Illustrative
+          </button>
           <button
             type="button"
             className={`gx-btn${panel?.kind === "topology" ? " on" : ""}`}
@@ -382,13 +429,13 @@ export function AttackGraphExplorer({
           target={targetState}
           tab={tab}
           onTab={setTab}
-          graph={graph}
+          graph={displayGraph}
           nameOf={nameOf}
           onClose={close}
           onSelect={select}
         />
       ) : panel?.kind === "topology" ? (
-        <TopologyDrawer graph={graph} nameOf={nameOf} onClose={close} onSelect={select} />
+        <TopologyDrawer graph={displayGraph} nameOf={nameOf} onClose={close} onSelect={select} />
       ) : null}
     </div>
   );
@@ -398,6 +445,13 @@ function InternetNode({ layout }: { layout: GraphLayout }) {
   const { cx: ix, cy: iy } = layout.internet;
   return (
     <g className="am-internet">
+      {/* Tied to the icon's own position (not a fixed top-of-canvas header, unlike the other
+          columns' titles) so it stays attached to the globe at any graph height — previously a
+          separate fixed-y label, which drifted far from the icon once a tall column pushed
+          "Internet" (always vertically centred on the whole body) well below the top. */}
+      <text className="am-caption" x={ix} y={iy - INTERNET_R - 12} textAnchor="middle">
+        Attacker
+      </text>
       <circle cx={ix} cy={iy} r={INTERNET_R} />
       <path
         d={`M${ix - 12},${iy} H${ix + 12} M${ix},${iy - 12} C${ix - 8},${iy - 6} ${ix - 8},${iy + 6} ${ix},${iy + 12} C${ix + 8},${iy + 6} ${ix + 8},${iy - 6} ${ix},${iy - 12}`}
@@ -422,6 +476,7 @@ function NodeMark({
   label,
   selected,
   dimmed,
+  illustrative,
   compromise,
   onSelect,
 }: {
@@ -430,17 +485,24 @@ function NodeMark({
   label: string;
   selected: boolean;
   dimmed: boolean;
+  illustrative: boolean;
   compromise: number | undefined;
   onSelect: () => void;
 }) {
   const { node, cx, cy } = placed;
   const heat = compromise !== undefined ? Math.round(compromise * HEAT_MAX_MIX) : 0;
-  const status = compromise !== undefined ? `${formatPercent(compromise, 1)} compromised` : ROLE_TEXT[node.role](node);
+  const status = illustrative
+    ? "illustrative"
+    : compromise !== undefined
+    ? `${formatPercent(compromise, 1)} compromised`
+    : ROLE_TEXT[node.role](node);
   const kev = node.kev_finding_count > 0 ? `, ${node.kev_finding_count} known exploited` : "";
-  const aria = `${name} (${node.asset_id}): ${status}, ${node.open_finding_count} open finding${node.open_finding_count === 1 ? "" : "s"}${kev}`;
+  const aria = illustrative
+    ? `${name} (${node.asset_id}): illustrative, added to this view, not from a connector`
+    : `${name} (${node.asset_id}): ${status}, ${node.open_finding_count} open finding${node.open_finding_count === 1 ? "" : "s"}${kev}`;
   return (
     <g
-      className={`am-node r-${node.role}${selected ? " sel" : ""}${dimmed ? " dim" : ""}`}
+      className={`am-node r-${node.role}${selected ? " sel" : ""}${dimmed ? " dim" : ""}${illustrative ? " illustrative" : ""}`}
       data-node
       role="button"
       tabIndex={0}
@@ -467,7 +529,7 @@ function NodeMark({
         style={heat > 0 ? ({ fill: `color-mix(in srgb, var(--crit) ${heat}%, var(--surface))` } as CSSProperties) : undefined}
       />
       <text className="am-count" x={cx} y={cy + 4.5} textAnchor="middle">
-        {node.open_finding_count}
+        {illustrative ? "–" : node.open_finding_count}
       </text>
       {node.kev_finding_count > 0 ? <circle className="am-kev" cx={cx + NODE_R * 0.74} cy={cy - NODE_R * 0.74} r={5} /> : null}
       <text className="am-name" x={cx} y={cy + NODE_R + 17} textAnchor="middle">
@@ -475,6 +537,38 @@ function NodeMark({
       </text>
       <text className="am-status" x={cx} y={cy + NODE_R + 31} textAnchor="middle">
         {status}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * The fold marker for a group's assets past its shown cap (`layoutAttackGraph`'s `MAX_*`
+ * constants) — never a silent drop: the count is always drawn, only the individual circles
+ * are not. For the "segment unknown" group specifically, these are real assets (an IAM role,
+ * an S3 bucket, a security group object) that genuinely have no network position to place on
+ * this graph, not assets waiting on more data.
+ */
+function MoreMark({
+  cx,
+  cy,
+  count,
+  unknown,
+}: {
+  cx: number;
+  cy: number;
+  count: number;
+  unknown: boolean;
+}) {
+  const label = unknown ? "no known network position" : `more, ${MAX_NODES_PER_SEGMENT} shown`;
+  return (
+    <g className="am-more" aria-label={`${count} more asset${count === 1 ? "" : "s"}, ${label}`}>
+      <circle className="am-more-dot" cx={cx} cy={cy} r={NODE_R} />
+      <text className="am-more-count" x={cx} y={cy + 4} textAnchor="middle">
+        +{count}
+      </text>
+      <text className="am-more-label" x={cx} y={cy + NODE_R + 17} textAnchor="middle">
+        {label}
       </text>
     </g>
   );
@@ -502,6 +596,12 @@ function Legend({ focused }: { focused: boolean }) {
           <path className="lg-link" d="M5,5 H19" markerStart="url(#am-arrow)" markerEnd="url(#am-arrow)" />
         </svg>
         Can reach; two heads when both ways
+      </li>
+      <li>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle className="lg-node illustrative" cx="12" cy="12" r="8" />
+        </svg>
+        Illustrative — added for this demo, not from a connector
       </li>
       {focused ? (
         <>

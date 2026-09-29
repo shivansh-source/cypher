@@ -108,7 +108,9 @@ def topology_from_aws(
         ``{"vpc_id", "vpc_cidr_block", "segments", "segment_reachability", "instances"}``, where
         each instance entry carries ``instance_id``, ``name`` (its ``Name`` tag, or the instance
         id), ``private_ip``, ``segment_id`` (its subnet id), ``internet_facing``, and
-        ``instance_arn``.
+        ``instance_arn``. ``instances`` also includes one synthetic entry per subnet for its
+        reserved ``.1`` gateway address (``instance_id`` prefixed ``gateway-``, ``instance_arn``
+        null) — see :func:`_gateway_entry`.
 
     Must never:
         Invent a segment that isn't a real subnet, or a reachability edge this function did not
@@ -154,6 +156,8 @@ def topology_from_aws(
             }
         )
 
+    instance_entries.extend(_gateway_entry(subnet) for subnet in subnets)
+
     return {
         "vpc_id": vpc["VpcId"],
         "vpc_cidr_block": vpc_cidr_block,
@@ -161,6 +165,42 @@ def topology_from_aws(
         # Cross-subnet reachability is not attempted here; see the module docstring.
         "segment_reachability": [],
         "instances": instance_entries,
+    }
+
+
+def _gateway_entry(subnet: dict[str, Any]) -> dict[str, Any]:
+    """The synthetic instance entry for a subnet's reserved AWS gateway address.
+
+    AWS always reserves the second address of every subnet (``.1``, e.g.
+    ``10.20.1.1`` in ``10.20.1.0/24``) as that subnet's implicit VPC router —
+    a documented AWS networking fact
+    (https://docs.aws.amazon.com/vpc/latest/userguide/subnet-sizing.html),
+    not an inference. Emitting it as a network-topology fact for whatever
+    asset another connector already observed at that address (Greenbone, for
+    example, scans and fingerprints it like any other host) is therefore
+    honest; nothing here is invented. ``instance_arn`` is null and
+    ``instance_id`` is prefixed ``gateway-`` specifically so this can never
+    be mistaken for a real, taggable EC2 instance.
+
+    Returns:
+        An entry in the same shape as :func:`topology_from_aws`'s other
+        ``instances`` entries, with ``internet_facing`` conservatively
+        ``False`` (a reserved router address is not a scannable web
+        application the way a server is, and no security-group rule governs
+        it the way one does an instance's ENI).
+    """
+    network = ipaddress.ip_network(subnet["CidrBlock"])
+    gateway_ip = str(network.network_address + 1)
+    name = next(
+        (t["Value"] for t in subnet.get("Tags", []) if t["Key"] == "Name"), subnet["SubnetId"]
+    )
+    return {
+        "instance_id": f"gateway-{subnet['SubnetId']}",
+        "name": f"{name} gateway (AWS-reserved)",
+        "private_ip": gateway_ip,
+        "segment_id": subnet["SubnetId"],
+        "internet_facing": False,
+        "instance_arn": None,
     }
 
 
