@@ -891,8 +891,15 @@ button.ob-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 
 .am-layers text { fill: var(--muted); font: 600 11.5px var(--display); }
 .am-caption { fill: var(--ink-2); font: 500 11px var(--sans); }
 .am-caption.tentative { font-style: italic; }
-.am-edges path, .am-inet-edges path, .lg-link { fill: none; stroke: var(--muted); stroke-width: 1.3; stroke-opacity: 0.7; }
+.am-caption.illustrative { font-style: italic; fill: var(--accent); }
+.am-inet-edges path, .lg-link { fill: none; stroke: var(--muted); stroke-width: 1.3; stroke-opacity: 0.7; }
 .am-inet-edges path { stroke-dasharray: 3 3; }
+/* Same-segment reachability edges: every pair in a segment is mutually reachable, so a segment
+   of N assets draws a full mesh (N*(N-1)/2 lines) — at rest that reads as noise, not structure,
+   once a segment has more than a handful of assets. Kept thin and faint by default (still real,
+   still hoverable for the exact reason) and brought to full strength only for the lines that
+   matter to whatever is selected, via the same .hot mechanism below. */
+.am-edges path { fill: none; stroke: var(--muted); stroke-width: 1; stroke-opacity: 0.16; }
 .amap.focused .am-edges path, .amap.focused .am-inet-edges path { stroke-opacity: 0.14; }
 .amap.focused .am-edges path.hot, .amap.focused .am-inet-edges path.hot, .lg-hot { stroke: var(--accent); stroke-opacity: 0.85; stroke-width: 2; stroke-dasharray: none; }
 .am-arrowhead { fill: var(--muted); }
@@ -901,6 +908,7 @@ button.ob-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 
 .am-internet path { fill: none; stroke: var(--ink-2); stroke-width: 1.4; }
 .am-internet text { fill: var(--ink); font: 600 12px var(--display); }
 .am-dot, .lg-node { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.5; }
+.lg-node.illustrative { stroke-dasharray: 3 3; stroke: var(--accent); }
 .am-ring, .lg-ring { fill: none; stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 2 2.5; }
 .am-node { cursor: pointer; outline: none; }
 .am-node.r-unknown .am-dot { stroke: var(--muted); stroke-dasharray: 3 3; }
@@ -908,12 +916,22 @@ button.ob-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 
 .am-node:focus-visible .am-dot { stroke: var(--accent); stroke-width: 4; }
 .am-node.sel .am-dot { stroke: var(--accent); stroke-width: 3.5; }
 .am-node.dim { opacity: 0.3; }
+/* Added client-side to illustrate a deeper attack path beyond the estate's real, single
+   subnet (see attack-map-illustrative.ts) — dashed and accent-coloured so it never reads as
+   a connector-observed asset. */
+.am-node.illustrative .am-dot { stroke-dasharray: 3 3; stroke: var(--accent); }
+.am-node.illustrative .am-name, .am-node.illustrative .am-status { font-style: italic; }
 .am-count { fill: var(--ink); font: 700 12px var(--mono); font-variant-numeric: tabular-nums; pointer-events: none; }
 .am-kev, .lg-kev { fill: var(--crit); stroke: var(--surface); stroke-width: 1.5; }
 .am-name { fill: var(--ink); font: 600 11.5px var(--sans); }
 .am-status { fill: var(--muted); font: 500 10.5px var(--mono); font-variant-numeric: tabular-nums; }
 /* A halo in the canvas colour keeps labels readable where edges cross them. */
-.am-name, .am-status, .am-caption, .am-internet text, .am-layers text { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.am-name, .am-status, .am-caption, .am-internet text, .am-layers text, .am-more-label { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+/* The "+N more" fold marker for assets past a group's shown cap — dashed and muted so it
+   reads as a summary, not another discovered asset. */
+.am-more-dot { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.am-more-count { fill: var(--muted); font: 700 11px var(--mono); font-variant-numeric: tabular-nums; pointer-events: none; }
+.am-more-label { fill: var(--muted); font: 500 10.5px var(--sans); }
 
 /* floating chrome */
 .gx-top { position: absolute; top: 12px; left: 12px; right: 12px; transition: right 0.2s ease; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; pointer-events: none; z-index: 3; }
@@ -921,6 +939,7 @@ button.ob-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 
 .gx-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .gx-chip { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px; border-radius: 7px; background: var(--surface); border: 1px solid var(--line); font-size: 12px; color: var(--ink-2); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06); white-space: nowrap; cursor: default; }
 .gx-chip.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, var(--line)); }
+.gx-chip.illustrative { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; border: 1.5px solid var(--ink-2); background: var(--surface); }
 .dot.r-entry { background: var(--ink-2); }
 .dot.r-unreachable { border-color: var(--muted); }
@@ -970,6 +989,7 @@ button.ob-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 
 .gd-role.r-entry { background: var(--ink-2); }
 .gd-role.r-unknown { border-style: dashed; border-color: var(--muted); }
 .gd-role.r-unreachable { border-color: var(--muted); }
+.gd-role.illustrative { border-style: dashed; border-color: var(--accent); }
 .gd-actions { margin-left: auto; display: flex; gap: 2px; }
 .gd-icon { all: unset; box-sizing: border-box; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: var(--muted); cursor: pointer; }
 .gd-icon:hover { background: var(--surface-2); color: var(--ink); }
@@ -986,6 +1006,7 @@ button.ob-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 
 .gd-badge { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; border-radius: 5px; border: 1px solid var(--line); font-size: 11.5px; font-weight: 500; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .gd-badge.crit { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 35%, var(--line)); background: var(--crit-soft); }
 .gd-badge.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, var(--line)); }
+.gd-badge.illustrative { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
 .gd-badge.strong { color: var(--ink); font-weight: 600; }
 .gd-tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--line); }
 .gd-tab { all: unset; display: inline-flex; align-items: center; gap: 6px; padding: 10px 8px 9px; font-size: 12.5px; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }

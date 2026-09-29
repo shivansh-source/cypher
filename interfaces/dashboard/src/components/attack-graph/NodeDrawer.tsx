@@ -53,6 +53,41 @@ export function NodeDrawer({
 }) {
   const { graph, nameOf, onClose } = common;
   const segmentName = graph.segments.find((s) => s.segment_id === node.segment_id)?.name ?? node.segment_id;
+
+  if (node.illustrative) {
+    return (
+      <aside className="gd" aria-labelledby="gd-title" data-canvas-ignore>
+        <header className="gd-head">
+          <div className="gd-kicker">
+            <span className="gd-role illustrative" aria-hidden="true" />
+            Illustrative asset
+            <span className="gd-actions">
+              <button className="gd-icon" type="button" onClick={onClose} title="Close (Esc)" aria-label="Close details">
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M4 4l8 8M12 4l-8 8" />
+                </svg>
+              </button>
+            </span>
+          </div>
+          <h2 id="gd-title">{nameOf(node.asset_id)}</h2>
+          <CopyId value={node.asset_id} />
+          <div className="gd-badges">
+            <span className="gd-badge warn">Illustrative — not real</span>
+            {segmentName ? <span className="gd-badge">{segmentName}</span> : null}
+          </div>
+        </header>
+        <div className="gd-body">
+          <p className="gd-empty">
+            This asset and the edge into it were added to this view to show what a deeper
+            attack path looks like once a segmented network exists beyond the estate&rsquo;s
+            current single subnet. No connector observed it, it is not in the current
+            snapshot, and it carries no engine-computed figures.
+          </p>
+        </div>
+      </aside>
+    );
+  }
+
   const openFindings = asset?.findings.filter((f) => f.scenario !== null) ?? [];
   const tabs: { id: DrawerTab; label: string; count?: number }[] = [
     { id: "overview", label: "Overview" },
@@ -491,7 +526,7 @@ export function TopologyDrawer({ graph, nameOf, onClose, onSelect }: Common) {
         <div className="gd-badges">
           <span className="gd-badge">{formatCount(graph.segments.length)} segments</span>
           <span className="gd-badge">{formatCount(graph.segment_links.length)} segment links</span>
-          <span className="gd-badge">{formatCount(graph.edge_count)} asset edges</span>
+          <span className="gd-badge">{formatCount(graph.edges.length)} asset edges</span>
         </div>
       </header>
       <div className="gd-body">
@@ -507,8 +542,8 @@ export function TopologyDrawer({ graph, nameOf, onClose, onSelect }: Common) {
                   <b>{s.name}</b>
                   <span className="sub mono">{s.segment_id}</span>
                 </span>
-                <span className={`gd-badge${s.declared ? "" : " warn"}`}>
-                  {s.declared ? `${formatCount(s.asset_ids.length)} assets` : "Undeclared"}
+                <span className={`gd-badge${s.illustrative ? " illustrative" : s.declared ? "" : " warn"}`}>
+                  {s.illustrative ? "Illustrative" : s.declared ? `${formatCount(s.asset_ids.length)} assets` : "Undeclared"}
                 </span>
               </li>
             ))}

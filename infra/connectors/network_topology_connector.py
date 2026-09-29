@@ -22,10 +22,14 @@ bridging ``cypher.py`` already does for ``cmdb_connector.py``'s
 
 Because the same physical machine is known under more than one placeholder
 identity scheme in this codebase (Wazuh/Greenbone mint ``host:<ip>``;
-Prowler/ScoutSuite mint ``cloud:<ARN>`` — see ``docs/CONNECTORS.md`` on the
-duplicate-asset caveat), this connector emits a fragment under *each* scheme
-per instance, so whichever representation another connector actually created
-in a given run receives the real network facts.
+Prowler/ScoutSuite mint ``cloud:<ARN>``; and ``wazuh_connector.py`` falls back
+to an agent's *name* — in practice AWS's own default EC2 hostname,
+``ip-<private-ip-with-dashes>`` — whenever ``agent_control`` reports no
+usable IP for it, minting a third ``host:ip-<...>`` identity for the same
+machine — see ``docs/CONNECTORS.md`` on the duplicate-asset caveat), this
+connector emits a fragment under *each* scheme per instance, so whichever
+representation another connector actually created in a given run receives
+the real network facts.
 """
 
 from __future__ import annotations
@@ -113,7 +117,8 @@ class NetworkTopologyConnector(Connector):
             raw: Exactly what :meth:`fetch` returned.
 
         Returns:
-            Two fragments per instance (one ``host:<private_ip>``, one
+            Up to three fragments per instance (``host:<private_ip>``,
+            ``host:ip-<private-ip-with-dashes>``, and
             ``cloud:<instance ARN>``) — see the module docstring — each
             ``{"network": {"internet_facing": bool, "segment_id": str}}``
             plus a private ``_identity_hint``. An instance missing a private
@@ -164,6 +169,17 @@ class NetworkTopologyConnector(Connector):
             if private_ip:
                 fragments.append(
                     {"network": network, "_identity_hint": {"kind": "host", "value": private_ip}}
+                )
+                # AWS's own default EC2 private hostname is "ip-<private-ip-with-dashes>" (e.g.
+                # ip-10-20-1-56). wazuh_connector.py falls back to an agent's *name* rather than
+                # its IP whenever agent_control reports no usable IP for it, and in practice
+                # that name is exactly this default hostname — creating a third placeholder
+                # identity for the same physical host that the two fragments above don't reach.
+                # Emitting under it too is a mechanical, deterministic AWS-naming fact, not a
+                # guess, so it belongs alongside the other two rather than being left unmatched.
+                hostname_id = "ip-" + private_ip.replace(".", "-")
+                fragments.append(
+                    {"network": network, "_identity_hint": {"kind": "host", "value": hostname_id}}
                 )
             instance_arn = instance.get("instance_arn")
             if instance_arn:

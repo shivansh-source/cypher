@@ -42,11 +42,13 @@ def test_run_emits_a_host_and_a_cloud_fragment_per_instance(
 
     fragments = connector.run()
 
-    # 2 instances x 2 identity schemes each = 4 fragments.
+    # 2 instances x 3 identity schemes each (ip, ip-with-dashes hostname, ARN) = 6 fragments.
     assert {f["asset_id"] for f in fragments} == {
         "host:10.99.1.20",
+        "host:ip-10-99-1-20",
         "cloud:arn:aws:ec2:ap-south-1:999999999999:instance/i-syn0000",
         "host:10.99.1.21",
+        "host:ip-10-99-1-21",
         "cloud:arn:aws:ec2:ap-south-1:999999999999:instance/i-syn0001",
     }
     assert all(not any(key.startswith("_") for key in f) for f in fragments)

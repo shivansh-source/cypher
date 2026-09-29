@@ -33,6 +33,19 @@ export const LABEL_HALF_W = 90;
  * segment would be an unreadable column.
  */
 export const MAX_NODES_PER_SEGMENT = 60;
+/**
+ * Same guard, but tighter for the "segment unknown" group specifically. Every
+ * other group is a real network segment with real edges; this one is not a
+ * segment at all — it is every asset no connector could place on the graph
+ * (an IAM role, an S3 bucket, a security-group object itself), each with no
+ * edges by construction. A handful of AWS estates can push this group into
+ * the hundreds, at which point one unbroken column of disconnected circles
+ * stops reading as "a graph" at all; folding it aggressively, ranked by
+ * `rank()` so the highest-finding-count assets stay visible, keeps the page
+ * honest (the count is never hidden, only the individual circles) without
+ * drowning the real, connected part of the graph.
+ */
+export const MAX_UNKNOWN_SEGMENT_NODES = 8;
 
 export interface PlacedNode {
   node: AttackGraphNode;
@@ -46,6 +59,8 @@ export interface PlacedGroup {
   /** null for the group of assets whose segment is unknown. */
   segmentId: string | null;
   declared: boolean;
+  /** Client-added, not from the API — see `attack-map-illustrative.ts`. */
+  illustrative: boolean;
   isolated: boolean;
   column: number;
   cx: number;
@@ -129,6 +144,7 @@ export function layoutAttackGraph(
       name: segment.name,
       segmentId: segment.segment_id,
       declared: segment.declared,
+      illustrative: segment.illustrative ?? false,
       isolated: d === undefined,
       column: d ?? reachedColumns,
       ids: segment.asset_ids,
@@ -140,6 +156,7 @@ export function layoutAttackGraph(
       name: "Segment unknown",
       segmentId: null,
       declared: false,
+      illustrative: false,
       isolated: false,
       column: reachedColumns + (hasIsolated ? 1 : 0),
       ids: unknownIds,
@@ -156,8 +173,8 @@ export function layoutAttackGraph(
       const ordered = [...entry.ids].sort(
         (a, b) => rank(nodesById.get(b), priority) - rank(nodesById.get(a), priority),
       );
-      const shown =
-        ordered.length > MAX_NODES_PER_SEGMENT ? ordered.slice(0, MAX_NODES_PER_SEGMENT - 1) : ordered;
+      const cap = entry.segmentId === null ? MAX_UNKNOWN_SEGMENT_NODES : MAX_NODES_PER_SEGMENT;
+      const shown = ordered.length > cap ? ordered.slice(0, cap - 1) : ordered;
       const rows = Math.max(shown.length + (ordered.length > shown.length ? 1 : 0), 1);
       return { entry, shown, hidden: ordered.length - shown.length, h: GROUP_HEAD + rows * ROW_H };
     }),
