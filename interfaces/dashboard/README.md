@@ -152,3 +152,11 @@ error, with the API's `detail`.
 - Styles live in `src/app/globals.css`, one section per prototype stylesheet.
   Light and dark palettes follow the operating system. Semantic colour is
   reserved for status, so red on this screen always means "worse".
+
+## Running against the real API
+
+`docs/DASHBOARD_WIRING.md` maps every page to the endpoints it reads, records what was verified against a
+real snapshot, and gives the exact commands to run the API and this dashboard together. Two things to know:
+`NEXT_PUBLIC_API_BASE_URL` is inlined at build time (rebuild after changing it), and on the Windows setup we
+tested `next dev` (Turbopack) failed on the Google-font loader while `next build && next start` worked, so use the
+production build for local checks.

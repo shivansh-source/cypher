@@ -49,3 +49,21 @@ calibrated to any real organization's loss history (see
 artifact: every assumption, its justification, and what it would take to
 calibrate it properly. Any demo or evaluation of this system should be read
 alongside that document, not the headline number alone.
+
+## Where the project stands (2026-09-26)
+
+Working end to end on real sandbox data: six connectors feed a daily pipeline that passes five quality
+gates, commits an immutable snapshot, and publishes it to S3. The engine turns each snapshot into an
+Expected Annual Loss and Value at Risk, and the dashboard shows real figures on every page. Hosting the API
+and dashboard (Render/Fly and Vercel) is configured in the repo but not yet deployed.
+
+Read next, in this order:
+
+- `docs/BUILD_LOG.md` — what was built, why, what broke, and what is still open.
+- `docs/CONNECTORS.md` — the connector catalog with honest Live / Ready / Planned status.
+- `docs/OPERATIONS.md` — the pipeline, hosting, cost, shutdown and rebuild runbooks.
+- `docs/DASHBOARD_WIRING.md` — which page reads which endpoint, and what was verified.
+- `docs/ASSUMPTIONS.md` — every modelling constant and how far it is from calibrated.
+
+The rupee figure is still driven largely by placeholder assumptions; treat it as a demonstration of the
+method, and read it alongside `docs/ASSUMPTIONS.md`.
