@@ -154,6 +154,11 @@ jobs:
           python -m infra.inventory.export_ec2_inventory --region "${AWS_REGION}" > inputs/ec2_inventory.json
           echo "CMDB_EXPORT_PATH=inputs/ec2_inventory.json" >> "${GITHUB_ENV}"
 
+          # Real subnet segmentation + security-group-derived internet exposure, straight from
+          # AWS (read-only). Feeds the attack graph; see network_topology_connector.py.
+          python -m infra.inventory.export_network_topology --region "${AWS_REGION}" > inputs/network_topology.json
+          echo "NETWORK_TOPOLOGY_EXPORT_PATH=inputs/network_topology.json" >> "${GITHUB_ENV}"
+
           if bash .github/scripts/fetch-input.sh inputs/pmapper.json inputs/pmapper.json 48; then
             echo "IAM_PMAPPER_OUTPUT_PATH=inputs/pmapper.json" >> "${GITHUB_ENV}"
           fi

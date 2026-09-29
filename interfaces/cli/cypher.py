@@ -47,6 +47,10 @@ from infra.connectors._identity_resolution import (
 from infra.connectors.cmdb_connector import CMDBConnector, CMDBConnectorError
 from infra.connectors.greenbone_connector import GreenboneConnectorError
 from infra.connectors.iam_connector import IAMConnectorError
+from infra.connectors.network_topology_connector import (
+    NetworkTopologyConnector,
+    NetworkTopologyConnectorError,
+)
 from infra.connectors.prowler_connector import ProwlerConnectorError
 from infra.connectors.scoutsuite_connector import ScoutSuiteConnectorError
 from infra.connectors.terraform_plan import (
@@ -444,9 +448,14 @@ def ingest_command(commit: bool = True) -> None:
     Runs :class:`infra.connectors.WazuhConnector`,
     :class:`infra.connectors.GreenboneConnector`,
     :class:`infra.connectors.ProwlerConnector`,
-    :class:`infra.connectors.ScoutSuiteConnector`, and
-    :class:`infra.connectors.cmdb_connector.CMDBConnector`. Each
-    connector's own exception type is caught individually so that one
+    :class:`infra.connectors.ScoutSuiteConnector`,
+    :class:`infra.connectors.cmdb_connector.CMDBConnector`, and
+    :class:`infra.connectors.network_topology_connector.NetworkTopologyConnector`
+    (whose snapshot-level ``network_topology`` object is read off that one
+    instance after the loop below, and included in the candidate only when
+    the connector was reachable — see that module's own docstring on why it
+    needs this extra step beyond the standard per-asset fragment merge).
+    Each connector's own exception type is caught individually so that one
     connector's failure never prevents the others from running: a failed
     connector's ``name`` is recorded under the candidate snapshot's
     ``scan_scope.unreachable_scanners``, a succeeded one under
@@ -480,6 +489,7 @@ def ingest_command(commit: bool = True) -> None:
     from core.snapshot import commit_snapshot, validate_snapshot
     from core.snapshot_store import load_current_snapshot, save_snapshot
 
+    topology_connector = NetworkTopologyConnector()
     connectors: list[tuple[Any, type[Exception]]] = [
         (WazuhConnector(), WazuhConnectorError),
         (GreenboneConnector(), GreenboneConnectorError),
@@ -487,6 +497,7 @@ def ingest_command(commit: bool = True) -> None:
         (ScoutSuiteConnector(), ScoutSuiteConnectorError),
         (IAMConnector(), IAMConnectorError),
         (CMDBConnector(), CMDBConnectorError),
+        (topology_connector, NetworkTopologyConnectorError),
     ]
 
     reachable_scanners: list[str] = []
@@ -556,6 +567,11 @@ def ingest_command(commit: bool = True) -> None:
         "assets": assets,
         "endpoints": endpoints,
     }
+    # network_topology is optional and typed object-only (never null) in the schema, so it is
+    # included only when the connector actually produced one — omitted, not set to None, when
+    # unreachable.
+    if topology_connector.name in reachable_scanners and topology_connector.topology is not None:
+        candidate["network_topology"] = topology_connector.topology
 
     store_path = Path(os.environ.get("SNAPSHOT_STORE_PATH", _DEFAULT_SNAPSHOT_STORE_PATH))
     previous = load_current_snapshot(store_path)
