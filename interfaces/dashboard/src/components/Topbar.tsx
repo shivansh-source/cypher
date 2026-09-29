@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { isStandaloneRoute } from "@/lib/route-gate";
 import { AskSurakshaTrigger } from "./AskSuraksha";
 
 const VIEWS: { prefix: string; eyebrow: string; title: string }[] = [
@@ -17,7 +18,7 @@ const OVERVIEW = { eyebrow: "Executive view", title: "Exposure overview" };
 export function Topbar() {
   const pathname = usePathname();
   // The tool selector is a standalone page with its own header (see AppShell's STANDALONE_ROUTES).
-  if (pathname.startsWith("/setup")) return null;
+  if (isStandaloneRoute(pathname)) return null;
   const view = VIEWS.find((v) => pathname.startsWith(v.prefix)) ?? OVERVIEW;
   return (
     <header className="topbar">

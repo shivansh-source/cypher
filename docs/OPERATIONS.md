@@ -225,3 +225,27 @@ done by hand and must be redone:
 | 5 `ai/` tests fail locally | a real `data/snapshots/` exists and the tests expect none | run with `SNAPSHOT_STORE_PATH=<empty dir>` |
 | Dashboard dev server returns 500 on every page (Turbopack, Google fonts) | a Turbopack dev-mode font-loader failure on this Windows setup | use `next build && next start` (the production build works and is what Vercel runs) |
 | `git fetch` says "Repository not found" from an automated shell | credentials not available in that shell | fetch/push from your own terminal |
+
+## Accounts and sign-in (Supabase)
+
+Users register on the dashboard (organisation name, email, password), pick their
+tools, then reach the dashboard. Accounts, organisations and tool selections live
+in Supabase Postgres; passwords are held only by Supabase Auth.
+
+One-time setup:
+
+1. Create a Supabase project. Under **Authentication → Providers → Email**, turn
+   **Confirm email** off (sign-up then logs the user straight in) and set the
+   minimum password length to 10.
+2. Run `infra/supabase/migrations/0001_auth.sql` in the SQL editor (or
+   `supabase db push`). It creates `organizations`, `profiles`, `org_tools`, their
+   row-level-security policies, the sign-up trigger that creates the org, and the
+   `save_org_setup` function.
+3. Dashboard `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   (both public by design).
+4. API `.env`: `SUPABASE_JWT_SECRET` (legacy HS256 projects) or `SUPABASE_URL`
+   (asymmetric signing keys). Server-side only. With neither set, every protected
+   route answers 503; `AUTH_DISABLED=1` skips the check for local development only.
+
+Not yet per-organisation: the snapshot store is still one global store, and the
+saved tool selection records the org's estate but does not gate `cypher ingest`.

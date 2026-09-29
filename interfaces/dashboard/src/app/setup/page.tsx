@@ -3,12 +3,14 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { CypherMark } from "@/components/CypherMark";
+import { Spinner } from "@/components/Loader";
 import { InfoTip } from "@/components/InfoTip";
 import { OrgProfile } from "@/components/onboarding/OrgProfile";
 import { TelemetryMap } from "@/components/onboarding/TelemetryMap";
 import { groupId, ToolGroup } from "@/components/onboarding/ToolGroup";
 import { coverageByCategory } from "@/lib/coverage";
 import type { EntityType } from "@/lib/frameworks";
+import { saveSetup } from "@/app/(auth)/actions";
 import { saveOrgProfile, useOrgProfile } from "@/lib/org-profile-state";
 import { CATEGORY_INFO, CATEGORY_ORDER, TOOL_CATALOG, type ToolCategory } from "@/lib/tool-catalog";
 import {
@@ -60,6 +62,8 @@ function SetupScreen() {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [custom, setCustom] = useState<CustomTool[]>([]);
   const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [entityType, setEntityType] = useState<EntityType | null>(null);
   const [touched, setTouched] = useState(false);
   const [seeded, setSeeded] = useState(false);
@@ -132,13 +136,29 @@ function SetupScreen() {
     section?.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
   }
 
-  function save() {
+  async function save() {
+    setSaving(true);
+    setSaveError(null);
     const customIds = new Set(custom.map((t) => t.id));
-    saveToolSelection(Array.from(selected).filter((id) => !id.startsWith(CUSTOM_TOOL_PREFIX) || customIds.has(id)));
+    const ids = Array.from(selected).filter((id) => !id.startsWith(CUSTOM_TOOL_PREFIX) || customIds.has(id));
+    const result = await saveSetup({
+      entityType,
+      tools: ids.map((id) => {
+        const c = custom.find((t) => t.id === id);
+        return c ? { id, name: c.name, category: c.category } : { id };
+      }),
+    });
+    if (!result.ok) {
+      setSaving(false);
+      setSaveError(result.error ?? "We couldn't save your selection.");
+      return;
+    }
+    // Keep the in-browser copy in step with what is now stored for the organisation.
+    saveToolSelection(ids);
     saveCustomTools(custom);
-    const orgName = name.trim();
-    saveOrgProfile(orgName || entityType ? { name: orgName, entityType } : null);
+    saveOrgProfile({ name, entityType });
     router.push("/");
+    router.refresh();
   }
 
   const coverage = coverageByCategory(selected, custom);
@@ -202,16 +222,25 @@ function SetupScreen() {
               </button>
             ) : null}
           </div>
-          <button type="button" className="btn ob-go" disabled={count === 0} onClick={save}>
-            {hasSaved ? "Save changes" : "Continue to the dashboard"}
+          <button type="button" className="btn ob-go" disabled={count === 0 || saving} onClick={save}>
+            {saving ? (
+              <>
+                <Spinner /> Saving…
+              </>
+            ) : hasSaved ? "Save changes" : "Continue to the dashboard"}
           </button>
+          {saveError ? (
+            <p className="auth-err" role="alert">
+              {saveError}
+            </p>
+          ) : null}
           <p className="ob-scope">
-            Saved in this browser only, not yet connected to the ingest pipeline.
+            Saved to your organisation.
             <InfoTip id="setup-scope" label="What this does and doesn't do">
-              This selection isn&apos;t sent anywhere. It doesn&apos;t yet change which connector code
-              runs: <code>cypher ingest</code> always tries the same fixed set of connectors, and
-              each one runs only if its own environment variables are configured. Treat this as the
-              record of what your org has in place, not a switch, until that wiring exists.
+              This records which tools your org has in place. It doesn&apos;t yet change which
+              connector code runs: <code>cypher ingest</code> always tries the same fixed set of
+              connectors, and each one runs only if its own environment variables are configured.
+              Treat it as the record of your estate, not a switch, until that wiring exists.
             </InfoTip>
           </p>
         </div>
@@ -219,12 +248,7 @@ function SetupScreen() {
 
       <div className="ob-main">
         <OrgProfile
-          name={name}
           entityType={entityType}
-          onName={(value) => {
-            setTouched(true);
-            setName(value);
-          }}
           onEntityType={(value) => {
             setTouched(true);
             setEntityType(value);

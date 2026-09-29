@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Spinner } from "./Loader";
 import { fetchQualityGates, fetchSnapshotProvenance, type ApiResult } from "@/lib/api";
 import { formatDate, formatTimestamp, shortSnapshotId } from "@/lib/format";
 import type { GateReport, SnapshotProvenance } from "@/lib/types";
@@ -39,7 +40,9 @@ export function SnapCard() {
   return (
     <Link className="snapcard" href="/data-quality" aria-live="polite">
       {loaded === null ? (
-        <p className="small muted">Loading snapshot…</p>
+        <p className="small muted sc-loading">
+          <Spinner size={12} /> Loading snapshot…
+        </p>
       ) : loaded.provenance.state !== "ok" ? (
         <>
           <span className="sc-status warn">
