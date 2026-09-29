@@ -67,6 +67,21 @@ should be rejected in review regardless of how convenient it is.
 `core/` is the only place that produces a rupee figure. `ai/` is the only
 place an LLM is invoked.
 
+Other folders, and the rules that apply to them:
+
+- `infra/inventory/` — operator-run helpers that produce *input files* for
+  connectors (e.g. `export_ec2_inventory.py`, `build_wazuh_bundle.py`). Same
+  import rules as `infra/connectors/`: never `core/`, `governance/` or `ai/`.
+- `infra/bastion/` and `infra/terraform/` — shell scripts run on the bastion,
+  and the sandbox's infrastructure as code. No Python imports; see
+  `docs/OPERATIONS.md`.
+- `core/declared/` (with `core/declared_services.py`) — **human-declared**
+  business context (service criticality, backup posture, which assets serve
+  them). It is declared, never observed, and its files must say so.
+- `interfaces/api/snapshot_sync.py` and `snapshot_links.py` — pull the
+  published snapshot store from S3 and issue short-lived signed URLs; see
+  `docs/OPERATIONS.md`.
+
 ## Code conventions
 
 - **Type hints are required** on every function and method signature, no
@@ -111,12 +126,20 @@ ruff check .
 ```
 
 Tests are colocated per top-level package: `core/tests/`, `governance/tests/`,
-`ai/tests/`. There are intentionally no tests under `infra/` or
-`interfaces/` yet — connectors and entry points should be integration-tested
-against a live or recorded fixture once implemented, not unit-tested against
-mocks that assert nothing about real tool output shapes. `interfaces/dashboard/`
-will get its own frontend test tooling (e.g. `npm test`) once it exists —
-that is separate from `pytest`/`mypy`/`ruff` above and never runs through them.
+`ai/tests/`, `infra/tests/` and `interfaces/tests/` (all in pytest's
+`testpaths`). Connector tests run against fixtures in the real tool's output
+shape — each fixture says whether it is a **real capture** or **synthetic**
+(synthetic ones use the reserved `192.0.2.0/24` range and invented names) —
+never against mocks that assert nothing about real output shapes.
+`interfaces/tests/` covers pure logic only (snapshot sync, signed links).
+`interfaces/dashboard/` has no test runner yet; check it with `next build`
+(which type-checks) and `eslint`, separate from `pytest`/`mypy`/`ruff`.
+
+Two local-environment notes: history files are named `sha256:<hash>.json`, which
+NTFS cannot create, so 4 `core/tests/test_snapshot_store.py` tests fail on
+Windows (they pass on Linux/CI); and the `ai/` tests read `./data/snapshots`, so
+run them with `SNAPSHOT_STORE_PATH` pointing at an empty directory if you have a
+real snapshot there.
 
 ## Common mistakes (do not do these)
 
@@ -140,3 +163,12 @@ that is separate from `pytest`/`mypy`/`ruff` above and never runs through them.
   already mitigates, for example). Any multi-control recommendation must be
   produced by re-running the Monte Carlo simulation on the candidate
   portfolio as a whole. (Principle 7)
+- **Do not use `counts_toward_loss: false` to hide a finding.** It means
+  "corroborating evidence, counted elsewhere", not "fixed" and not "ignore".
+  The finding stays in the snapshot; using the flag needs a written reason in
+  `docs/ASSUMPTIONS.md`. (Principles 1 and 5)
+- **Do not fabricate or backfill connector data, and do not let a missing
+  input look clean.** A missing, stale or unparseable input must leave its
+  scanner in `unreachable_scanners`. Never invent a timestamp, criticality or
+  identifier, and never present a synthetic fixture as captured output.
+  (Principle 5)

@@ -54,6 +54,92 @@ in §9.
 >   `/frameworks/{framework}/status` are registered routes today, along
 >   with `/optimize/plan`).
 
+> **Update, 2026-09-26 (pipeline, data sources, hosting) — supersedes §1, §4–§6, §8 and §9 wherever they
+> conflict.** The original 2026-09-22 text below is kept as a historical snapshot. This block is current. For depth
+> see `docs/BUILD_LOG.md`, `docs/CONNECTORS.md`, `docs/OPERATIONS.md` and `docs/DASHBOARD_WIRING.md`.
+>
+> **What is stale below.** "`core/snapshot.py` is a stub", "no snapshot store exists", "4/9 connectors", "only
+> `ingest` is implemented in the CLI", the API route list, and the dashboard-route gap (§9.10) are all out of date.
+>
+> **Snapshot lifecycle is real.** `core/snapshot.py` implements the 5 quality gates, `validate_snapshot` and
+> `commit_snapshot`; `core/snapshot_store.py` persists `current.json` plus an immutable `history/<snapshot_id>.json`
+> under `SNAPSHOT_STORE_PATH`. `riskctl ingest` reads the previous snapshot, validates, commits and saves.
+>
+> **New folders and files**
+>
+> | Path | Purpose |
+> |---|---|
+> | `.github/workflows/scheduled-ingest.yml`, `.github/scripts/` | daily + on-demand pipeline; OIDC login, input fetch, bastion refresh via SSM |
+> | `infra/inventory/` | `export_ec2_inventory.py` (asset inventory from AWS), `build_wazuh_bundle.py` (Wazuh alerts + agent list → bundle) |
+> | `infra/bastion/` | scripts that run on the bastion: `refresh_host_data.sh`, `export_host_data.sh`, `export_greenbone_report.sh` |
+> | `infra/terraform/` | the LoanEase sandbox (network, compute, planted IAM, backup) and the `pipeline` module; `manifest.yaml` lists V-01…V-06 |
+> | `infra/Dockerfile.api` | container for the hosted API |
+> | `core/declared/`, `core/declared_services.py` | human-declared services (criticality, backup posture) and asset links |
+> | `interfaces/api/snapshot_sync.py`, `snapshot_links.py` | pull the snapshot store from S3; short-lived signed download URLs |
+> | `interfaces/tests/` | pure-logic tests for the two modules above |
+> | `docs/BUILD_LOG.md`, `CONNECTORS.md`, `OPERATIONS.md`, `DASHBOARD_WIRING.md` | current documentation |
+>
+> **Connectors (6 real, 3 stubs)**
+>
+> | Connector | Status | Reads |
+> |---|---|---|
+> | `prowler_connector` | Live | S3 `latest/prowler_connector.json` (Prowler 5.43 `json-asff`) |
+> | `iam_connector` | Live | `IAM_PMAPPER_OUTPUT_PATH` (PMapper JSON) |
+> | `cmdb_connector` | Live | `CMDB_EXPORT_PATH` (EC2 inventory JSON) or a REST CMDB |
+> | `wazuh_connector` | Live | `WAZUH_EXPORT_PATH` bundle, or manager API + indexer |
+> | `greenbone_connector` | Live | `GREENBONE_EXPORT_PATH` (report XML or GSA CSV), or GMP over TLS |
+> | `scoutsuite_connector` | Ready | S3 `latest/scoutsuite_connector.json` (evidence only: `counts_toward_loss: false`) |
+> | `threat_intel_connector`, `nessus_connector`, `nmap_connector` | Planned (stubs) | — |
+>
+> **Data pipeline (current)**
+>
+> | Stage | Where | Status |
+> |---|---|---|
+> | Collection + normalization | `infra/connectors/` | 6 implemented; file-source pattern for tools whose API is unreachable |
+> | Identity | connector `_identity_hint` → `host:` / `cloud:` / `cloud:aws-account:` placeholder ids | placeholders; Jev merge needs `TYPESAFE_API_KEY` (not set) |
+> | Business context | `core/declared_services.py` applied in `ingest` | implemented |
+> | Aggregation, gates, commit, persistence | `riskctl ingest` → `core/snapshot.py` → `core/snapshot_store.py` | implemented (gates: asset-count delta ±50%, no findings from unreachable scanners, criticality present, provenance present, no ordinal in numeric field) |
+> | Publish | workflow syncs `snapshots/` to S3; API syncs it back | implemented; API not yet deployed |
+>
+> **Engine changes since the original dump**
+>
+> - Findings without an EPSS score scale the baseline exploit probability by their own criticality
+>   (`UNSCORED_EXPLOIT_PROBABILITY_SCALE_BY_CRITICALITY`, placeholder).
+> - Schema field `counts_toward_loss` (optional, absent = true): `false` keeps a finding as evidence but
+>   `build_loss_event_scenarios` does not count it as a loss event.
+> - `core/engine/attack_graph*.py` exists (added by the team): edges come only from `network_topology` and
+>   `assets[].network.segment_id`, which no connector supplies yet, so the graph is empty on real data.
+>
+> **CLI (`riskctl`, now also a console script)**
+>
+> | Subcommand | Status |
+> |---|---|
+> | `ingest` | implemented (all 6 connectors, declared services, identity step, gates, commit) |
+> | `validate-snapshot`, `run-engine`, `framework-status` | implemented |
+> | `optimize` | still a stub |
+>
+> **API (`interfaces/api/`)** — all routes the dashboard calls exist: `/health`, `/health/snapshot-sync`, `/snapshot`,
+> `/snapshot/gates`, `/exposure`, `/exposure/history`, `/exposure/exceedance`, `/assets`, `/frameworks`,
+> `/frameworks/{framework}/status`, `/assumptions`, `/optimize` (GET and POST), `/optimize/candidates`,
+> `/optimize/plan`, `/simulate`, `/attack-graph`, `/attack-graph/targets/{asset_id}`, `/chat`, `/chat/stream`,
+> `/chat/tools`, `DELETE /chat/sessions/{id}`, plus the signed-link routes `/snapshots` and
+> `/snapshots/{id}/download-url` (refuse unless `SNAPSHOT_LINKS_TOKEN` is set).
+>
+> **Config added to `.env.example`** — `IAM_PMAPPER_OUTPUT_PATH`, `CMDB_EXPORT_PATH`, `WAZUH_EXPORT_PATH`,
+> `GREENBONE_EXPORT_PATH`, `DECLARED_SERVICES_PATH`, `SNAPSHOT_S3_BUCKET`, `SNAPSHOT_S3_PREFIX`,
+> `SNAPSHOT_SYNC_INTERVAL_SECONDS`, `SNAPSHOT_LINKS_TOKEN`, `SNAPSHOT_URL_EXPIRY_SECONDS`; `RAW_FINDINGS_BUCKET`
+> and `AWS_REGION` are now provisioned.
+>
+> **Gaps that remain (supersedes the original §9 list where they conflict)**
+>
+> - API and dashboard are not yet deployed (Render/Fly, Vercel).
+> - No connector supplies network topology, so the attack graph is empty; compliance has no weighted scores and the DPDP
+>   library has no controls.
+> - Threat intel (EPSS/KEV), Nessus and nmap are stubs; `optimize_investment` (assistant tool) and `riskctl optimize` are stubs.
+> - Wazuh EDR is not joined to the cloud versions of the same machines (identity merge is off).
+> - The rupee figure is driven mostly by placeholder assumptions (`docs/ASSUMPTIONS.md`); informational detections are
+>   still counted as loss events at a reduced weight.
+
 ---
 
 ## 1. Repo structure

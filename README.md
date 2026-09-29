@@ -15,13 +15,19 @@ reduction, and maps the underlying findings to Indian regulatory frameworks
 (LLM client, numeric guard, tool registry, chat assistant), `interfaces/api/`,
 `interfaces/dashboard/`, `core/` (the snapshot quality gates and store, the
 Open FAIR + Monte Carlo engine, the Bayesian attack graph that models
-multi-step "stepping-stone" attacks, and the joint-simulation optimizer), four of
-`infra/connectors/` (`wazuh_connector.py`, `greenbone_connector.py`,
-`prowler_connector.py`, `scoutsuite_connector.py`) and the `ingest` command in
-`interfaces/cli/riskctl.py` are real. Still signatures and docstrings only:
-the `threat_intel`, `iam`, `nessus` and `nmap` connectors, the
+multi-step "stepping-stone" attacks, and the joint-simulation optimizer), six of
+`infra/connectors/` (`prowler_connector.py`, `iam_connector.py` (PMapper),
+`cmdb_connector.py` (asset inventory), `wazuh_connector.py`,
+`greenbone_connector.py`, `scoutsuite_connector.py`) and the `ingest` command in
+`interfaces/cli/riskctl.py` are real, and a daily GitHub Actions pipeline
+(`.github/workflows/scheduled-ingest.yml`) refreshes and publishes snapshots to S3.
+Still signatures and docstrings only:
+the `threat_intel`, `nessus` and `nmap` connectors, the
 `optimize_investment` tool in `ai/tools/`, and `riskctl`'s `optimize`
-command — see `CLAUDE.md` for the design principles that govern how the
+command. For the connector catalog and what each one produces today see
+`docs/CONNECTORS.md`; for running, hosting, cost and runbooks see
+`docs/OPERATIONS.md`; for the full history of what was built and why see
+`docs/BUILD_LOG.md` — and see `CLAUDE.md` for the design principles that govern how the
 remaining bodies must be implemented, and `docs/ASSUMPTIONS.md` for every
 modelling constant `core/engine/` reads from and how far each is from being
 calibrated to a real organization.
@@ -152,12 +158,12 @@ is a different language runtime entirely (Node.js) and is never part of
 that venv; it manages its own dependencies via `package.json`/`node_modules`
 and is isolated by that mechanism instead.
 
-`riskctl ingest` (see `infra/README.md`) is runnable today against real
-Wazuh/Greenbone/Prowler/ScoutSuite output, and `core.engine.compute_risk_figure`
-is runnable today against a hand-authored snapshot (see
-`schema/sample_aggregated.json`) — but the two aren't connected yet: the
-quality gates and snapshot commit lifecycle in `core/snapshot.py` are
-still unimplemented, so an ingested snapshot has nowhere to go, and the
-optimizer in `core/optimizer.py` (which calls `compute_risk_figure`
-internally) is also still unimplemented. See `.claude/commands/` for the
-workflows a contributor will repeat as that lands.
+`riskctl ingest` (see `infra/README.md`) runs every implemented connector,
+passes the candidate through the five quality gates in `core/snapshot.py`, and
+commits it to the snapshot store (`SNAPSHOT_STORE_PATH`). `core.engine.compute_risk_figure`
+then computes the rupee figure from that committed snapshot, and the API,
+dashboard and assistant read it. `schema/sample_aggregated.json` remains a
+hand-authored fixture for exercising the engine. In the hosted setup the same
+snapshot store is published to S3 by the daily workflow and pulled by the API
+(see `docs/OPERATIONS.md`). See `.claude/commands/` for the workflows a
+contributor will repeat.
