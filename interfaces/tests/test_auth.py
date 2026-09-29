@@ -28,7 +28,12 @@ def _no_dotenv(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _token(secret: str = SECRET, *, exp_in: int = 3600, aud: str = "suraksha") -> str:
-    claims: dict[str, Any] = {"sub": "u-1", "org": "o-1", "aud": aud, "exp": int(time.time()) + exp_in}
+    claims: dict[str, Any] = {
+        "sub": "u-1",
+        "org": "o-1",
+        "aud": aud,
+        "exp": int(time.time()) + exp_in,
+    }
     return jwt.encode(claims, secret, algorithm="HS256")
 
 
@@ -51,7 +56,12 @@ def test_data_route_requires_token(client: TestClient) -> None:
 
 @pytest.mark.parametrize(
     "token",
-    [_token("wrong-secret-wrong-secret-wrong-secret"), _token(exp_in=-10), _token(aud="anon"), "garbage"],
+    [
+        _token("wrong-secret-wrong-secret-wrong-secret"),
+        _token(exp_in=-10),
+        _token(aud="anon"),
+        "garbage",
+    ],
 )
 def test_bad_tokens_rejected(client: TestClient, token: str) -> None:
     assert client.get("/snapshot", headers={"Authorization": f"Bearer {token}"}).status_code == 401
@@ -59,14 +69,18 @@ def test_bad_tokens_rejected(client: TestClient, token: str) -> None:
 
 def test_valid_token_passes_guard(client: TestClient) -> None:
     # Empty store => the route's own 404, which proves the guard let it through.
-    assert client.get("/snapshot", headers={"Authorization": f"Bearer {_token()}"}).status_code == 404
+    assert (
+        client.get("/snapshot", headers={"Authorization": f"Bearer {_token()}"}).status_code == 404
+    )
 
 
 def test_fails_closed_when_unconfigured(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     monkeypatch.delenv("AUTH_DISABLED", raising=False)
     monkeypatch.delenv("AUTH_JWT_SECRET", raising=False)
     monkeypatch.setenv("SNAPSHOT_STORE_PATH", str(tmp_path))
-    response = TestClient(create_app()).get("/snapshot", headers={"Authorization": f"Bearer {_token()}"})
+    response = TestClient(create_app()).get(
+        "/snapshot", headers={"Authorization": f"Bearer {_token()}"}
+    )
     assert response.status_code == 503
 
 
@@ -97,7 +111,13 @@ def test_password_hashing() -> None:
 
 
 def test_public_path_matching() -> None:
-    for path in ("/health", "/health/snapshot-sync", "/snapshots/abc/download-url", "/auth/login", "/auth/register"):
+    for path in (
+        "/health",
+        "/health/snapshot-sync",
+        "/snapshots/abc/download-url",
+        "/auth/login",
+        "/auth/register",
+    ):
         assert is_public_path(path), path
     for path in ("/snapshot", "/auth/me", "/org/setup", "/healthz-not-real"):
         assert not is_public_path(path), path

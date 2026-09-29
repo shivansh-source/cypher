@@ -59,7 +59,7 @@ def _ensure_schema(conn: psycopg.Connection[dict[str, Any]], url: str) -> None:
         return
     with _schema_lock:
         if _schema_ready_for != url:
-            conn.execute(_SCHEMA_FILE.read_text(encoding="utf-8"))  # type: ignore[arg-type]
+            conn.execute(_SCHEMA_FILE.read_text(encoding="utf-8").encode())
             conn.commit()
             _schema_ready_for = url
 

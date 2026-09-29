@@ -81,7 +81,9 @@ def _org_id(request: Request) -> str:
 
 def _db_unavailable(exc: Exception) -> HTTPException:
     if isinstance(exc, store.DatabaseNotConfiguredError):
-        return HTTPException(status_code=503, detail="The account database is not configured (DATABASE_URL).")
+        return HTTPException(
+            status_code=503, detail="The account database is not configured (DATABASE_URL)."
+        )
     return HTTPException(status_code=503, detail="The account database is unavailable.")
 
 
@@ -93,7 +95,9 @@ def register_account_routes(app: FastAPI) -> None:
         try:
             user = store.create_account(body.org_name, body.email, hash_password(body.password))
         except store.EmailTakenError:
-            raise HTTPException(status_code=409, detail="An account with this email already exists.") from None
+            raise HTTPException(
+                status_code=409, detail="An account with this email already exists."
+            ) from None
         except Exception as exc:  # database down / misconfigured
             raise _db_unavailable(exc) from exc
         return {"token": issue_token(user.id, user.org_id)}
@@ -134,7 +138,9 @@ def register_account_routes(app: FastAPI) -> None:
             custom = tool.id.startswith(CUSTOM_PREFIX)
             name = (tool.name or "").strip()
             if custom and (not name or tool.category not in TOOL_CATEGORIES):
-                raise HTTPException(status_code=422, detail="A custom tool needs a name and a valid category.")
+                raise HTTPException(
+                    status_code=422, detail="A custom tool needs a name and a valid category."
+                )
             rows.append(
                 {
                     "tool_id": tool.id,

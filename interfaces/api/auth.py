@@ -82,7 +82,13 @@ def _secret() -> str:
 def issue_token(user_id: str, org_id: str) -> str:
     """A signed session token for ``user_id`` in ``org_id``."""
     now = int(time.time())
-    claims = {"sub": user_id, "org": org_id, "aud": TOKEN_AUDIENCE, "iat": now, "exp": now + TOKEN_LIFETIME_SECONDS}
+    claims = {
+        "sub": user_id,
+        "org": org_id,
+        "aud": TOKEN_AUDIENCE,
+        "iat": now,
+        "exp": now + TOKEN_LIFETIME_SECONDS,
+    }
     return jwt.encode(claims, _secret(), algorithm="HS256")
 
 

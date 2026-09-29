@@ -21,6 +21,8 @@ SECRET = "test-secret-at-least-32-bytes-long-000000"
 def _no_dotenv(monkeypatch: pytest.MonkeyPatch) -> None:
     """create_app() would refill the env vars these tests remove from the developer's real .env."""
     monkeypatch.setattr("interfaces.api.app.load_dotenv", lambda *a, **k: None)
+
+
 PASSWORD = "Correct-Horse-9"
 
 
@@ -42,7 +44,9 @@ def client(monkeypatch: pytest.MonkeyPatch, database_url: str, tmp_path: Path) -
 
 
 def _register(client: TestClient, email: str, org: str = "LoanEase Finance") -> dict[str, Any]:
-    response = client.post("/auth/register", json={"org_name": org, "email": email, "password": PASSWORD})
+    response = client.post(
+        "/auth/register", json={"org_name": org, "email": email, "password": PASSWORD}
+    )
     assert response.status_code == 201, response.text
     body: dict[str, Any] = response.json()
     return body
@@ -84,16 +88,23 @@ def test_register_login_me_setup_flow(client: TestClient) -> None:
 
 def test_duplicate_email_conflicts_and_writes_nothing(client: TestClient) -> None:
     _register(client, "dup@example.in", org="First Org")
-    again = client.post("/auth/register", json={"org_name": "Second Org", "email": "dup@example.in", "password": PASSWORD})
+    again = client.post(
+        "/auth/register",
+        json={"org_name": "Second Org", "email": "dup@example.in", "password": PASSWORD},
+    )
     assert again.status_code == 409
     with accounts_store._connect() as conn:
-        row = conn.execute("select count(*) as n from organizations where name = 'Second Org'").fetchone()
+        row = conn.execute(
+            "select count(*) as n from organizations where name = 'Second Org'"
+        ).fetchone()
     assert row is not None and row["n"] == 0  # the org insert rolled back with the failed user
 
 
 def test_login_failures_are_indistinguishable(client: TestClient) -> None:
     _register(client, "real@example.in")
-    wrong = client.post("/auth/login", json={"email": "real@example.in", "password": "nope-nope-nope"})
+    wrong = client.post(
+        "/auth/login", json={"email": "real@example.in", "password": "nope-nope-nope"}
+    )
     unknown = client.post("/auth/login", json={"email": "ghost@example.in", "password": PASSWORD})
     assert wrong.status_code == unknown.status_code == 401
     assert wrong.json() == unknown.json()
@@ -114,7 +125,11 @@ def test_register_validation(client: TestClient, payload: dict[str, str]) -> Non
 def test_setup_validation_and_isolation(client: TestClient) -> None:
     a = _register(client, "a@one.in", org="Org A")["token"]
     b = _register(client, "b@two.in", org="Org B")["token"]
-    bad = client.post("/org/setup", headers=_auth(a), json={"tools": [{"id": "custom:x", "name": "T", "category": "Bogus"}]})
+    bad = client.post(
+        "/org/setup",
+        headers=_auth(a),
+        json={"tools": [{"id": "custom:x", "name": "T", "category": "Bogus"}]},
+    )
     assert bad.status_code == 422
     client.post("/org/setup", headers=_auth(a), json={"tools": [{"id": "wazuh"}]})
     assert client.get("/auth/me", headers=_auth(b)).json()["tools"] == []  # B never sees A's tools
