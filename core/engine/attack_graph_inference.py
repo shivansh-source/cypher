@@ -173,7 +173,9 @@ def extract_bounded_subgraph(
     )
 
 
-def _bfs_distance(graph: AttackGraph, start_asset_ids: set[str], *, reverse: bool) -> dict[str, int]:
+def _bfs_distance(
+    graph: AttackGraph, start_asset_ids: set[str], *, reverse: bool
+) -> dict[str, int]:
     """Fewest-hop distance from the nearest of ``start_asset_ids``, following edges forward
     (or backward, if ``reverse``, i.e. distance *to* ``start_asset_ids``)."""
     adjacency: dict[str, list[str]] = {}
