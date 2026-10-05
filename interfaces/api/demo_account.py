@@ -67,7 +67,7 @@ def ensure_demo_account() -> bool:
         _logger.info("created demo account %s", email)
     elif not check_password(user.password_hash, password):
         store.set_password_hash(user.id, hash_password(password))
-        _logger.info("reset demo account password for %s", email)
+        _logger.info("demo account %s re-hashed from DEMO_ACCOUNT_* settings", email)
     return True
 
 
