@@ -6,10 +6,7 @@ import { useState, useSyncExternalStore, type CSSProperties, type ReactNode } fr
 import { useAgentPanelOpen, useAgentPanelWidth } from "@/lib/agent-panel-state";
 import { ENTITY_TYPES } from "@/lib/frameworks";
 import { isStandaloneRoute } from "@/lib/route-gate";
-import { useOrgProfile } from "@/lib/org-profile-state";
-import { useToolSelection } from "@/lib/tool-selection-state";
 import { LogoutButton } from "@/components/auth/LogoutButton";
-import { PageLoader } from "@/components/Loader";
 import { logout } from "@/app/(auth)/actions";
 import { AskSurakshaPanel } from "./AskSuraksha";
 import { CypherMark } from "./CypherMark";
@@ -69,7 +66,14 @@ const CANVAS_ROUTES = ["/attack-paths"];
 
 
 /** The app frame: collapsible sidebar (brand, nav, current snapshot) beside the page. */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  org,
+}: {
+  children: ReactNode;
+  /** From the session token (verified on the server); `null` when signed out. */
+  org: { name: string; entityType: string | null } | null;
+}) {
   const pathname = usePathname();
   const canvas = CANVAS_ROUTES.some((route) => pathname.startsWith(route));
   const stored = useSyncExternalStore(subscribe, readCollapsed, () => false);
@@ -85,24 +89,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
   const agentOpen = useAgentPanelOpen();
   const agentWidth = useAgentPanelWidth();
-  const tools = useToolSelection();
-  const org = useOrgProfile();
   const orgKind = ENTITY_TYPES.find((t) => t.id === org?.entityType)?.label;
 
   if (isStandaloneRoute(pathname)) {
     return <div className="standalone">{children}</div>;
   }
-  // No saved tool selection: the request gate (proxy.ts) is sending it to /setup, so render
-  // nothing rather than flash a dashboard for tools nobody has picked yet. (`null` means
-  // storage hasn't been read yet — keep the server-rendered page until it has.)
-  if (tools === undefined) {
-    return (
-      <div className="standalone">
-        <PageLoader label="Loading your workspace…" fill />
-      </div>
-    );
-  }
-
   return (
     <div
       className={`app${collapsed ? " collapsed" : ""}${agentOpen ? " agent-open" : ""}${canvas ? " canvas-route" : ""}`}
