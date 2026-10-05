@@ -20,6 +20,19 @@ of data came from — see `CLAUDE.md` principle 3 at the repo root.
   with good backup posture and one with none, and an unreachable scanner in
   `scan_scope`. Used by `.claude/commands/run-engine.md` to exercise the
   engine without a live connector.
+- **`sample_segmented_estate.json`** — a **synthetic** (not captured from any
+  tool) snapshot of an invented lender, built to show the attack graph and
+  the engine on a realistic shape: 18 assets, 16 placed on a network of six
+  segments in four hops (`dmz` and `remote-access` entry points, then
+  `app-tier` and `corp-lan`, then `data-tier`, then `backup-net`), plus two
+  assets with no network position (an IAM role and an S3 bucket), which the
+  graph deliberately leaves off and counts. It is schema-valid and passes all
+  five quality gates as a first snapshot. Everything in it is invented and
+  marked as such: `syn-` asset and finding IDs, the `synthetic_fixture`
+  connector (so no finding claims to come from a real scanner), addresses
+  in the reserved `192.0.2.0/24` range, `.example.invalid` hostnames, and CVE
+  IDs and EPSS scores that are made up. Never present it as captured output.
+  Load it into a local store with `commit_snapshot` + `save_snapshot`.
 
 ## Field notes worth calling out explicitly
 
