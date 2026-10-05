@@ -13,12 +13,10 @@ Cypher was originally called *Su₹aksha*. You will still see `suraksha` in the 
 5. [Technology Stack](#5-technology-stack)
 6. [Architecture](#6-architecture)
 7. [Repository Structure](#7-repository-structure)
-8. [Final Presentation](#8-final-presentation)
-9. [Demo Video](#9-demo-video)
-10. [Screenshots / Prototype Walkthrough](#10-screenshots--prototype-walkthrough)
-11. [Installation](#11-installation)
-12. [Run](#12-run)
-13. [Future Scope](#13-future-scope)
+8. [Prototype Walkthrough](#8-prototype-walkthrough)
+9. [Installation](#9-installation)
+10. [Run](#10-run)
+11. [Future Scope](#11-future-scope)
 
 ---
 
@@ -26,16 +24,18 @@ Cypher was originally called *Su₹aksha*. You will still see `suraksha` in the 
 
 - **Project Title:** Cypher: cyber risk quantification and investment optimisation, in rupees (formerly *Su₹aksha*)
 - **PS ID:** 26105
-- **PS Title:** _TODO: paste the exact title. See the open item in [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md)._
-- **Category:** _TODO_
-- **Theme:** _TODO_
-- **Organization:** _TODO_
+- **PS Title:** AI-Powered Continuous Cyber Risk Quantification and Investment Optimization Platform
+- **Category:** Software
+- **Theme:** Blockchain & Cybersecurity
+- **Team Name:** DLL Not Found
+- **Team ID:** 181865
+- **Organization:** AICTE
 
 ## 2. Problem Statement
 
 Cyber risk is usually reported as a unitless score or a Low / Medium / High label. That cannot be compared with a budget, an insurance premium or a regulatory penalty, so a CFO, a board or a regulator cannot tell whether the current security spend is adequate or well allocated. Security telemetry (scanner output, EDR alerts, cloud and IAM misconfigurations) is technical and disconnected from those decisions. Indian regulated entities also have to evidence their posture against RBI, SEBI and DPDP requirements, and those rules are entity-specific and change over time.
 
-PS 26105 asks for a system that quantifies cyber risk in financial terms for Indian organisations and helps them prioritise security spend, while accounting for the applicable Indian regulatory frameworks. The exact problem statement text is still to be pasted into [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md).
+PS 26105 asks for a system that quantifies cyber risk in financial terms for Indian organisations and helps them prioritise security spend, while accounting for the applicable Indian regulatory frameworks.
 
 ## 3. Proposed Solution
 
@@ -94,7 +94,7 @@ Every modelling constant is a documented judgement call, not fitted to a real or
 Two kinds of data are stored differently:
 
 - **Accounts, organisations and tool selections** live in Postgres (`users`, `organizations`, `org_tools`), reached through the `DATABASE_URL` environment variable. Any Postgres works, including a hosted Supabase database. The tables are created automatically on first use from `interfaces/api/sql/0001_accounts.sql`. Passwords are stored only as argon2 hashes.
-- **Risk data** lives in the snapshot store, not in the database. Snapshots are immutable JSON files (`current.json` plus an append-only `history/`), and the daily pipeline publishes them to S3, which the hosted API syncs down. This suits the bitemporal, content-addressed design. It is also **not yet per organisation**: every signed-in organisation sees the same snapshot. See [Future Scope](#13-future-scope).
+- **Risk data** lives in the snapshot store, not in the database. Snapshots are immutable JSON files (`current.json` plus an append-only `history/`), and the daily pipeline publishes them to S3, which the hosted API syncs down. This suits the bitemporal, content-addressed design. It is also **not yet per organisation**: every signed-in organisation sees the same snapshot. See [Future Scope](#11-future-scope).
 
 ## 6. Architecture
 
@@ -239,20 +239,10 @@ Su₹aksha/
 | Account schema (Postgres) | `interfaces/api/sql/` |
 | Sandbox infrastructure and bastion scripts | `infra/terraform/`, `infra/bastion/` |
 | Technical documentation and assumptions | `docs/` (start with `docs/PROJECT_CONTEXT.md` and `docs/ASSUMPTIONS.md`) |
-| Project screenshots | `assets/screenshots/` (to be added) |
-| Final presentation and demo video | `submission/` (to be added) |
 
-## 8. Final Presentation
+## 8. Prototype Walkthrough
 
-Details and presentation slides link: _to be added (`submission/PRESENTATION.md`)._
-
-## 9. Demo Video
-
-Live product demo video walkthrough: _to be added (`submission/DEMO.md`)._
-
-## 10. Screenshots / Prototype Walkthrough
-
-Screenshots have not been added yet; they will live in `assets/screenshots/`. The walkthrough below describes what each screen shows.
+The walkthrough below describes what each screen shows.
 
 1. **Register and Sign in.** Anyone who is not signed in lands here. Register takes an organisation name, work email and password (with a strength meter). Sign in shows one generic error for any bad credential.
 2. **Setup: Tool Selection.** Pick the security tools your organisation runs, grouped by category. The screen shows which kinds of telemetry are covered, which connect today and which are declare-only, and asks for your entity type so the right regulations are mapped.
@@ -264,7 +254,7 @@ Screenshots have not been added yet; they will live in `assets/screenshots/`. Th
 8. **Data & Model.** Snapshot provenance, the five quality gates, coverage and the live assumption register.
 9. **Ask Cypher.** The chat panel, where every number is verified against engine output before display.
 
-## 11. Installation
+## 9. Installation
 
 ### Prerequisites
 
@@ -308,7 +298,7 @@ cp .env.example .env.local       # then set NEXT_PUBLIC_API_BASE_URL if the API 
 npm install
 ```
 
-## 12. Run
+## 10. Run
 
 ### 1. Start the Backend API Server
 
@@ -386,7 +376,7 @@ cd interfaces/dashboard && npm run lint && npm run build
 
 The `ai/` tests read `./data/snapshots`, so run them with `SNAPSHOT_STORE_PATH` pointing at an empty directory if you have a real snapshot there. Connector and CLI tests run against recorded tool output in `infra/tests/fixtures/` (Greenbone, Prowler, ScoutSuite, PMapper and Wazuh exports, and `terraform show -json` plans), not against mocks. The account tests start a throwaway Postgres through `pgserver`. GitHub Actions runs lint, type checks, tests, a build, a dependency audit, secret scanning and Semgrep on every push and PR to `main` and `develop`.
 
-## 13. Future Scope
+## 11. Future Scope
 
 - **Per-organisation data isolation.** Accounts and tool selections are per organisation, but the snapshot store is still one global store, so every signed-in organisation sees the same figures. Next step: a snapshot store per organisation.
 - **Tool selection that drives ingestion.** The saved selection records what an organisation runs, but does not yet decide which connectors `cypher ingest` executes; that is still a fixed list, gated by each connector's own environment variables.
