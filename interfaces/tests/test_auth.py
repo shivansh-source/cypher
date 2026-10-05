@@ -87,7 +87,7 @@ def test_fails_closed_when_unconfigured(monkeypatch: pytest.MonkeyPatch, tmp_pat
 def test_short_secret_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AUTH_JWT_SECRET", "too-short")
     with pytest.raises(Exception, match="not configured"):
-        issue_token("u", "o")
+        issue_token("u", "o", "Org", None, False)
 
 
 def test_auth_disabled_bypasses(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
@@ -98,8 +98,9 @@ def test_auth_disabled_bypasses(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) 
 
 def test_issued_token_round_trips(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AUTH_JWT_SECRET", SECRET)
-    claims = verify_token(issue_token("u-9", "o-9"))
+    claims = verify_token(issue_token("u-9", "o-9", "Org Nine", "nbfc", True))
     assert (claims["sub"], claims["org"]) == ("u-9", "o-9")
+    assert (claims["org_name"], claims["etype"], claims["onb"]) == ("Org Nine", "nbfc", True)
 
 
 def test_password_hashing() -> None:

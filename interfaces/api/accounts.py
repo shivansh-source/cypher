@@ -72,19 +72,16 @@ class SetupRequest(BaseModel):
     tools: list[ToolIn] = Field(default_factory=list, max_length=MAX_TOOLS)
 
 
-def _org_id(request: Request) -> str:
-    user: dict[str, Any] | None = getattr(request.state, "user", None)
-    if user is None:
-        raise HTTPException(status_code=401, detail="Sign in required.")
-    return str(user["org"])
-
-
 def _db_unavailable(exc: Exception) -> HTTPException:
     if isinstance(exc, store.DatabaseNotConfiguredError):
         return HTTPException(
             status_code=503, detail="The account database is not configured (DATABASE_URL)."
         )
     return HTTPException(status_code=503, detail="The account database is unavailable.")
+
+
+def _token_for(user: store.UserRecord) -> str:
+    return issue_token(user.id, user.org_id, user.org_name, user.entity_type, user.onboarded)
 
 
 def register_account_routes(app: FastAPI) -> None:
@@ -100,7 +97,7 @@ def register_account_routes(app: FastAPI) -> None:
             ) from None
         except Exception as exc:  # database down / misconfigured
             raise _db_unavailable(exc) from exc
-        return {"token": issue_token(user.id, user.org_id)}
+        return {"token": _token_for(user)}
 
     @app.post("/auth/login")
     def login(body: LoginRequest) -> dict[str, Any]:
@@ -111,7 +108,7 @@ def register_account_routes(app: FastAPI) -> None:
         # One message for every failure: never reveal whether the account exists.
         if not check_password(user.password_hash if user else None, body.password) or user is None:
             raise HTTPException(status_code=401, detail="Incorrect email or password.")
-        return {"token": issue_token(user.id, user.org_id)}
+        return {"token": _token_for(user)}
 
     @app.get("/auth/me")
     def me(request: Request) -> dict[str, Any]:
@@ -127,8 +124,11 @@ def register_account_routes(app: FastAPI) -> None:
         return account
 
     @app.post("/org/setup")
-    def setup(body: SetupRequest, request: Request) -> dict[str, bool]:
-        org_id = _org_id(request)
+    def setup(body: SetupRequest, request: Request) -> dict[str, Any]:
+        claims: dict[str, Any] | None = getattr(request.state, "user", None)
+        if claims is None:
+            raise HTTPException(status_code=401, detail="Sign in required.")
+        org_id = str(claims["org"])
         rows: list[dict[str, Any]] = []
         seen: set[str] = set()
         for tool in body.tools:
@@ -150,7 +150,11 @@ def register_account_routes(app: FastAPI) -> None:
                 }
             )
         try:
-            store.save_setup(org_id, body.entity_type, rows)
+            org_name = store.save_setup(org_id, body.entity_type, rows)
         except Exception as exc:
             raise _db_unavailable(exc) from exc
-        return {"ok": True}
+        # Reissue the token: it carries the org's entity type and onboarded flag.
+        return {
+            "ok": True,
+            "token": issue_token(str(claims["sub"]), org_id, org_name, body.entity_type, True),
+        }

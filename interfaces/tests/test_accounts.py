@@ -59,6 +59,11 @@ def _auth(token: str) -> dict[str, str]:
 def test_register_login_me_setup_flow(client: TestClient) -> None:
     token = _register(client, "Ops@LoanEase.in")["token"]  # email is normalised to lower case
 
+    import jwt as _jwt
+
+    first = _jwt.decode(token, SECRET, algorithms=["HS256"], audience="suraksha")
+    assert (first["onb"], first["etype"], first["org_name"]) == (False, None, "LoanEase Finance")
+
     me = client.get("/auth/me", headers=_auth(token)).json()
     assert me["email"] == "ops@loanease.in"
     assert me["org"] == {"name": "LoanEase Finance", "entity_type": None, "onboarded": False}
@@ -76,7 +81,12 @@ def test_register_login_me_setup_flow(client: TestClient) -> None:
             ],
         },
     )
-    assert saved.json() == {"ok": True}
+    assert saved.json()["ok"] is True
+    # The reissued token carries the new routing facts, so the dashboard needs no lookup.
+    import jwt as _jwt
+
+    fresh = _jwt.decode(saved.json()["token"], SECRET, algorithms=["HS256"], audience="suraksha")
+    assert (fresh["onb"], fresh["etype"], fresh["org_name"]) == (True, "nbfc", "LoanEase Finance")
 
     me = client.get("/auth/me", headers=_auth(token)).json()
     assert me["org"]["onboarded"] is True and me["org"]["entity_type"] == "nbfc"
