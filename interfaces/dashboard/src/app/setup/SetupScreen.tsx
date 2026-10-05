@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { CypherMark } from "@/components/CypherMark";
 import { Spinner } from "@/components/Loader";
 import { InfoTip } from "@/components/InfoTip";
@@ -143,11 +144,14 @@ export function SetupScreen({ initial }: { initial: OrgState }) {
             </div>
             <div className="word">Cypher</div>
           </div>
-          {hasSaved ? (
-            <button type="button" className="btn ghost" onClick={() => router.push("/")}>
-              Back to the dashboard
-            </button>
-          ) : null}
+          <div className="ob-top-actions">
+            {hasSaved ? (
+              <button type="button" className="btn ghost" onClick={() => router.push("/")}>
+                Back to the dashboard
+              </button>
+            ) : null}
+            <LogoutButton />
+          </div>
         </div>
 
         <section className="ob-hero">
@@ -193,7 +197,7 @@ export function SetupScreen({ initial }: { initial: OrgState }) {
               <>
                 <Spinner /> Saving…
               </>
-            ) : hasSaved ? "Save changes" : "Continue to the dashboard"}
+            ) : hasSaved && !isFirstRun ? "Save changes" : "Continue to the dashboard"}
           </button>
           {saveError ? (
             <p className="auth-err" role="alert">

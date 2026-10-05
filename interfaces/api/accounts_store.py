@@ -212,3 +212,9 @@ def save_setup(org_id: str, entity_type: str | None, tools: list[dict[str, Any]]
                     ],
                 )
     return str(org["name"])
+
+
+def set_password_hash(user_id: str, password_hash: str) -> None:
+    """Replace one user's password hash (the demo account, when its password is changed)."""
+    with _connect() as conn:
+        conn.execute("update users set password_hash = %s where id = %s", (password_hash, user_id))

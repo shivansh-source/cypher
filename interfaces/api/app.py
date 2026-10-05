@@ -376,6 +376,11 @@ def create_app() -> Any:
     app.get("/chat/tools", response_model=list[ToolDescription])(chat_tools_route())
     app.delete("/chat/sessions/{session_id}")(delete_session_route())
     register_account_routes(app)
+    # A shared, already-onboarded demo sign-in, when DEMO_ACCOUNT_EMAIL/PASSWORD are set.
+    from interfaces.api.demo_account import register_demo_routes, start_demo_seeding
+
+    register_demo_routes(app)
+    start_demo_seeding()
     register_dashboard_routes(app)
 
     # Signed S3 download links for published snapshots; refuses unless

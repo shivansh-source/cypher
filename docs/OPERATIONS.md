@@ -248,8 +248,17 @@ One-time setup:
    automatically on first use from `interfaces/api/sql/0001_accounts.sql`.
 
 Every API route needs the session token except `/health*`, `/docs`, `/snapshots` (its own
-token) and `/auth/register` / `/auth/login`. With no `AUTH_JWT_SECRET` set, protected routes
+token), `/auth/register` / `/auth/login`, and `/auth/demo`. With no `AUTH_JWT_SECRET` set, protected routes
 answer 503. `AUTH_DISABLED=1` skips the check for local development only.
+
+Demo sign-in: set `DEMO_ACCOUNT_EMAIL` and `DEMO_ACCOUNT_PASSWORD` (and optionally
+`DEMO_ACCOUNT_ORG`) on the API host. At start-up the API creates that account, already
+onboarded, and `GET /auth/demo` publishes the credentials, which `/login` and `/register`
+show. "Sign in as demo" (`/login`) goes straight to the dashboard; "Sign up as demo"
+(`/register`) goes through tool selection first. Both call `POST /auth/demo/login`, which
+restores the demo organisation's default tools before signing in, so a visitor who changed
+them doesn't change what the next one sees. The password is public by design. Unset either
+variable to turn it off.
 
 Not yet per-organisation: the snapshot store is still one global store, and the saved tool
 selection records the org's estate but does not gate `cypher ingest`. Login has no rate

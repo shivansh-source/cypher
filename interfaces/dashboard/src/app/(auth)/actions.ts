@@ -79,6 +79,29 @@ export async function login(_prev: AuthFormState, form: FormData): Promise<AuthF
   redirect("/");
 }
 
+/**
+ * Signs in as the shared demo account (the API first restores its default tools), then
+ * goes to `destination`. Returns an error message if it can't.
+ */
+async function demoSession(destination: "/" | "/setup?first=1"): Promise<string | null> {
+  const result = await accountCall<TokenResponse>("/auth/demo/login", { method: "POST" });
+  if (!result.ok) {
+    return result.status === 404 ? "The demo account isn't available right now." : result.detail;
+  }
+  await setSessionToken(result.data.token);
+  redirect(destination);
+}
+
+/** "Sign in as demo": straight to the dashboard, with the demo organisation's tools. */
+export async function signInAsDemo(): Promise<string | null> {
+  return demoSession("/");
+}
+
+/** "Sign up as demo": the tool-selection step, starting from the demo organisation's tools. */
+export async function signUpAsDemo(): Promise<string | null> {
+  return demoSession("/setup?first=1");
+}
+
 export async function logout(): Promise<void> {
   await clearSessionToken();
   redirect("/login");

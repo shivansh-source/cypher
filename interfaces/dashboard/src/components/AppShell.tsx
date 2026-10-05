@@ -6,8 +6,6 @@ import { useState, useSyncExternalStore, type CSSProperties, type ReactNode } fr
 import { useAgentPanelOpen, useAgentPanelWidth } from "@/lib/agent-panel-state";
 import { ENTITY_TYPES } from "@/lib/frameworks";
 import { isStandaloneRoute } from "@/lib/route-gate";
-import { LogoutButton } from "@/components/auth/LogoutButton";
-import { logout } from "@/app/(auth)/actions";
 import { AskSurakshaPanel } from "./AskSuraksha";
 import { CypherMark } from "./CypherMark";
 import { Nav } from "./Nav";
@@ -136,9 +134,6 @@ export function AppShell({
         <Nav />
         <div className="side-foot">
           <SnapCard />
-          <form action={logout}>
-            <LogoutButton />
-          </form>
         </div>
       </aside>
       {children}

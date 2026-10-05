@@ -25,7 +25,8 @@ from fastapi import HTTPException, Request
 
 #: Routes that do not need a session token. ``/snapshots`` has its own shared-secret
 #: header (see ``snapshot_links.py``); health probes must work for load balancers;
-#: register and login are how a token is obtained.
+#: register and login are how a token is obtained, and ``/auth/demo`` publishes the
+#: shared demo sign-in (see ``demo_account.py``).
 PUBLIC_PATH_PREFIXES = (
     "/health",
     "/docs",
@@ -34,6 +35,7 @@ PUBLIC_PATH_PREFIXES = (
     "/snapshots",
     "/auth/register",
     "/auth/login",
+    "/auth/demo",
 )
 
 TOKEN_AUDIENCE = "suraksha"
