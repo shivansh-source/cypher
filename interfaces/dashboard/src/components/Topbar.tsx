@@ -11,6 +11,7 @@ const VIEWS: { prefix: string; eyebrow: string; title: string }[] = [
   { prefix: "/investment", eyebrow: "Budget decision", title: "Investment optimization" },
   { prefix: "/compliance", eyebrow: "Governance view", title: "Compliance & frameworks" },
   { prefix: "/data-quality", eyebrow: "Provenance view", title: "Data quality & coverage" },
+  { prefix: "/profile", eyebrow: "Your account", title: "Profile" },
 ];
 
 const OVERVIEW = { eyebrow: "Executive view", title: "Exposure overview" };

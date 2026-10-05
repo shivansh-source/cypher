@@ -165,7 +165,8 @@ def load_account(user_id: str) -> dict[str, Any] | None:
     """The signed-in user's email, organisation and tool selection (one round trip)."""
     with _connect() as conn:
         row = conn.execute(
-            "select u.email, o.name, o.entity_type, o.onboarded_at is not null as onboarded, "
+            "select u.email, u.created_at, o.name, o.entity_type, "
+            "o.onboarded_at is not null as onboarded, "
             "coalesce((select json_agg(json_build_object("
             "'tool_id', t.tool_id, 'is_custom', t.is_custom, "
             "'custom_name', t.custom_name, 'category', t.category) "
@@ -178,6 +179,7 @@ def load_account(user_id: str) -> dict[str, Any] | None:
         return None
     return {
         "email": row["email"],
+        "member_since": row["created_at"].isoformat(),
         "org": {
             "name": row["name"],
             "entity_type": row["entity_type"],

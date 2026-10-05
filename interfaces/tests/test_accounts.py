@@ -66,6 +66,7 @@ def test_register_login_me_setup_flow(client: TestClient) -> None:
 
     me = client.get("/auth/me", headers=_auth(token)).json()
     assert me["email"] == "ops@loanease.in"
+    assert me["member_since"].startswith("20")  # ISO timestamp of registration
     assert me["org"] == {"name": "LoanEase Finance", "entity_type": None, "onboarded": False}
     assert me["tools"] == []
 
