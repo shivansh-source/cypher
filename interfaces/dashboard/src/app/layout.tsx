@@ -3,8 +3,7 @@ import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { DemoBanner } from "@/components/DemoBanner";
-import { SessionHydrator } from "@/components/auth/SessionHydrator";
-import { loadOrgState } from "@/lib/org-repo";
+import { getSessionClaims } from "@/lib/session";
 import { Topbar } from "@/components/Topbar";
 
 const poppins = Poppins({
@@ -26,14 +25,15 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const org = await loadOrgState();
+  // Local token check, no network: the layout renders on every navigation.
+  const claims = await getSessionClaims();
+  const org = claims?.orgName ? { name: claims.orgName, entityType: claims.entityType } : null;
   return (
     <html lang="en" className={`${poppins.variable} ${inter.variable}`} suppressHydrationWarning>
       {/* Extensions (Grammarly, password managers) add attributes to <body> before React loads. */}
       <body suppressHydrationWarning>
-        <SessionHydrator state={org} />
         <DemoBanner />
-        <AppShell>
+        <AppShell org={org}>
           <main>
             <Topbar />
             {children}

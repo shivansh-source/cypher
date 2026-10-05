@@ -226,26 +226,31 @@ done by hand and must be redone:
 | Dashboard dev server returns 500 on every page (Turbopack, Google fonts) | a Turbopack dev-mode font-loader failure on this Windows setup | use `next build && next start` (the production build works and is what Vercel runs) |
 | `git fetch` says "Repository not found" from an automated shell | credentials not available in that shell | fetch/push from your own terminal |
 
-## Accounts and sign-in (Supabase)
+## Accounts and sign-in
 
-Users register on the dashboard (organisation name, email, password), pick their
-tools, then reach the dashboard. Accounts, organisations and tool selections live
-in Supabase Postgres; passwords are held only by Supabase Auth.
+Anyone not signed in lands on `/register` (organisation name, email, password), then
+picks their tools, then reaches the dashboard. Accounts, organisations and tool
+selections live in Postgres. Passwords are stored only as argon2 hashes, and sessions
+are signed, expiring tokens issued by the API (`interfaces/api/auth.py`).
 
 One-time setup:
 
-1. Create a Supabase project. Under **Authentication → Providers → Email**, turn
-   **Confirm email** off (sign-up then logs the user straight in) and set the
-   minimum password length to 10.
-2. Run `infra/supabase/migrations/0001_auth.sql` in the SQL editor (or
-   `supabase db push`). It creates `organizations`, `profiles`, `org_tools`, their
-   row-level-security policies, the sign-up trigger that creates the org, and the
-   `save_org_setup` function.
-3. Dashboard `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   (both public by design).
-4. API `.env`: `SUPABASE_JWT_SECRET` (legacy HS256 projects) or `SUPABASE_URL`
-   (asymmetric signing keys). Server-side only. With neither set, every protected
-   route answers 503; `AUTH_DISABLED=1` skips the check for local development only.
+1. Get a Postgres connection string. Any Postgres works; for a hosted one, create a
+   Supabase project and copy the **Session pooler** string from Project Settings ->
+   Database -> Connection string (URL-encode special characters in the password).
+2. API `.env`: `DATABASE_URL` (that string) and `AUTH_JWT_SECRET` (at least 32 random
+   bytes: `python -c "import secrets; print(secrets.token_urlsafe(48))"`). Both are
+   server-side only; never put them in a `NEXT_PUBLIC_` variable.
+3. Dashboard `.env.local`: set the **same** `AUTH_JWT_SECRET` (server-side only, never `NEXT_PUBLIC_`).
+   The dashboard verifies the session token locally, so routing and the layout make no network call;
+   without it every request asks the API, which costs a database round trip each time.
+4. Start the API. The tables (`organizations`, `users`, `org_tools`) are created
+   automatically on first use from `interfaces/api/sql/0001_accounts.sql`.
 
-Not yet per-organisation: the snapshot store is still one global store, and the
-saved tool selection records the org's estate but does not gate `cypher ingest`.
+Every API route needs the session token except `/health*`, `/docs`, `/snapshots` (its own
+token) and `/auth/register` / `/auth/login`. With no `AUTH_JWT_SECRET` set, protected routes
+answer 503. `AUTH_DISABLED=1` skips the check for local development only.
+
+Not yet per-organisation: the snapshot store is still one global store, and the saved tool
+selection records the org's estate but does not gate `cypher ingest`. Login has no rate
+limiting yet.

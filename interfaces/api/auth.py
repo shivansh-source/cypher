@@ -79,12 +79,28 @@ def _secret() -> str:
     return secret
 
 
-def issue_token(user_id: str, org_id: str) -> str:
-    """A signed session token for ``user_id`` in ``org_id``."""
+def issue_token(
+    user_id: str,
+    org_id: str,
+    org_name: str,
+    entity_type: str | None,
+    onboarded: bool,
+) -> str:
+    """A signed session token for ``user_id`` in ``org_id``.
+
+    Besides identity it carries the few facts the dashboard needs on every
+    request (org name, entity type, whether setup is done), so its request gate
+    can decide where to send a visitor without a database round trip. They are
+    display and routing hints only: the API never treats them as authorisation,
+    and they are refreshed by reissuing the token when they change.
+    """
     now = int(time.time())
     claims = {
         "sub": user_id,
         "org": org_id,
+        "org_name": org_name,
+        "etype": entity_type,
+        "onb": onboarded,
         "aud": TOKEN_AUDIENCE,
         "iat": now,
         "exp": now + TOKEN_LIFETIME_SECONDS,

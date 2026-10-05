@@ -18,7 +18,7 @@
  * its `CORS_ALLOWED_ORIGINS` must include the dashboard's origin.
  */
 
-import { getAccessToken } from "./auth-token";
+import { getAccessToken, invalidateAccessToken } from "./auth-token";
 import { demoResult, demoUnavailable } from "./demo-data";
 import { parseSseFrames } from "./sse";
 import type {
@@ -135,6 +135,8 @@ async function request<T>(
     };
   }
 
+  // A rejected token must not be reused by the next call.
+  if (response.status === 401) invalidateAccessToken();
   if (unavailableStatuses.has(response.status)) {
     const detail = await readDetail(response);
     return {
@@ -359,6 +361,7 @@ export async function streamChat(
     };
   }
 
+  if (response.status === 401) invalidateAccessToken();
   if (CHAT_UNAVAILABLE_STATUSES.has(response.status)) {
     const detail = await readDetail(response);
     return { state: "unavailable", reason: detail ?? `The assistant is not configured (HTTP ${response.status}).` };

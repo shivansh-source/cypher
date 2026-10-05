@@ -97,7 +97,7 @@ export async function saveSetup(payload: SetupPayload): Promise<{ ok: boolean; e
     name: t.id.startsWith("custom:") ? (t.name ?? "").trim().slice(0, 120) : undefined,
     category: t.id.startsWith("custom:") && t.category && CATEGORY_ORDER.includes(t.category) ? t.category : undefined,
   }));
-  const result = await accountCall<{ ok: boolean }>("/org/setup", {
+  const result = await accountCall<{ ok: boolean; token?: string }>("/org/setup", {
     method: "POST",
     body: { entity_type: entity, tools },
     token: await getSessionToken(),
@@ -105,5 +105,8 @@ export async function saveSetup(payload: SetupPayload): Promise<{ ok: boolean; e
   if (!result.ok) {
     return { ok: false, error: result.status === 401 ? "Your session expired. Please sign in again." : result.detail };
   }
+  // The reissued token carries the new entity type and onboarded flag, so the request gate
+  // and layout can read them without a database lookup.
+  if (result.data.token) await setSessionToken(result.data.token);
   return { ok: true };
 }

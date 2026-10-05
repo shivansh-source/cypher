@@ -29,7 +29,7 @@ dependencies = [
     # interfaces/api/auth.py + accounts*.py: session tokens, password hashing, Postgres accounts.
     "PyJWT",
     "argon2-cffi",
-    "psycopg[binary]",
+    "psycopg[binary,pool]",
 ]
 
 [project.scripts]
