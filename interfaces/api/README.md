@@ -14,6 +14,26 @@ Configuration comes from the environment (see the repo-root `.env.example`):
 `CORS_ALLOWED_ORIGINS`, `GROQ_API_KEY`, `GROQ_MODEL`,
 `CHAT_SESSION_TTL_MINUTES`, `CHAT_MAX_SESSIONS`, `CHAT_MAX_TOOL_ITERATIONS`.
 
+## Speed: remembered figures
+
+The read routes (`/exposure`, `/exposure/history`, `/exposure/exceedance`, `/assets`,
+`/attack-graph`, `/frameworks`, `/optimize/plan`) remember their engine output per
+`snapshot_id` in `_engine_cache.py`. That is exact, not approximate: a committed snapshot
+is immutable and content-hashed, and the engine's default seed comes from its content, so a
+remembered figure is the one a fresh run would give, and a new current snapshot gets fresh
+figures. What-if routes (`POST /simulate`, `POST /optimize`) and the chat tools are never
+cached, because they run on modified copies that keep the original `snapshot_id`.
+`_cache_warmer.py` precomputes these whenever the current snapshot changes
+(`ENGINE_CACHE_WARMUP=0` turns it off).
+
+The cache is per process, so `--reload` empties it on every code change. Judge speed
+without it, and against a production dashboard build (`next build && next start`; the
+dev server compiles each page on first visit and never prefetches links):
+
+```
+uvicorn --factory interfaces.api.app:create_app --port 8000 --workers 2
+```
+
 ## The chat assistant
 
 `POST /chat` answers natural-language questions about the infrastructure by

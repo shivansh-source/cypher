@@ -80,6 +80,14 @@ const API_BASE_URL =
  */
 const NO_FIGURE_STATUSES = new Set([404, 409, 501]);
 
+/**
+ * How long one API call may take before it is reported as unreachable. Long
+ * enough for the slowest cold computation (the priority plan, several seconds
+ * of Monte Carlo on a large estate), short enough that a hung API shows an
+ * error instead of freezing navigation. Not a modelling constant.
+ */
+const REQUEST_TIMEOUT_MS = 60_000;
+
 /** The API's own explanation from a FastAPI error body, if it sent one. */
 async function readDetail(response: Response): Promise<string | null> {
   try {
@@ -118,6 +126,7 @@ async function request<T>(
       // the snapshot lifecycle is that the current figure tracks the current
       // committed snapshot.
       cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
         Accept: "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),

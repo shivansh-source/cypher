@@ -36,11 +36,21 @@ from ai.sessions import (
     InMemorySessionStore,
 )
 from ai.tool_registry import execute_tool, tool_specs
+from core.snapshot_store import load_current_snapshot
 from interfaces._dotenv import load_dotenv
-from interfaces.api._http import execution_to_response
+from interfaces.api._engine_cache import ENGINE_CACHE
+from interfaces.api._http import execution_to_response, snapshot_store_path
 from interfaces.api.accounts import register_account_routes
 from interfaces.api.auth import require_user
-from interfaces.api.dashboard_routes import register_dashboard_routes
+from interfaces.api.dashboard_routes import (
+    assets_route,
+    attack_graph_route,
+    exposure_exceedance_route,
+    exposure_history_route,
+    frameworks_route,
+    optimize_plan_route,
+    register_dashboard_routes,
+)
 
 _store: InMemorySessionStore | None = None
 _engine: ChatEngine | None = None
@@ -143,7 +153,22 @@ def get_exposure_route() -> Any:
 
     def handler(scope: str | None = None) -> dict[str, Any]:
         arguments: dict[str, Any] = {"scope": scope} if scope else {}
-        return execution_to_response(execute_tool("get_exposure", arguments))
+
+        def compute() -> dict[str, Any]:
+            return execution_to_response(execute_tool("get_exposure", arguments))
+
+        current = load_current_snapshot(snapshot_store_path())
+        if current is None:
+            return compute()
+        snapshot_id = current["snapshot_id"]
+        # Remembered per committed snapshot (see interfaces.api._engine_cache), but only
+        # when the tool really read that snapshot: a new one committed between the two
+        # reads must not be filed under the old id.
+        return ENGINE_CACHE.get_or_compute(
+            ("exposure", snapshot_id, scope or None),
+            compute,
+            cacheable=lambda result: result.get("snapshot_id") == snapshot_id,
+        )
 
     return handler
 
@@ -358,4 +383,21 @@ def create_app() -> Any:
     from interfaces.api.snapshot_links import register_snapshot_link_routes
 
     register_snapshot_link_routes(app)
+
+    # Precompute what the dashboard's pages read, for each new current snapshot, so the
+    # first visitor after an ingest or sync does not wait on the engine (off with
+    # ENGINE_CACHE_WARMUP=0). Cheapest first; the priority plan takes seconds.
+    from interfaces.api._cache_warmer import start_cache_warmer
+
+    start_cache_warmer(
+        [
+            get_exposure_route(),
+            exposure_exceedance_route(),
+            assets_route(),
+            attack_graph_route(),
+            frameworks_route(),
+            exposure_history_route(),
+            optimize_plan_route(),
+        ]
+    )
     return app
