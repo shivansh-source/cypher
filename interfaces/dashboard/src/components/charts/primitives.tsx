@@ -87,6 +87,8 @@ export function TipRow({
 }
 
 export interface LegendItem {
+  /** React key; defaults to `label`. Set it when two items can share a label. */
+  key?: string;
   label: string;
   colour: string;
   kind?: "area" | "line";
@@ -97,7 +99,7 @@ export function Legend({ items }: { items: LegendItem[] }) {
   return (
     <div className="legend">
       {items.map((item) => (
-        <span key={item.label} title={item.title}>
+        <span key={item.key ?? item.label} title={item.title}>
           <i className={`sw${item.kind === "line" ? " line" : ""}`} style={{ background: item.colour }} />
           {item.label}
         </span>

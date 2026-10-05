@@ -5,6 +5,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8
 
 export interface AccountResponse {
   email: string;
+  /** ISO timestamp the user registered. */
+  member_since: string;
   org: { name: string; entity_type: string | null; onboarded: boolean };
   tools: { tool_id: string; is_custom: boolean; custom_name: string | null; category: string | null }[];
 }

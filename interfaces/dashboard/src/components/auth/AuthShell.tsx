@@ -20,6 +20,11 @@ export function AuthShell({ step, children }: { step?: 1 | 2 | 3; children: Reac
           </div>
           <div className="word">Cypher</div>
         </div>
+        <div className="auth-hero">
+          {/* The product mark: white line art on transparency (public/cypher-mark.png, from cypher.png). */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/cypher-mark.png" alt="Cypher" width={900} height={634} fetchPriority="high" />
+        </div>
         <div className="auth-story">
           <h2>Put a rupee figure on your cyber risk.</h2>
           <ul>
@@ -31,15 +36,6 @@ export function AuthShell({ step, children }: { step?: 1 | 2 | 3; children: Reac
             ))}
           </ul>
         </div>
-        <svg className="auth-orbit" viewBox="0 0 200 200" aria-hidden="true">
-          <circle cx="100" cy="100" r="30" />
-          <circle cx="100" cy="100" r="62" />
-          <circle cx="100" cy="100" r="94" />
-          <circle className="node n1" cx="100" cy="38" r="4" />
-          <circle className="node n2" cx="162" cy="100" r="4" />
-          <circle className="node n3" cx="46" cy="146" r="4" />
-          <circle className="core" cx="100" cy="100" r="7" />
-        </svg>
       </aside>
       <div className="auth-panel">
         <div className="auth-card">

@@ -8,6 +8,8 @@ import type { CustomTool } from "@/lib/tool-selection-state";
 /** What the database holds for the signed-in user's organisation. */
 export interface OrgState {
   email: string;
+  /** ISO timestamp the user registered, when the API reports it. */
+  memberSince: string | null;
   name: string;
   entityType: EntityType | null;
   onboarded: boolean;
@@ -21,9 +23,10 @@ export async function loadOrgState(): Promise<OrgState | null> {
   if (!token) return null;
   const result = await accountCall<AccountResponse>("/auth/me", { token });
   if (!result.ok) return null;
-  const { email, org, tools } = result.data;
+  const { email, member_since, org, tools } = result.data;
   return {
     email,
+    memberSince: member_since ?? null,
     name: org.name,
     entityType: ENTITY_TYPES.find((t) => t.id === org.entity_type)?.id ?? null,
     onboarded: org.onboarded,

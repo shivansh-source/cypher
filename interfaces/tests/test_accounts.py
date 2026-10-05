@@ -66,6 +66,7 @@ def test_register_login_me_setup_flow(client: TestClient) -> None:
 
     me = client.get("/auth/me", headers=_auth(token)).json()
     assert me["email"] == "ops@loanease.in"
+    assert me["member_since"].startswith("20")  # ISO timestamp of registration
     assert me["org"] == {"name": "LoanEase Finance", "entity_type": None, "onboarded": False}
     assert me["tools"] == []
 
@@ -158,3 +159,93 @@ def test_database_not_configured_is_503(monkeypatch: pytest.MonkeyPatch, tmp_pat
         "/auth/register", json={"org_name": "X", "email": "a@b.in", "password": PASSWORD}
     )
     assert response.status_code == 503
+
+
+def test_demo_route_is_404_when_no_demo_account_is_configured(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("DEMO_ACCOUNT_EMAIL", raising=False)
+    monkeypatch.delenv("DEMO_ACCOUNT_PASSWORD", raising=False)
+    assert client.get("/auth/demo").status_code == 404
+
+
+def test_demo_account_is_seeded_onboarded_and_its_password_kept_in_step(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from interfaces.api.demo_account import ensure_demo_account
+
+    monkeypatch.setenv("DEMO_ACCOUNT_EMAIL", "Demo@Cypher-Demo.in")
+    monkeypatch.setenv("DEMO_ACCOUNT_PASSWORD", "Demo-Password-1")
+
+    # Public: the sign-in page reads it before anyone has a token.
+    assert client.get("/auth/demo").json() == {
+        "email": "demo@cypher-demo.in",
+        "password": "Demo-Password-1",
+    }
+
+    assert ensure_demo_account() is True
+    assert ensure_demo_account() is True  # idempotent
+    login = client.post(
+        "/auth/login", json={"email": "demo@cypher-demo.in", "password": "Demo-Password-1"}
+    )
+    assert login.status_code == 200, login.text
+    me = client.get("/auth/me", headers=_auth(login.json()["token"])).json()
+    assert me["org"]["onboarded"] is True  # straight to the dashboard, no setup step
+    assert me["org"]["entity_type"] == "nbfc"
+    assert {t["tool_id"] for t in me["tools"]} >= {"prowler", "wazuh"}
+
+    monkeypatch.setenv("DEMO_ACCOUNT_PASSWORD", "Changed-Password-2")
+    ensure_demo_account()
+    old = client.post(
+        "/auth/login", json={"email": "demo@cypher-demo.in", "password": "Demo-Password-1"}
+    )
+    new = client.post(
+        "/auth/login", json={"email": "demo@cypher-demo.in", "password": "Changed-Password-2"}
+    )
+    assert (old.status_code, new.status_code) == (401, 200)
+
+
+def test_demo_account_needs_both_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    from interfaces.api.demo_account import demo_credentials
+
+    monkeypatch.setenv("DEMO_ACCOUNT_EMAIL", "demo@cypher-demo.in")
+    monkeypatch.setenv("DEMO_ACCOUNT_PASSWORD", "short")
+    assert demo_credentials() is None
+    monkeypatch.delenv("DEMO_ACCOUNT_EMAIL")
+    monkeypatch.setenv("DEMO_ACCOUNT_PASSWORD", "Long-Enough-Password-1")
+    assert demo_credentials() is None
+
+
+def test_demo_login_restores_the_default_tools(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DEMO_ACCOUNT_EMAIL", "demo2@cypher-demo.in")
+    monkeypatch.setenv("DEMO_ACCOUNT_PASSWORD", "Demo-Password-1")
+
+    first = client.post("/auth/demo/login")  # creates the account on first use
+    assert first.status_code == 200, first.text
+    token = first.json()["token"]
+    # An earlier visitor changes the shared demo's tools on the setup page...
+    client.post("/org/setup", headers=_auth(token), json={"entity_type": "bank", "tools": []})
+
+    # ...and the next demo sign-in starts from the demo's own setup again.
+    again = client.post("/auth/demo/login").json()["token"]
+    me = client.get("/auth/me", headers=_auth(again)).json()
+    assert me["org"]["onboarded"] is True
+    assert me["org"]["entity_type"] == "nbfc"
+    assert {t["tool_id"] for t in me["tools"]} == {
+        "greenbone",
+        "prowler",
+        "wazuh",
+        "aws-iam",
+        "nmap",
+        "cmdb",
+    }
+
+
+def test_demo_login_is_404_when_no_demo_account_is_configured(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("DEMO_ACCOUNT_EMAIL", raising=False)
+    monkeypatch.delenv("DEMO_ACCOUNT_PASSWORD", raising=False)
+    assert client.post("/auth/demo/login").status_code == 404

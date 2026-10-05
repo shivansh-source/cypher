@@ -149,11 +149,18 @@ export function ExposureTrendChart({
   const legend: LegendItem[] =
     mode === "scenario"
       ? [
-          ...named.map((c, k) => ({
-            label: contributionLabel(c, assets).title,
-            colour: SERIES_COLOURS[k],
-            title: `${c.description} — ${contributionLabel(c, assets).where}`,
-          })),
+          ...named.map((c, k) => {
+            const { title, where } = contributionLabel(c, assets);
+            // The same CVE open on two assets gives two scenarios with one title: name the
+            // asset too, so the two bands can be told apart.
+            const shared = named.some((other) => other !== c && contributionLabel(other, assets).title === title);
+            return {
+              key: c.scenario_id,
+              label: shared ? `${title} · ${where}` : title,
+              colour: SERIES_COLOURS[k],
+              title: `${c.description} — ${where}`,
+            };
+          }),
           { label: "All other scenarios", colour: "var(--other)" },
         ]
       : [

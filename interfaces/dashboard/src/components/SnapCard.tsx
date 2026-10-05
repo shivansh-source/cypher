@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Spinner } from "./Loader";
 import { fetchQualityGates, fetchSnapshotProvenance, type ApiResult } from "@/lib/api";
 import { formatDate, formatTimestamp, shortSnapshotId } from "@/lib/format";
 import type { GateReport, SnapshotProvenance } from "@/lib/types";
+
+/** How old the card's data may be before a navigation re-fetches it. Not a modelling constant. */
+const REFRESH_AFTER_MS = 15_000;
 
 interface Loaded {
   provenance: ApiResult<SnapshotProvenance>;
@@ -16,25 +19,46 @@ interface Loaded {
 /**
  * The sidebar's "current snapshot" card.
  *
- * Fetched in the browser and re-fetched on every navigation, because the
- * sidebar lives in the root layout, which Next does not re-render between
- * pages — a server-rendered card would keep showing the snapshot that was
- * current when the app first loaded, beside pages computed from a newer one.
+ * Fetched in the browser and re-fetched on navigation, because the sidebar
+ * lives in the root layout, which Next does not re-render between pages — a
+ * server-rendered card would keep showing the snapshot that was current when
+ * the app first loaded, beside pages computed from a newer one. Snapshots
+ * change about once a day, so a navigation within {@link REFRESH_AFTER_MS} of
+ * the last fetch reuses it rather than queueing two more API calls in front
+ * of the page's own; returning to the tab always re-fetches.
  */
 export function SnapCard() {
   const pathname = usePathname();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const fetchedAt = useRef<number | null>(null);
+  const mounted = useRef(true);
 
   useEffect(() => {
-    let cancelled = false;
-    Promise.all([fetchSnapshotProvenance(), fetchQualityGates()]).then(
-      ([provenance, gates]) => {
-        if (!cancelled) setLoaded({ provenance, gates });
-      },
-    );
+    mounted.current = true;
     return () => {
-      cancelled = true;
+      mounted.current = false;
     };
+  }, []);
+
+  useEffect(() => {
+    // A fetch is never cancelled by a later navigation (only by unmounting): one that
+    // skips re-fetching relies on the in-flight result still landing.
+    const load = (force: boolean) => {
+      const now = Date.now();
+      if (!force && fetchedAt.current !== null && now - fetchedAt.current < REFRESH_AFTER_MS) return;
+      fetchedAt.current = now;
+      Promise.all([fetchSnapshotProvenance(), fetchQualityGates()]).then(
+        ([provenance, gates]) => {
+          if (mounted.current) setLoaded({ provenance, gates });
+        },
+      );
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load(true);
+    };
+    load(false);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [pathname]);
 
   return (
