@@ -18,6 +18,7 @@
  * its `CORS_ALLOWED_ORIGINS` must include the dashboard's origin.
  */
 
+import { getAccessToken, invalidateAccessToken } from "./auth-token";
 import { demoResult, demoUnavailable } from "./demo-data";
 import { parseSseFrames } from "./sse";
 import type {
@@ -79,6 +80,14 @@ const API_BASE_URL =
  */
 const NO_FIGURE_STATUSES = new Set([404, 409, 501]);
 
+/**
+ * How long one API call may take before it is reported as unreachable. Long
+ * enough for the slowest cold computation (the priority plan, several seconds
+ * of Monte Carlo on a large estate), short enough that a hung API shows an
+ * error instead of freezing navigation. Not a modelling constant.
+ */
+const REQUEST_TIMEOUT_MS = 60_000;
+
 /** The API's own explanation from a FastAPI error body, if it sent one. */
 async function readDetail(response: Response): Promise<string | null> {
   try {
@@ -109,6 +118,7 @@ async function request<T>(
   unavailableStatuses: ReadonlySet<number> = NO_FIGURE_STATUSES,
 ): Promise<ApiResult<T>> {
   let response: Response;
+  const token = await getAccessToken();
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: init.method ?? "GET",
@@ -116,8 +126,10 @@ async function request<T>(
       // the snapshot lifecycle is that the current figure tracks the current
       // committed snapshot.
       cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
         Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
       },
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
@@ -132,6 +144,8 @@ async function request<T>(
     };
   }
 
+  // A rejected token must not be reused by the next call.
+  if (response.status === 401) invalidateAccessToken();
   if (unavailableStatuses.has(response.status)) {
     const detail = await readDetail(response);
     return {
@@ -334,11 +348,16 @@ export async function streamChat(
   if (DEMO_MODE) return demoUnavailable("the Ask Cypher assistant");
   const path = "/chat/stream";
   let response: Response;
+  const token = await getAccessToken();
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: "POST",
       cache: "no-store",
-      headers: { Accept: "text/event-stream", "Content-Type": "application/json" },
+      headers: {
+        Accept: "text/event-stream",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ message, session_id: sessionId }),
     });
   } catch (cause) {
@@ -351,6 +370,7 @@ export async function streamChat(
     };
   }
 
+  if (response.status === 401) invalidateAccessToken();
   if (CHAT_UNAVAILABLE_STATUSES.has(response.status)) {
     const detail = await readDetail(response);
     return { state: "unavailable", reason: detail ?? `The assistant is not configured (HTTP ${response.status}).` };

@@ -3,7 +3,7 @@ import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { DemoBanner } from "@/components/DemoBanner";
-import { FirstRunGate } from "@/components/FirstRunGate";
+import { getSessionClaims } from "@/lib/session";
 import { Topbar } from "@/components/Topbar";
 
 const poppins = Poppins({
@@ -24,13 +24,16 @@ export const metadata: Metadata = {
     "Rupee-denominated cyber risk (Expected Annual Loss, Value at Risk) derived from security telemetry via Open FAIR and Monte Carlo simulation.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Local token check, no network: the layout renders on every navigation.
+  const claims = await getSessionClaims();
+  const org = claims?.orgName ? { name: claims.orgName, entityType: claims.entityType } : null;
   return (
-    <html lang="en" className={`${poppins.variable} ${inter.variable}`}>
-      <body>
-        <FirstRunGate />
+    <html lang="en" className={`${poppins.variable} ${inter.variable}`} suppressHydrationWarning>
+      {/* Extensions (Grammarly, password managers) add attributes to <body> before React loads. */}
+      <body suppressHydrationWarning>
         <DemoBanner />
-        <AppShell>
+        <AppShell org={org}>
           <main>
             <Topbar />
             {children}

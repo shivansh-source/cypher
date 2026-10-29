@@ -225,3 +225,41 @@ done by hand and must be redone:
 | 5 `ai/` tests fail locally | a real `data/snapshots/` exists and the tests expect none | run with `SNAPSHOT_STORE_PATH=<empty dir>` |
 | Dashboard dev server returns 500 on every page (Turbopack, Google fonts) | a Turbopack dev-mode font-loader failure on this Windows setup | use `next build && next start` (the production build works and is what Vercel runs) |
 | `git fetch` says "Repository not found" from an automated shell | credentials not available in that shell | fetch/push from your own terminal |
+
+## Accounts and sign-in
+
+Anyone not signed in lands on `/register` (organisation name, email, password), then
+picks their tools, then reaches the dashboard. Accounts, organisations and tool
+selections live in Postgres. Passwords are stored only as argon2 hashes, and sessions
+are signed, expiring tokens issued by the API (`interfaces/api/auth.py`).
+
+One-time setup:
+
+1. Get a Postgres connection string. Any Postgres works; for a hosted one, create a
+   Supabase project and copy the **Session pooler** string from Project Settings ->
+   Database -> Connection string (URL-encode special characters in the password).
+2. API `.env`: `DATABASE_URL` (that string) and `AUTH_JWT_SECRET` (at least 32 random
+   bytes: `python -c "import secrets; print(secrets.token_urlsafe(48))"`). Both are
+   server-side only; never put them in a `NEXT_PUBLIC_` variable.
+3. Dashboard `.env.local`: set the **same** `AUTH_JWT_SECRET` (server-side only, never `NEXT_PUBLIC_`).
+   The dashboard verifies the session token locally, so routing and the layout make no network call;
+   without it every request asks the API, which costs a database round trip each time.
+4. Start the API. The tables (`organizations`, `users`, `org_tools`) are created
+   automatically on first use from `interfaces/api/sql/0001_accounts.sql`.
+
+Every API route needs the session token except `/health*`, `/docs`, `/snapshots` (its own
+token), `/auth/register` / `/auth/login`, and `/auth/demo`. With no `AUTH_JWT_SECRET` set, protected routes
+answer 503. `AUTH_DISABLED=1` skips the check for local development only.
+
+Demo sign-in: set `DEMO_ACCOUNT_EMAIL` and `DEMO_ACCOUNT_PASSWORD` (and optionally
+`DEMO_ACCOUNT_ORG`) on the API host. At start-up the API creates that account, already
+onboarded, and `GET /auth/demo` publishes the credentials, which `/login` and `/register`
+show. "Sign in as demo" (`/login`) goes straight to the dashboard; "Sign up as demo"
+(`/register`) goes through tool selection first. Both call `POST /auth/demo/login`, which
+restores the demo organisation's default tools before signing in, so a visitor who changed
+them doesn't change what the next one sees. The password is public by design. Unset either
+variable to turn it off.
+
+Not yet per-organisation: the snapshot store is still one global store, and the saved tool
+selection records the org's estate but does not gate `cypher ingest`. Login has no rate
+limiting yet.

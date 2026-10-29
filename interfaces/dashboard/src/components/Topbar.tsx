@@ -1,7 +1,9 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { isStandaloneRoute } from "@/lib/route-gate";
 import { AskSurakshaTrigger } from "./AskSuraksha";
+import { LogoutButton } from "./auth/LogoutButton";
 
 const VIEWS: { prefix: string; eyebrow: string; title: string }[] = [
   { prefix: "/assets", eyebrow: "Technical view", title: "Assets & findings" },
@@ -9,15 +11,16 @@ const VIEWS: { prefix: string; eyebrow: string; title: string }[] = [
   { prefix: "/investment", eyebrow: "Budget decision", title: "Investment optimization" },
   { prefix: "/compliance", eyebrow: "Governance view", title: "Compliance & frameworks" },
   { prefix: "/data-quality", eyebrow: "Provenance view", title: "Data quality & coverage" },
+  { prefix: "/profile", eyebrow: "Your account", title: "Profile" },
 ];
 
 const OVERVIEW = { eyebrow: "Executive view", title: "Exposure overview" };
 
-/** Page eyebrow and title for the current route, and the Ask Cypher entry point. */
+/** Page eyebrow and title for the current route, the Ask Cypher entry point, and sign-out. */
 export function Topbar() {
   const pathname = usePathname();
   // The tool selector is a standalone page with its own header (see AppShell's STANDALONE_ROUTES).
-  if (pathname.startsWith("/setup")) return null;
+  if (isStandaloneRoute(pathname)) return null;
   const view = VIEWS.find((v) => pathname.startsWith(v.prefix)) ?? OVERVIEW;
   return (
     <header className="topbar">
@@ -25,7 +28,10 @@ export function Topbar() {
         <div className="eyebrow">{view.eyebrow}</div>
         <h1>{view.title}</h1>
       </div>
-      <AskSurakshaTrigger />
+      <div className="topbar-actions">
+        <AskSurakshaTrigger />
+        <LogoutButton />
+      </div>
     </header>
   );
 }

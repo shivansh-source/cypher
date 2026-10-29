@@ -99,6 +99,8 @@ function evidenceSummary(refs: string[], evidence: EvidenceIndex | null): string
 export default async function CompliancePage(props: PageProps<"/compliance">) {
   const params = await props.searchParams;
   const requested = Array.isArray(params.framework) ? params.framework[0] : params.framework;
+  // Started now, not after the framework list: it doesn't depend on it.
+  const assetsRequest = fetchAssets();
   const frameworks = await fetchFrameworks();
 
   if (frameworks.state !== "ok") {
@@ -121,7 +123,7 @@ export default async function CompliancePage(props: PageProps<"/compliance">) {
   }
   const [statuses, assets] = await Promise.all([
     Promise.all(libraries.map((l) => fetchFrameworkStatus(l.framework))),
-    fetchAssets(),
+    assetsRequest,
   ]);
   const selectedIndex = Math.max(
     0,
