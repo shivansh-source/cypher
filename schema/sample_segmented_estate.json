@@ -1,0 +1,1104 @@
+{
+  "snapshot_id": "sha256:23bee7009431ad9157a178930645d3d94a1208118417e0bfcb7e74e0289bdf82",
+  "observed_at": "2026-09-29T06:00:00Z",
+  "valid_from": "2026-09-29T06:00:00Z",
+  "valid_to": null,
+  "scan_scope": {
+    "reachable_scanners": [
+      "synthetic_fixture"
+    ],
+    "unreachable_scanners": [],
+    "coverage": []
+  },
+  "services": [
+    {
+      "service_id": "svc-customer-portal",
+      "name": "Customer Loan Portal",
+      "criticality": "high",
+      "backup": {
+        "exists": true,
+        "last_tested_at": "2026-08-20T00:00:00Z",
+        "rpo_hours": 4,
+        "rto_hours": 8,
+        "immutable_copy": false
+      }
+    },
+    {
+      "service_id": "svc-core-lending",
+      "name": "Core Lending System",
+      "criticality": "critical",
+      "backup": {
+        "exists": true,
+        "last_tested_at": "2026-09-05T00:00:00Z",
+        "rpo_hours": 1,
+        "rto_hours": 4,
+        "immutable_copy": true
+      }
+    },
+    {
+      "service_id": "svc-payments",
+      "name": "Payments & Settlement",
+      "criticality": "critical",
+      "backup": {
+        "exists": true,
+        "last_tested_at": null,
+        "rpo_hours": 2,
+        "rto_hours": 6,
+        "immutable_copy": false
+      }
+    },
+    {
+      "service_id": "svc-corp-it",
+      "name": "Corporate IT",
+      "criticality": "medium",
+      "backup": {
+        "exists": false,
+        "last_tested_at": null,
+        "rpo_hours": null,
+        "rto_hours": null,
+        "immutable_copy": null
+      }
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "syn-web-01",
+      "service_ids": [
+        "svc-customer-portal"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0001",
+          "type": "cve",
+          "cve_id": "CVE-2026-00101",
+          "epss_score": 0.91,
+          "kev_listed": true,
+          "criticality": "critical",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-cve-0001"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        },
+        {
+          "finding_id": "syn-finding-0002",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "medium",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-weak-tls-0002"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 1,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": true,
+        "open_ports": [
+          80,
+          443
+        ],
+        "segment_id": "dmz"
+      }
+    },
+    {
+      "asset_id": "syn-web-02",
+      "service_ids": [
+        "svc-customer-portal"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0003",
+          "type": "cve",
+          "cve_id": "CVE-2026-00101",
+          "epss_score": 0.91,
+          "kev_listed": true,
+          "criticality": "critical",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-cve-0003"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 1,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": true,
+        "open_ports": [
+          443
+        ],
+        "segment_id": "dmz"
+      }
+    },
+    {
+      "asset_id": "syn-api-gw-01",
+      "service_ids": [
+        "svc-payments",
+        "svc-customer-portal"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0004",
+          "type": "cve",
+          "cve_id": "CVE-2026-00102",
+          "epss_score": 0.34,
+          "kev_listed": false,
+          "criticality": "high",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-cve-0004"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 1,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": true,
+        "open_ports": [
+          443
+        ],
+        "segment_id": "dmz"
+      }
+    },
+    {
+      "asset_id": "syn-vpn-gw-01",
+      "service_ids": [
+        "svc-corp-it"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0005",
+          "type": "cve",
+          "cve_id": "CVE-2026-00103",
+          "epss_score": 0.62,
+          "kev_listed": true,
+          "criticality": "critical",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-cve-0005"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 2,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": true,
+        "open_ports": [
+          443,
+          1194
+        ],
+        "segment_id": "remote-access"
+      }
+    },
+    {
+      "asset_id": "syn-mail-relay-01",
+      "service_ids": [
+        "svc-corp-it"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0006",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "medium",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-open-relay-0006"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": false,
+        "agent_healthy": null,
+        "detection_rules_active": null,
+        "recent_alerts": null
+      },
+      "identity_access": {
+        "privileged_accounts_count": 1,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": true,
+        "open_ports": [
+          25,
+          443
+        ],
+        "segment_id": "remote-access"
+      }
+    },
+    {
+      "asset_id": "syn-app-01",
+      "service_ids": [
+        "svc-customer-portal",
+        "svc-core-lending"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0007",
+          "type": "cve",
+          "cve_id": "CVE-2026-00101",
+          "epss_score": 0.91,
+          "kev_listed": true,
+          "criticality": "high",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-cve-0007"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 3,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": false,
+        "open_ports": [
+          8443
+        ],
+        "segment_id": "app-tier"
+      }
+    },
+    {
+      "asset_id": "syn-app-02",
+      "service_ids": [
+        "svc-core-lending"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0008",
+          "type": "cve",
+          "cve_id": "CVE-2026-00104",
+          "epss_score": 0.12,
+          "kev_listed": false,
+          "criticality": "high",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-cve-0008"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 1,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": false,
+        "open_ports": [
+          8443
+        ],
+        "segment_id": "app-tier"
+      }
+    },
+    {
+      "asset_id": "syn-auth-01",
+      "service_ids": [
+        "svc-customer-portal",
+        "svc-payments",
+        "svc-core-lending"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0009",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "high",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-admin-no-mfa-0009"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 5,
+        "mfa_enforced": false
+      },
+      "network": {
+        "internet_facing": false,
+        "open_ports": [
+          8443
+        ],
+        "segment_id": "app-tier"
+      }
+    },
+    {
+      "asset_id": "syn-jump-01",
+      "service_ids": [
+        "svc-corp-it"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0010",
+          "type": "cve",
+          "cve_id": "CVE-2026-00105",
+          "epss_score": 0.48,
+          "kev_listed": false,
+          "criticality": "high",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-cve-0010"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        },
+        {
+          "finding_id": "syn-finding-0011",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "high",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-rdp-internal-0011"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 6,
+        "mfa_enforced": false
+      },
+      "network": {
+        "internet_facing": false,
+        "open_ports": [
+          22,
+          3389
+        ],
+        "segment_id": "corp-lan"
+      }
+    },
+    {
+      "asset_id": "syn-ad-01",
+      "service_ids": [
+        "svc-corp-it"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0012",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "high",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-stale-privileged-0012"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 14,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": false,
+        "open_ports": [
+          88,
+          389
+        ],
+        "segment_id": "corp-lan"
+      }
+    },
+    {
+      "asset_id": "syn-fileshare-01",
+      "service_ids": [
+        "svc-corp-it"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0013",
+          "type": "cve",
+          "cve_id": "CVE-2026-00106",
+          "epss_score": 0.71,
+          "kev_listed": true,
+          "criticality": "high",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-cve-0013"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": false,
+        "detection_rules_active": null,
+        "recent_alerts": null
+      },
+      "identity_access": {
+        "privileged_accounts_count": 1,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": false,
+        "open_ports": [
+          445
+        ],
+        "segment_id": "corp-lan"
+      }
+    },
+    {
+      "asset_id": "syn-db-core-01",
+      "service_ids": [
+        "svc-core-lending",
+        "svc-payments"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0014",
+          "type": "cve",
+          "cve_id": "CVE-2026-00107",
+          "epss_score": 0.21,
+          "kev_listed": false,
+          "criticality": "critical",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-cve-0014"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        },
+        {
+          "finding_id": "syn-finding-0015",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "medium",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-superuser-from-app-0015"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 4,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": false,
+        "open_ports": [
+          5432
+        ],
+        "segment_id": "data-tier"
+      }
+    },
+    {
+      "asset_id": "syn-db-replica-01",
+      "service_ids": [
+        "svc-core-lending"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0016",
+          "type": "cve",
+          "cve_id": "CVE-2026-00107",
+          "epss_score": 0.21,
+          "kev_listed": false,
+          "criticality": "critical",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-cve-0016"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": false,
+        "agent_healthy": null,
+        "detection_rules_active": null,
+        "recent_alerts": null
+      },
+      "identity_access": {
+        "privileged_accounts_count": 1,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": false,
+        "open_ports": [
+          5432
+        ],
+        "segment_id": "data-tier"
+      }
+    },
+    {
+      "asset_id": "syn-cache-01",
+      "service_ids": [
+        "svc-customer-portal"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0017",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "high",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-cache-no-auth-0017"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 1,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": false,
+        "open_ports": [
+          6379
+        ],
+        "segment_id": "data-tier"
+      }
+    },
+    {
+      "asset_id": "syn-backup-01",
+      "service_ids": [
+        "svc-core-lending",
+        "svc-payments"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0018",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "medium",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-backup-not-immutable-0018"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        },
+        {
+          "finding_id": "syn-finding-0019",
+          "type": "cve",
+          "cve_id": "CVE-2026-00108",
+          "epss_score": 0.05,
+          "kev_listed": false,
+          "criticality": "medium",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-cve-0019"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 1,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": false,
+        "open_ports": [
+          9000
+        ],
+        "segment_id": "backup-net"
+      }
+    },
+    {
+      "asset_id": "syn-vault-01",
+      "service_ids": [
+        "svc-payments"
+      ],
+      "findings": [],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": true,
+        "agent_healthy": true,
+        "detection_rules_active": [
+          "synthetic-rule-generic"
+        ],
+        "recent_alerts": []
+      },
+      "identity_access": {
+        "privileged_accounts_count": 2,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": false,
+        "open_ports": [
+          8200
+        ],
+        "segment_id": "backup-net"
+      }
+    },
+    {
+      "asset_id": "syn-iam-role-ops",
+      "service_ids": [
+        "svc-core-lending",
+        "svc-payments"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0020",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "critical",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-admin-policy-0020"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": false,
+        "agent_healthy": null,
+        "detection_rules_active": null,
+        "recent_alerts": null
+      },
+      "identity_access": {
+        "privileged_accounts_count": 3,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": null,
+        "open_ports": null,
+        "segment_id": null
+      }
+    },
+    {
+      "asset_id": "syn-s3-audit-logs",
+      "service_ids": [
+        "svc-core-lending"
+      ],
+      "findings": [
+        {
+          "finding_id": "syn-finding-0021",
+          "type": "misconfiguration",
+          "cve_id": null,
+          "epss_score": null,
+          "kev_listed": null,
+          "criticality": "low",
+          "provenance": {
+            "connector": "synthetic_fixture",
+            "raw_source_id": "synthetic-versioning-off-0021"
+          },
+          "first_seen_at": "2026-08-15T00:00:00Z",
+          "remediated_at": null
+        }
+      ],
+      "threat_intel": {},
+      "edr": {
+        "agent_installed": false,
+        "agent_healthy": null,
+        "detection_rules_active": null,
+        "recent_alerts": null
+      },
+      "identity_access": {
+        "privileged_accounts_count": 0,
+        "mfa_enforced": true
+      },
+      "network": {
+        "internet_facing": null,
+        "open_ports": null,
+        "segment_id": null
+      }
+    }
+  ],
+  "network_topology": {
+    "segments": [
+      {
+        "segment_id": "dmz",
+        "name": "dmz"
+      },
+      {
+        "segment_id": "remote-access",
+        "name": "remote-access"
+      },
+      {
+        "segment_id": "app-tier",
+        "name": "app-tier"
+      },
+      {
+        "segment_id": "corp-lan",
+        "name": "corp-lan"
+      },
+      {
+        "segment_id": "data-tier",
+        "name": "data-tier"
+      },
+      {
+        "segment_id": "backup-net",
+        "name": "backup-net"
+      }
+    ],
+    "segment_reachability": [
+      {
+        "from_segment_id": "dmz",
+        "to_segment_id": "app-tier"
+      },
+      {
+        "from_segment_id": "remote-access",
+        "to_segment_id": "corp-lan"
+      },
+      {
+        "from_segment_id": "app-tier",
+        "to_segment_id": "data-tier"
+      },
+      {
+        "from_segment_id": "corp-lan",
+        "to_segment_id": "data-tier"
+      },
+      {
+        "from_segment_id": "data-tier",
+        "to_segment_id": "backup-net"
+      }
+    ]
+  },
+  "endpoints": [
+    {
+      "endpoint_id": "syn-endpoint-0001",
+      "address_type": "ipv4",
+      "address": "192.0.2.10",
+      "resolved_asset_id": "syn-web-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0002",
+      "address_type": "hostname",
+      "address": "syn-web-01.example.invalid",
+      "resolved_asset_id": "syn-web-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0003",
+      "address_type": "ipv4",
+      "address": "192.0.2.11",
+      "resolved_asset_id": "syn-web-02"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0004",
+      "address_type": "hostname",
+      "address": "syn-web-02.example.invalid",
+      "resolved_asset_id": "syn-web-02"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0005",
+      "address_type": "ipv4",
+      "address": "192.0.2.12",
+      "resolved_asset_id": "syn-api-gw-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0006",
+      "address_type": "hostname",
+      "address": "syn-api-gw-01.example.invalid",
+      "resolved_asset_id": "syn-api-gw-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0007",
+      "address_type": "ipv4",
+      "address": "192.0.2.13",
+      "resolved_asset_id": "syn-vpn-gw-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0008",
+      "address_type": "hostname",
+      "address": "syn-vpn-gw-01.example.invalid",
+      "resolved_asset_id": "syn-vpn-gw-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0009",
+      "address_type": "ipv4",
+      "address": "192.0.2.14",
+      "resolved_asset_id": "syn-mail-relay-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0010",
+      "address_type": "hostname",
+      "address": "syn-mail-relay-01.example.invalid",
+      "resolved_asset_id": "syn-mail-relay-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0011",
+      "address_type": "ipv4",
+      "address": "192.0.2.15",
+      "resolved_asset_id": "syn-app-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0012",
+      "address_type": "hostname",
+      "address": "syn-app-01.example.invalid",
+      "resolved_asset_id": "syn-app-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0013",
+      "address_type": "ipv4",
+      "address": "192.0.2.16",
+      "resolved_asset_id": "syn-app-02"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0014",
+      "address_type": "hostname",
+      "address": "syn-app-02.example.invalid",
+      "resolved_asset_id": "syn-app-02"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0015",
+      "address_type": "ipv4",
+      "address": "192.0.2.17",
+      "resolved_asset_id": "syn-auth-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0016",
+      "address_type": "hostname",
+      "address": "syn-auth-01.example.invalid",
+      "resolved_asset_id": "syn-auth-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0017",
+      "address_type": "ipv4",
+      "address": "192.0.2.18",
+      "resolved_asset_id": "syn-jump-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0018",
+      "address_type": "hostname",
+      "address": "syn-jump-01.example.invalid",
+      "resolved_asset_id": "syn-jump-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0019",
+      "address_type": "ipv4",
+      "address": "192.0.2.19",
+      "resolved_asset_id": "syn-ad-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0020",
+      "address_type": "hostname",
+      "address": "syn-ad-01.example.invalid",
+      "resolved_asset_id": "syn-ad-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0021",
+      "address_type": "ipv4",
+      "address": "192.0.2.20",
+      "resolved_asset_id": "syn-fileshare-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0022",
+      "address_type": "hostname",
+      "address": "syn-fileshare-01.example.invalid",
+      "resolved_asset_id": "syn-fileshare-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0023",
+      "address_type": "ipv4",
+      "address": "192.0.2.21",
+      "resolved_asset_id": "syn-db-core-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0024",
+      "address_type": "hostname",
+      "address": "syn-db-core-01.example.invalid",
+      "resolved_asset_id": "syn-db-core-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0025",
+      "address_type": "ipv4",
+      "address": "192.0.2.22",
+      "resolved_asset_id": "syn-db-replica-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0026",
+      "address_type": "hostname",
+      "address": "syn-db-replica-01.example.invalid",
+      "resolved_asset_id": "syn-db-replica-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0027",
+      "address_type": "ipv4",
+      "address": "192.0.2.23",
+      "resolved_asset_id": "syn-cache-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0028",
+      "address_type": "hostname",
+      "address": "syn-cache-01.example.invalid",
+      "resolved_asset_id": "syn-cache-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0029",
+      "address_type": "ipv4",
+      "address": "192.0.2.24",
+      "resolved_asset_id": "syn-backup-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0030",
+      "address_type": "hostname",
+      "address": "syn-backup-01.example.invalid",
+      "resolved_asset_id": "syn-backup-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0031",
+      "address_type": "ipv4",
+      "address": "192.0.2.25",
+      "resolved_asset_id": "syn-vault-01"
+    },
+    {
+      "endpoint_id": "syn-endpoint-0032",
+      "address_type": "hostname",
+      "address": "syn-vault-01.example.invalid",
+      "resolved_asset_id": "syn-vault-01"
+    }
+  ]
+}
