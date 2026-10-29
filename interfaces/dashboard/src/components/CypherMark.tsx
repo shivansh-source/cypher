@@ -1,41 +1,35 @@
 /**
- * The mark's strokes on a 24-unit grid, for embedding inside another SVG
- * (the setup screen's telemetry map). Inherits stroke styling from its parent.
+ * Cypher's brand mark: the wide-brimmed, masked figure from the product logo
+ * (repo-root `cypher.png`). `public/cypher-mark-small.png` is that artwork's line
+ * work with the strokes thickened so it still reads at 16-34px, white on
+ * transparency; it is used here only as a mask, so the mark is drawn in
+ * `currentColor` and follows the theme like any icon. The full-detail version
+ * is `public/cypher-mark.png` (the sign-in and register pages).
+ */
+const MARK_SRC = "/cypher-mark-small.png";
+
+/** Width / height of the mark artwork. */
+const MARK_ASPECT = 256 / 180;
+
+/**
+ * The mark for embedding inside another 24-unit SVG (the setup screen's
+ * telemetry map). Filled with the parent's `color`.
  */
 export function CypherMarkShapes() {
+  const height = 24 / MARK_ASPECT;
   return (
     <>
-      <circle cx="12" cy="3.9" r="1.5" />
-      <path d="M8.9 9.6l1.2-3.1h3.8l1.2 3.1" />
-      <path d="M1.8 11.4l7-1.8h6.4l7 1.8-10.2 2.9z" />
-      <path d="M8.7 13.6v3.9l2.9 3h2.7l2.4-2.8.6-5" />
-      <circle cx="14" cy="16" r="1.1" />
+      <defs>
+        <mask id="cypher-mark-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+          <image href={MARK_SRC} x="0" y={(24 - height) / 2} width="24" height={height} />
+        </mask>
+      </defs>
+      <rect width="24" height="24" fill="currentColor" stroke="none" mask="url(#cypher-mark-mask)" />
     </>
   );
 }
 
-/**
- * Cypher's small brand mark: the wide-brimmed, masked figure from the full
- * logo (`public/cypher-logo.svg`), redrawn as an outline icon in the same style as the
- * nav icons (24-unit grid, 1.7 stroke, round caps and joins) so it sits with
- * them and still reads at 16-34px.
- *
- * Drawn in `currentColor` with no fill; the parent sets the colour and size.
- */
+/** The mark as an inline element; the parent sets its colour (`color`) and width. */
 export function CypherMark({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <CypherMarkShapes />
-    </svg>
-  );
+  return <span className={`cypher-mark${className ? ` ${className}` : ""}`} aria-hidden="true" />;
 }

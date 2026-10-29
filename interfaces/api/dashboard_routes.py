@@ -8,8 +8,12 @@ LLM of its own — the only arithmetic here is counting findings and joining
 engine outputs to the snapshot records they describe.
 
 Each rupee figure in a response comes from a call into ``core.engine`` or
-``core.optimizer`` made while handling that request, so it always tracks
-the current committed snapshot rather than a cached or remembered one.
+``core.optimizer`` on the current committed snapshot. The read routes
+remember that output by ``snapshot_id`` (``interfaces.api._engine_cache``):
+a committed snapshot is immutable and content-hashed and the engine's
+default seed comes from its content, so the remembered figure is exactly
+the one a fresh run would produce, and a new current snapshot always gets
+freshly computed figures.
 """
 
 from __future__ import annotations
@@ -18,7 +22,7 @@ import ast
 import inspect
 import re
 from dataclasses import asdict
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +37,7 @@ from core.engine import (
     expected_annual_loss_by_asset,
     parameterize_scenario,
 )
-from core.engine.attack_graph import build_attack_graph
+from core.engine.attack_graph import GraphReachability, build_attack_graph
 from core.engine.attack_graph_inference import (
     compute_compromise_probabilities,
     compute_graph_reachability,
@@ -54,6 +58,7 @@ from core.snapshot_store import (
     load_snapshot_history,
 )
 from governance.library_loader import load_all_control_libraries
+from interfaces.api._engine_cache import ENGINE_CACHE
 from interfaces.api._http import (
     NO_SNAPSHOT_DETAIL,
     current_snapshot_or_404,
@@ -73,13 +78,6 @@ _MAX_CANDIDATE_CONTROLS = 500
 #: guard (each step costs Monte Carlo runs), not a modelling constant; the
 #: response says when more steps would still reduce loss.
 _MAX_PLAN_STEPS = 12
-
-#: Priority plans already computed, by snapshot_id. A committed snapshot is
-#: immutable and content-hashed (principle 5) and the assumptions are fixed
-#: for the life of the process, so a plan for a given snapshot_id never
-#: changes; only the most recent few are kept.
-_PLAN_CACHE: dict[str, dict[str, Any]] = {}
-_PLAN_CACHE_SIZE = 4
 
 #: Scenario fields ``core.engine.parameterize_scenario`` adds that the
 #: dashboard shows as an asset's FAIR parameters. The raw ``finding`` and
@@ -224,13 +222,34 @@ def exposure_history_route() -> Any:
                 {
                     "snapshot_id": snapshot["snapshot_id"],
                     "observed_at": snapshot["observed_at"],
-                    "risk_figure": asdict(compute_risk_figure(snapshot)),
+                    "risk_figure": risk_figure_dict(snapshot),
                 }
                 for snapshot in history
             ]
         }
 
     return handler
+
+
+def risk_figure_dict(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """``compute_risk_figure`` on a committed snapshot, as JSON, once per ``snapshot_id``.
+
+    Must never be called with anything but a snapshot loaded from the
+    store: a modified copy keeping the same ``snapshot_id`` would be served
+    the original's figure.
+    """
+    return ENGINE_CACHE.get_or_compute(
+        ("risk_figure", snapshot["snapshot_id"]),
+        lambda: asdict(compute_risk_figure(snapshot)),
+    )
+
+
+def _graph_reachability(snapshot: dict[str, Any]) -> dict[str, GraphReachability]:
+    """``compute_graph_reachability`` (default seed) on a committed snapshot, once per id."""
+    return ENGINE_CACHE.get_or_compute(
+        ("graph_reachability", snapshot["snapshot_id"]),
+        lambda: compute_graph_reachability(snapshot),
+    )
 
 
 def exposure_exceedance_route() -> Any:
@@ -241,7 +260,11 @@ def exposure_exceedance_route() -> Any:
     """
 
     def handler() -> dict[str, Any]:
-        return asdict(compute_loss_exceedance_curve(current_snapshot_or_404()))
+        snapshot = current_snapshot_or_404()
+        return ENGINE_CACHE.get_or_compute(
+            ("exceedance", snapshot["snapshot_id"]),
+            lambda: asdict(compute_loss_exceedance_curve(snapshot)),
+        )
 
     return handler
 
@@ -260,63 +283,71 @@ def assets_route() -> Any:
 
     def handler() -> dict[str, Any]:
         snapshot = current_snapshot_or_404()
-        figure = compute_risk_figure(snapshot)
-        contribution_by_scenario = {c.scenario_id: c for c in figure.top_contributors}
-        asset_eal = expected_annual_loss_by_asset(figure)
-        # The same reachability compute_risk_figure applied (same snapshot,
-        # same default seed), so the parameters shown are the ones that
-        # produced each figure rather than the pre-graph ones.
-        graph_reachability = compute_graph_reachability(snapshot)
-        scenario_by_finding: dict[tuple[str, str], dict[str, Any]] = {}
-        for scenario in build_loss_event_scenarios(snapshot):
-            parameterized = parameterize_scenario(
-                scenario, snapshot, graph_reachability=graph_reachability
-            )
-            contribution = contribution_by_scenario[parameterized["scenario_id"]]
-            scenario_by_finding[(scenario["asset_id"], scenario["finding"]["finding_id"])] = {
-                **{key: parameterized[key] for key in _SCENARIO_PARAMETER_FIELDS},
-                "expected_annual_loss_inr": contribution.expected_annual_loss_inr,
-            }
-
-        services_by_id = {s["service_id"]: s for s in snapshot.get("services", [])}
-        assets: list[dict[str, Any]] = []
-        for asset in snapshot["assets"]:
-            service_ids: list[str] = asset.get("service_ids", [])
-            assets.append(
-                {
-                    "asset_id": asset["asset_id"],
-                    "service_ids": service_ids,
-                    "services": [services_by_id[s] for s in service_ids if s in services_by_id],
-                    "unresolved_service_ids": [s for s in service_ids if s not in services_by_id],
-                    "network": asset.get("network"),
-                    "edr": asset.get("edr"),
-                    "identity_access": asset.get("identity_access"),
-                    "expected_annual_loss_inr": asset_eal.get(asset["asset_id"]),
-                    "findings": [
-                        {
-                            # Schema-optional keys made explicit, so an absent
-                            # remediated_at reads as open — exactly as the engine
-                            # (``.get(...) is None``) reads it.
-                            **dict.fromkeys(_OPTIONAL_FINDING_FIELDS),
-                            **finding,
-                            "scenario": scenario_by_finding.get(
-                                (asset["asset_id"], finding["finding_id"])
-                            ),
-                        }
-                        for finding in asset["findings"]
-                    ],
-                }
-            )
-
-        return {
-            "snapshot_id": figure.snapshot_id,
-            "observed_at": snapshot["observed_at"],
-            "monte_carlo_iterations": figure.monte_carlo_iterations,
-            "expected_annual_loss_inr": figure.expected_annual_loss_inr,
-            "assets": assets,
-        }
+        return ENGINE_CACHE.get_or_compute(
+            ("assets", snapshot["snapshot_id"]), lambda: _assets_response(snapshot)
+        )
 
     return handler
+
+
+def _assets_response(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """The body of ``GET /assets`` for one committed snapshot (see :func:`assets_route`)."""
+    figure = compute_risk_figure(snapshot)
+    contribution_by_scenario = {c.scenario_id: c for c in figure.top_contributors}
+    asset_eal = expected_annual_loss_by_asset(figure)
+    # The same reachability compute_risk_figure applied (same snapshot,
+    # same default seed), so the parameters shown are the ones that
+    # produced each figure rather than the pre-graph ones. Remembered,
+    # so /attack-graph and later /assets calls reuse it.
+    graph_reachability = _graph_reachability(snapshot)
+    scenario_by_finding: dict[tuple[str, str], dict[str, Any]] = {}
+    for scenario in build_loss_event_scenarios(snapshot):
+        parameterized = parameterize_scenario(
+            scenario, snapshot, graph_reachability=graph_reachability
+        )
+        contribution = contribution_by_scenario[parameterized["scenario_id"]]
+        scenario_by_finding[(scenario["asset_id"], scenario["finding"]["finding_id"])] = {
+            **{key: parameterized[key] for key in _SCENARIO_PARAMETER_FIELDS},
+            "expected_annual_loss_inr": contribution.expected_annual_loss_inr,
+        }
+
+    services_by_id = {s["service_id"]: s for s in snapshot.get("services", [])}
+    assets: list[dict[str, Any]] = []
+    for asset in snapshot["assets"]:
+        service_ids: list[str] = asset.get("service_ids", [])
+        assets.append(
+            {
+                "asset_id": asset["asset_id"],
+                "service_ids": service_ids,
+                "services": [services_by_id[s] for s in service_ids if s in services_by_id],
+                "unresolved_service_ids": [s for s in service_ids if s not in services_by_id],
+                "network": asset.get("network"),
+                "edr": asset.get("edr"),
+                "identity_access": asset.get("identity_access"),
+                "expected_annual_loss_inr": asset_eal.get(asset["asset_id"]),
+                "findings": [
+                    {
+                        # Schema-optional keys made explicit, so an absent
+                        # remediated_at reads as open — exactly as the engine
+                        # (``.get(...) is None``) reads it.
+                        **dict.fromkeys(_OPTIONAL_FINDING_FIELDS),
+                        **finding,
+                        "scenario": scenario_by_finding.get(
+                            (asset["asset_id"], finding["finding_id"])
+                        ),
+                    }
+                    for finding in asset["findings"]
+                ],
+            }
+        )
+
+    return {
+        "snapshot_id": figure.snapshot_id,
+        "observed_at": snapshot["observed_at"],
+        "monte_carlo_iterations": figure.monte_carlo_iterations,
+        "expected_annual_loss_inr": figure.expected_annual_loss_inr,
+        "assets": assets,
+    }
 
 
 def frameworks_route() -> Any:
@@ -328,21 +359,35 @@ def frameworks_route() -> Any:
     """
 
     def handler() -> list[dict[str, Any]]:
-        libraries = load_all_control_libraries(_CONTROL_LIBRARY_DIR, datetime.now(UTC).date())
-        return [
-            {
-                "framework": library.framework,
-                "version": library.version,
-                "effective_from": library.effective_from,
-                "effective_to": library.effective_to,
-                "supersedes": library.supersedes,
-                "control_count": len(library.controls),
-                "penalty_provisions": [asdict(p) for p in library.penalty_provisions],
-            }
-            for library in libraries.values()
-        ]
+        today = datetime.now(UTC).date()
+        # Which library is in force depends only on the date and the YAML files,
+        # so re-parse only when either changes.
+        files = tuple(
+            (path.name, path.stat().st_mtime_ns)
+            for path in sorted(_CONTROL_LIBRARY_DIR.glob("*.yaml"))
+        )
+        return ENGINE_CACHE.get_or_compute(
+            ("frameworks", today, files), lambda: _frameworks_response(today)
+        )
 
     return handler
+
+
+def _frameworks_response(as_of: date) -> list[dict[str, Any]]:
+    """The body of ``GET /frameworks`` for one as-of date (see :func:`frameworks_route`)."""
+    libraries = load_all_control_libraries(_CONTROL_LIBRARY_DIR, as_of)
+    return [
+        {
+            "framework": library.framework,
+            "version": library.version,
+            "effective_from": library.effective_from,
+            "effective_to": library.effective_to,
+            "supersedes": library.supersedes,
+            "control_count": len(library.controls),
+            "penalty_provisions": [asdict(p) for p in library.penalty_provisions],
+        }
+        for library in libraries.values()
+    ]
 
 
 def framework_status_route() -> Any:
@@ -402,18 +447,17 @@ def optimize_plan_route() -> Any:
 
     def handler() -> dict[str, Any]:
         snapshot = current_snapshot_or_404()
-        snapshot_id = snapshot["snapshot_id"]
-        cached = _PLAN_CACHE.get(snapshot_id)
-        if cached is not None:
-            return cached
-        plan = prioritize_controls(snapshot, find_control_gaps(snapshot), max_steps=_MAX_PLAN_STEPS)
-        response = {"snapshot_id": snapshot_id, **asdict(plan)}
-        if len(_PLAN_CACHE) >= _PLAN_CACHE_SIZE:
-            _PLAN_CACHE.pop(next(iter(_PLAN_CACHE)))
-        _PLAN_CACHE[snapshot_id] = response
-        return response
+        return ENGINE_CACHE.get_or_compute(
+            ("plan", snapshot["snapshot_id"]), lambda: _plan_response(snapshot)
+        )
 
     return handler
+
+
+def _plan_response(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """The body of ``GET /optimize/plan`` for one committed snapshot."""
+    plan = prioritize_controls(snapshot, find_control_gaps(snapshot), max_steps=_MAX_PLAN_STEPS)
+    return {"snapshot_id": snapshot["snapshot_id"], **asdict(plan)}
 
 
 def optimize_route() -> Any:
@@ -519,7 +563,7 @@ def attack_graph_route() -> Any:
     def handler() -> dict[str, Any]:
         snapshot = current_snapshot_or_404()
         graph = build_attack_graph(snapshot)
-        reachability = compute_graph_reachability(snapshot)
+        reachability = _graph_reachability(snapshot)
         topology = snapshot.get("network_topology")
 
         declared = topology["segments"] if topology else []
