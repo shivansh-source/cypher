@@ -67,6 +67,37 @@ def test_get_exposure_scope_filters_top_contributors(committed_store: Path) -> N
     assert all(c["asset_id"] == "asset-web-01" for c in result["top_contributors"])
 
 
+def test_get_exposure_truncates_top_contributors_for_a_large_estate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real estate's scenario count can run well past MAX_NARRATED_CONTRIBUTORS; the full,
+    uncapped list is core.engine.RiskFigure's own contract (the dashboard's), so this must stay
+    a get_exposure-only trim, not something core.engine or get_top_contributors also does."""
+    from ai.tools.get_exposure import MAX_NARRATED_CONTRIBUTORS, get_exposure
+    from ai.tools.get_top_contributors import get_top_contributors
+
+    template = SAMPLE_SNAPSHOT["assets"][0]
+    candidate = copy.deepcopy(SAMPLE_SNAPSHOT)
+    candidate["assets"] = [
+        {
+            **copy.deepcopy(template),
+            "asset_id": f"asset-many-{i:02d}",
+            "findings": [{**template["findings"][0], "finding_id": f"finding-many-{i:02d}"}],
+        }
+        for i in range(MAX_NARRATED_CONTRIBUTORS + 5)
+    ]
+    candidate["snapshot_id"] = ""
+    committed = commit_snapshot(candidate, None)
+    save_snapshot(tmp_path, committed)
+    monkeypatch.setenv("SNAPSHOT_STORE_PATH", str(tmp_path))
+
+    result = get_exposure()
+    full = get_top_contributors(limit=MAX_NARRATED_CONTRIBUTORS + 5)
+
+    assert len(full["top_contributors"]) == MAX_NARRATED_CONTRIBUTORS + 5
+    assert len(result["top_contributors"]) == MAX_NARRATED_CONTRIBUTORS
+
+
 def test_get_top_contributors_respects_limit(committed_store: Path) -> None:
     from ai.tools.get_top_contributors import get_top_contributors
 
