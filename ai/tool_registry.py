@@ -217,7 +217,18 @@ def _build_specs() -> dict[str, ToolSpec]:
                             "Optional single asset to scope to. Omit, or pass null, "
                             "to summarize across the whole snapshot."
                         ),
-                    }
+                    },
+                    "limit": {
+                        "type": ["integer", "null"],
+                        "minimum": 1,
+                        "maximum": 50,
+                        "description": (
+                            "When asset_id is omitted, the maximum number of assets to "
+                            "return (total_asset_count in the response reports the real "
+                            "count). Ignored when asset_id is set. Omit, or pass null, "
+                            "for the default."
+                        ),
+                    },
                 },
                 "required": [],
             },
