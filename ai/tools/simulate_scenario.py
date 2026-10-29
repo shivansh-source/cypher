@@ -14,7 +14,17 @@ from dataclasses import asdict
 from typing import Any
 
 from ai.tools._snapshot import current_snapshot_or_unavailable
+from ai.tools.get_exposure import MAX_NARRATED_CONTRIBUTORS
 from core.optimizer import Control, compare_hypothetical
+
+
+def _narrated_risk_figure(risk_figure: Any) -> dict[str, Any]:
+    """A RiskFigure as a dict, with top_contributors capped the same way get_exposure.py
+    caps it — baseline and hypothetical are each a full RiskFigure, so returning both
+    uncapped doubles the same token-budget risk get_exposure already had to fix."""
+    result = asdict(risk_figure)
+    result["top_contributors"] = result["top_contributors"][:MAX_NARRATED_CONTRIBUTORS]
+    return result
 
 
 def _to_control(raw: dict[str, Any]) -> Control:
@@ -73,8 +83,8 @@ def simulate_scenario(hypothetical_controls: list[dict[str, Any]]) -> dict[str, 
     return {
         "snapshot_id": snapshot["snapshot_id"],
         "hypothetical_controls": [asdict(control) for control in comparison.controls],
-        "baseline": asdict(comparison.baseline_risk_figure),
-        "hypothetical": asdict(comparison.hypothetical_risk_figure),
+        "baseline": _narrated_risk_figure(comparison.baseline_risk_figure),
+        "hypothetical": _narrated_risk_figure(comparison.hypothetical_risk_figure),
         "expected_annual_loss_change_inr": comparison.expected_annual_loss_change_inr,
         "value_at_risk_change_inr": comparison.value_at_risk_change_inr,
     }
