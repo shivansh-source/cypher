@@ -14,6 +14,14 @@ from typing import Any
 from ai.tools._snapshot import current_snapshot_or_unavailable
 from core.engine import compute_risk_figure
 
+#: Same default as get_top_contributors.py's `limit`. core.engine.RiskFigure's
+#: top_contributors is the dashboard's contract and lists every loss-event scenario
+#: uncapped — on an estate with many findings that is large enough, once serialized into
+#: the conversation, to exceed Groq's free-tier tokens-per-minute limit on its own. This
+#: tool only needs enough contributors to narrate what drives the figure; a caller that
+#: wants the full ranked breakdown should use get_top_contributors instead.
+MAX_NARRATED_CONTRIBUTORS = 10
+
 
 def get_exposure(scope: str | None = None) -> dict[str, Any]:
     """Return the current Expected Annual Loss and Value at Risk.
@@ -28,7 +36,9 @@ def get_exposure(scope: str | None = None) -> dict[str, Any]:
         ``core.engine.RiskFigure``, plus the ``snapshot_id`` it was
         computed from, so the caller (``ai/llm_client.py``'s narration
         path) has ground truth to verify against via
-        ``ai.numeric_guard``.
+        ``ai.numeric_guard``. ``top_contributors`` is truncated to
+        ``MAX_NARRATED_CONTRIBUTORS`` (already ranked largest-first by
+        ``core.engine``); use ``get_top_contributors`` for the full breakdown.
 
     Must never:
         Compute or approximate a figure itself — this function's entire
@@ -47,4 +57,5 @@ def get_exposure(scope: str | None = None) -> dict[str, Any]:
             c for c in result["top_contributors"] if c["asset_id"] == scope
         ]
         result["scope"] = scope
+    result["top_contributors"] = result["top_contributors"][:MAX_NARRATED_CONTRIBUTORS]
     return result

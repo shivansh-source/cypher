@@ -90,9 +90,7 @@ def _last_run_time_to_iso8601(value: Any) -> str | None:
     if not isinstance(value, str) or not value:
         return None
     try:
-        # _LAST_RUN_TIME_FORMAT does include %z; ruff's DTZ007 can't see
-        # through the module-level constant to confirm that statically.
-        parsed = datetime.strptime(value, _LAST_RUN_TIME_FORMAT)  # noqa: DTZ007
+        parsed = datetime.strptime(value, _LAST_RUN_TIME_FORMAT)
     except ValueError:
         return value
     return parsed.isoformat()
